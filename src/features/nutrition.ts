@@ -29,6 +29,13 @@ import type { NutritionStrip, Recipe } from "../types";
 const USDA_BASE = "https://api.nal.usda.gov/fdc/v1";
 const API_KEY = (import.meta.env.VITE_USDA_API_KEY as string | undefined) ?? "DEMO_KEY";
 export const USING_DEMO_KEY = API_KEY === "DEMO_KEY";
+/** USDA's rate-limit ceilings. DEMO_KEY is 30/hour/IP; a registered
+ *  signup key is 1000/hour. We can't be 100% sure which tier the user
+ *  is on (the API doesn't tell us until it 429s) — surfacing the DEMO
+ *  ceiling on DEMO_KEY and the registered ceiling otherwise is the
+ *  best static approximation. The Info popover labels this as
+ *  "approximate" so users don't read it as gospel. */
+const USDA_HOURLY_LIMIT = USING_DEMO_KEY ? 30 : 1000;
 const CACHE_PATH = "nutrition-cache.json";
 const SEARCH_CONCURRENCY = 3;
 /** Session-wide rate-limit short-circuit. When this is in the future, USDA
@@ -37,6 +44,58 @@ const SEARCH_CONCURRENCY = 3;
  *  Prevents the user's recipe batch from burning through all 8 ingredients
  *  with a fresh 429 each. */
 let rateLimitedUntil = 0;
+
+/** Sliding-window timestamps (ms) of USDA fetches that actually went out
+ *  to the network this session. Cached lookups don't count (they don't
+ *  consume rate quota). 429s DO count — the request still hit USDA's
+ *  metered endpoint even though it bounced. Trimmed to the last hour on
+ *  every read, so the array stays small. */
+const recentFetchTimestamps: number[] = [];
+const FETCH_WINDOW_MS = 60 * 60 * 1000;
+
+/** Snapshot of USDA quota state for the Info popover. Returned values
+ *  are "approximate" — the real ceiling is enforced server-side and
+ *  shared across other clients on the same IP if the user's on
+ *  DEMO_KEY. The UI labels this caveat. */
+export interface USDAUsageSnapshot {
+  /** Fetches we sent in the last rolling hour. */
+  recentInLastHour: number;
+  /** Approximate per-hour ceiling (30 for DEMO_KEY, 1000 for signup key). */
+  approxLimit: number;
+  /** Approximate remaining. Clamped to 0. */
+  approxRemaining: number;
+  /** True when we've seen a 429 and are short-circuiting. */
+  rateLimited: boolean;
+  /** ms timestamp the rate-limit short-circuit clears at (0 if not active). */
+  rateLimitedUntil: number;
+  /** Are we on DEMO_KEY (vs. a registered key)? Determines the limit + the help copy. */
+  usingDemoKey: boolean;
+}
+
+export function getUSDAUsage(): USDAUsageSnapshot {
+  const now = Date.now();
+  const cutoff = now - FETCH_WINDOW_MS;
+  // Drop expired entries from the front of the array (cheap because
+  // timestamps are appended in order). Splice from the first index
+  // that's still within the window.
+  let firstFresh = 0;
+  while (
+    firstFresh < recentFetchTimestamps.length &&
+    recentFetchTimestamps[firstFresh]! < cutoff
+  ) {
+    firstFresh++;
+  }
+  if (firstFresh > 0) recentFetchTimestamps.splice(0, firstFresh);
+  const recent = recentFetchTimestamps.length;
+  return {
+    recentInLastHour: recent,
+    approxLimit: USDA_HOURLY_LIMIT,
+    approxRemaining: Math.max(0, USDA_HOURLY_LIMIT - recent),
+    rateLimited: rateLimitedUntil > now,
+    rateLimitedUntil,
+    usingDemoKey: USING_DEMO_KEY,
+  };
+}
 
 /** Per-100g macros from USDA. All values are floats; rounding happens at the strip level. */
 interface FoodMacros {
@@ -275,6 +334,11 @@ async function searchUSDA(query: string, signal?: AbortSignal): Promise<USDAFetc
   url.searchParams.set("pageSize", "1");
   url.searchParams.set("dataType", "Foundation,SR Legacy");
   let resp: Response;
+  // Stamp the timestamp BEFORE the await so the count reflects "fetch
+  // attempted" rather than "fetch returned". A user firing many
+  // requests in a tight loop sees the counter climb live, which is
+  // closer to what they care about than "successful responses".
+  recentFetchTimestamps.push(Date.now());
   try {
     resp = await fetch(url.toString(), { signal });
   } catch {

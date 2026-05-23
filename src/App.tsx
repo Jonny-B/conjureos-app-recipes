@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CapturedPhoto, Ingredient, Recipe, Screen } from "./types";
 import { CaptureScreen } from "./screens/CaptureScreen";
 import { IngredientsScreen } from "./screens/IngredientsScreen";
@@ -7,6 +7,7 @@ import { BrowseScreen } from "./screens/BrowseScreen";
 import { identifyIngredients } from "./features/vision";
 import { generateRecipes } from "./features/recipes";
 import { registerActions } from "./bridge/actions";
+import { getUSDAUsage, type USDAUsageSnapshot } from "./features/nutrition";
 
 type Tab = "build" | "browse";
 
@@ -77,6 +78,7 @@ export function App() {
           >
             Saved
           </button>
+          <InfoButton />
         </nav>
       </header>
       <main className="app-body">
@@ -154,6 +156,101 @@ function FullscreenSpinner({ label, sub }: { label: string; sub?: string }) {
       <div className="spinner" />
       <div style={{ fontWeight: 500 }}>{label}</div>
       {sub && <div className="muted" style={{ fontSize: 13 }}>{sub}</div>}
+    </div>
+  );
+}
+
+/**
+ * Small "i" button in the header that opens a popover with: app version,
+ * USDA quota remaining, and a one-line explanation of what the quota is.
+ * Designed to stay out of the way — collapsed by default, opens on
+ * click, closes on outside-click or Escape. Doesn't block any other
+ * interaction in the app.
+ */
+function InfoButton() {
+  const [open, setOpen] = useState(false);
+  const [usage, setUsage] = useState<USDAUsageSnapshot>(() => getUSDAUsage());
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  // Refresh the USDA snapshot every 5s while the popover is open. The
+  // sliding-window count changes over time as old timestamps age out of
+  // the rolling hour — polling beats trying to subscribe to a counter
+  // we don't event-source.
+  useEffect(() => {
+    if (!open) return;
+    setUsage(getUSDAUsage());
+    const t = setInterval(() => setUsage(getUSDAUsage()), 5000);
+    return () => clearInterval(t);
+  }, [open]);
+
+  // Close on outside-click + Escape so the popover doesn't trap focus.
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  // Time remaining until the rate-limit short-circuit clears, if active.
+  // Updated alongside the snapshot poll.
+  const rateLimitClearsIn = usage.rateLimited
+    ? Math.max(0, Math.ceil((usage.rateLimitedUntil - Date.now()) / 60_000))
+    : null;
+
+  return (
+    <div className="info-wrap" ref={wrapRef}>
+      <button
+        type="button"
+        className={`info-btn${open ? " active" : ""}`}
+        onClick={() => setOpen((v) => !v)}
+        aria-label="App info"
+        title="App info"
+        aria-expanded={open}
+      >
+        i
+      </button>
+      {open && (
+        <div className="info-popover" role="dialog" aria-label="App info">
+          <div className="info-row">
+            <span className="info-label">Version</span>
+            <span className="info-value mono">{__APP_VERSION__}</span>
+          </div>
+          <div className="info-divider" />
+          <div className="info-row">
+            <span className="info-label">USDA nutrition</span>
+            <span className="info-value">
+              {usage.usingDemoKey ? "Free shared tier" : "Your own key"}
+            </span>
+          </div>
+          <div className="info-row">
+            <span className="info-label">Used this hour</span>
+            <span className="info-value mono">
+              ~{usage.recentInLastHour} / {usage.approxLimit}
+            </span>
+          </div>
+          {usage.rateLimited ? (
+            <p className="info-help warn">
+              Hit the cap. Nutrition lookups pause for ~{rateLimitClearsIn} min,
+              then resume. Recipes still generate; macros just stay blank.
+            </p>
+          ) : (
+            <p className="info-help">
+              {usage.usingDemoKey
+                ? "Free shared key — ~30 nutrition lookups per hour across everyone on your network. Hit the cap? Recipes still generate; macros stay blank until it clears."
+                : "Your registered key — ~1000 lookups per hour."}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
