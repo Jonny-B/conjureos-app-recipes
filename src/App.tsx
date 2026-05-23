@@ -1,11 +1,12 @@
-import { useCallback, useState } from "react";
-import type { Ingredient, Recipe, Screen } from "./types";
+import { useCallback, useEffect, useState } from "react";
+import type { CapturedPhoto, Ingredient, Recipe, Screen } from "./types";
 import { CaptureScreen } from "./screens/CaptureScreen";
 import { IngredientsScreen } from "./screens/IngredientsScreen";
 import { RecipesScreen } from "./screens/RecipesScreen";
 import { BrowseScreen } from "./screens/BrowseScreen";
 import { identifyIngredients } from "./features/vision";
 import { generateRecipes } from "./features/recipes";
+import { registerActions } from "./bridge/actions";
 
 type Tab = "build" | "browse";
 
@@ -14,17 +15,29 @@ export function App() {
   const [screen, setScreen] = useState<Screen>({ kind: "capture" });
   const [error, setError] = useState<string | null>(null);
 
+  // Register cross-app action handlers once on boot. Other apps (calorie
+  // tracker, meal planner, shopping list, etc.) can invoke these via
+  // window.__conjureos.actions.invoke('/apps/recipes', actionName, params).
+  // Failure to register is non-fatal — the app stays usable, only the
+  // cross-app integrations break.
+  useEffect(() => {
+    registerActions().catch((err) => {
+      // eslint-disable-next-line no-console
+      console.warn("[recipes] action registration failed:", err);
+    });
+  }, []);
+
   const reset = useCallback(() => {
     setScreen({ kind: "capture" });
     setError(null);
   }, []);
 
-  const onPhotoSelected = useCallback(async (photoDataUrl: string) => {
+  const onIdentify = useCallback(async (photos: CapturedPhoto[]) => {
     setError(null);
-    setScreen({ kind: "identifying", photoDataUrl });
+    setScreen({ kind: "identifying", photos });
     try {
-      const ingredients = await identifyIngredients(photoDataUrl);
-      setScreen({ kind: "ingredients", photoDataUrl, ingredients });
+      const ingredients = await identifyIngredients(photos);
+      setScreen({ kind: "ingredients", photos, ingredients });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setScreen({ kind: "capture" });
@@ -32,15 +45,15 @@ export function App() {
   }, []);
 
   const onIngredientsConfirmed = useCallback(
-    async (photoDataUrl: string, ingredients: Ingredient[]) => {
+    async (photos: CapturedPhoto[], ingredients: Ingredient[]) => {
       setError(null);
-      setScreen({ kind: "generating", photoDataUrl, ingredients });
+      setScreen({ kind: "generating", photos, ingredients });
       try {
         const recipes = await generateRecipes(ingredients);
-        setScreen({ kind: "recipes", photoDataUrl, ingredients, recipes });
+        setScreen({ kind: "recipes", photos, ingredients, recipes });
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
-        setScreen({ kind: "ingredients", photoDataUrl, ingredients });
+        setScreen({ kind: "ingredients", photos, ingredients });
       }
     },
     [],
@@ -83,7 +96,7 @@ export function App() {
         ) : (
           <BuildPane
             screen={screen}
-            onPhotoSelected={onPhotoSelected}
+            onIdentify={onIdentify}
             onIngredientsConfirmed={onIngredientsConfirmed}
             onReset={reset}
           />
@@ -95,23 +108,28 @@ export function App() {
 
 interface BuildPaneProps {
   screen: Screen;
-  onPhotoSelected: (dataUrl: string) => void;
-  onIngredientsConfirmed: (dataUrl: string, ingredients: Ingredient[]) => void;
+  onIdentify: (photos: CapturedPhoto[]) => void;
+  onIngredientsConfirmed: (photos: CapturedPhoto[], ingredients: Ingredient[]) => void;
   onReset: () => void;
 }
 
-function BuildPane({ screen, onPhotoSelected, onIngredientsConfirmed, onReset }: BuildPaneProps) {
+function BuildPane({ screen, onIdentify, onIngredientsConfirmed, onReset }: BuildPaneProps) {
   switch (screen.kind) {
     case "capture":
-      return <CaptureScreen onPhoto={onPhotoSelected} />;
+      return <CaptureScreen onIdentify={onIdentify} />;
     case "identifying":
-      return <FullscreenSpinner label="Looking at your fridge…" sub="Identifying ingredients with Claude. ~5 seconds." />;
+      return (
+        <FullscreenSpinner
+          label={`Looking at ${screen.photos.length} photo${screen.photos.length === 1 ? "" : "s"}…`}
+          sub="Identifying + deduping ingredients with Claude. ~5-10 seconds."
+        />
+      );
     case "ingredients":
       return (
         <IngredientsScreen
-          photoDataUrl={screen.photoDataUrl}
+          photos={screen.photos}
           initialIngredients={screen.ingredients}
-          onConfirm={(items) => onIngredientsConfirmed(screen.photoDataUrl, items)}
+          onConfirm={(items) => onIngredientsConfirmed(screen.photos, items)}
           onRetake={onReset}
         />
       );

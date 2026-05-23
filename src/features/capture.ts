@@ -10,28 +10,21 @@
 const MAX_DIMENSION = 1280;
 const JPEG_QUALITY = 0.85;
 
-/** Result of preparing an image for both display and AI call. */
-export interface PreparedPhoto {
-  /** `data:image/jpeg;base64,...` — safe to assign to <img src>. */
-  dataUrl: string;
-  /** Base64 *without* the `data:image/...;base64,` prefix — what the bridge needs. */
-  base64: string;
-  /** MIME type matching the bridge's AIChatImage shape. */
-  mediaType: "image/jpeg";
-  /** Pixel dimensions of the downscaled image. */
-  width: number;
-  height: number;
-  /** Original byte size of the input file, for the muted footer. */
-  originalBytes: number;
-}
+import type { CapturedPhoto } from "../types";
 
-export async function preparePhoto(input: File | Blob): Promise<PreparedPhoto> {
+export async function preparePhoto(input: File | Blob): Promise<CapturedPhoto> {
   const originalBytes = input.size;
   const bitmap = await loadBitmap(input);
   const { canvas, width, height } = downscale(bitmap, MAX_DIMENSION);
   const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
   const base64 = dataUrl.split(",", 2)[1] ?? "";
+  // crypto.randomUUID is universal in modern browsers (Safari 15.4+); we
+  // ship to ConjureOS which already targets ES2022.
+  const id = typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `p-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   return {
+    id,
     dataUrl,
     base64,
     mediaType: "image/jpeg",

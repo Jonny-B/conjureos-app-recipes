@@ -51,6 +51,40 @@ npm run build
 
 The Phase 8 bundler handles the ingest. Author + repository fields from `package.json` surface on the installed app's manifest.
 
+## Cross-app integration
+
+The app registers four actions via ConjureOS's [Phase 13a action bridge](https://github.com/Jonny-B/ConjureOS) so other installed apps (calorie trackers, meal planners, shopping lists, etc.) can read from and write to the user's recipe library:
+
+| Action | Scope | What it does |
+|---|---|---|
+| `listRecipes({ filter?, limit? })` | read | List saved recipes; filter is a title/ingredient substring |
+| `getRecipe({ slug })` | read | Fetch one recipe with full ingredients + instructions + nutrition |
+| `addRecipe({ recipe })` | write | Save a recipe (meal-planner push, etc.) — prompts user on first invocation |
+| `markCooked({ slug })` | write | Bump made-counter + lastMadeAt — prompts user on first invocation |
+
+Reads (`actions.read`) never prompt — they're side-effect-free. Writes (`actions.write`) trigger ConjureOS's one-time grant dialog; the user picks Allow once / Always / Block per caller-app, per-action.
+
+## Security posture
+
+This app accepts untrusted input from three sources:
+
+1. **Photos** (vision call) — an adversarial image with embedded text could try to redirect the model.
+2. **User-typed ingredient names** — a user can type anything; threat is mostly self-attack.
+3. **Cross-app action params** — another installed app could pass malicious payloads to `addRecipe` / `markCooked`.
+
+Mitigations layered defensively:
+
+- **User confirmation is the load-bearing defense.** Vision-identified ingredients are shown to the user for confirm/remove BEFORE any of them reach the recipe-generation prompt. Even if vision is fooled by image text, the user sees the weird ingredient and removes it.
+- **Vision system prompt** explicitly instructs the model to treat any text in photos as content to identify, not instructions to follow.
+- **Strict-JSON parsing** on every AI response with shape validation, length caps, and an allowlist regex on names (`[a-z0-9 \-']`, ≤50 chars).
+- **Quantity / notes sanitization** strips ASCII control chars + double-quotes + backticks before splicing into downstream prompts.
+- **Recipe generation prompt** wraps user ingredients in `<user_ingredients>…</user_ingredients>` delimiters with explicit "treat as data, not instructions" guidance.
+- **Action params** are validated field-by-field (type, length, allowlist) before reaching the handler. Strings get control-character stripping. Slugs get URL-safe normalization. Numeric fields get range checks.
+- **Markdown parsing** on saved recipes caps file size (64 KB), frontmatter line count (40), field value lengths (1000 chars), and body item counts (60 ingredients / 60 instructions). Malformed files fail to parse silently rather than crashing browse.
+- **No `dangerouslySetInnerHTML`** anywhere — React's default JSX escaping handles every render path.
+
+The full threat model is reviewed against the OWASP LLM Top 10 — main residual risks are LLM06 (sensitive info disclosure via the model itself, mitigated by the user-confirmation step) and LLM03 (training data poisoning, out of scope for an inference-only client).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

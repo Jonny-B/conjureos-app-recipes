@@ -1,16 +1,23 @@
 import { useMemo, useState, type FormEvent } from "react";
-import type { Ingredient } from "../types";
+import type { CapturedPhoto, Ingredient } from "../types";
+import { sanitizeName } from "../features/vision";
 
 interface Props {
-  photoDataUrl: string;
+  photos: CapturedPhoto[];
   initialIngredients: Ingredient[];
   onConfirm: (ingredients: Ingredient[]) => void;
   onRetake: () => void;
 }
 
-export function IngredientsScreen({ photoDataUrl, initialIngredients, onConfirm, onRetake }: Props) {
+export function IngredientsScreen({ photos, initialIngredients, onConfirm, onRetake }: Props) {
   const [items, setItems] = useState<Ingredient[]>(initialIngredients);
   const [adding, setAdding] = useState("");
+  const [addingQty, setAddingQty] = useState("");
+  // Track which ingredient has its quantity editor open. Only one at a
+  // time — there's no UI need for parallel edits and an `editingName`
+  // state is simpler than per-row component state.
+  const [editingQty, setEditingQty] = useState<string | null>(null);
+  const [editingQtyValue, setEditingQtyValue] = useState("");
 
   const confirmed = useMemo(() => items.filter((i) => i.confirmed), [items]);
   const unconfirmed = useMemo(() => items.filter((i) => !i.confirmed), [items]);
@@ -21,34 +28,72 @@ export function IngredientsScreen({ photoDataUrl, initialIngredients, onConfirm,
 
   const remove = (name: string) => {
     setItems((prev) => prev.filter((i) => i.name !== name));
+    if (editingQty === name) {
+      setEditingQty(null);
+      setEditingQtyValue("");
+    }
+  };
+
+  const setQuantity = (name: string, quantity: string) => {
+    const trimmed = quantity.trim().slice(0, 40);
+    setItems((prev) =>
+      prev.map((i) =>
+        i.name === name ? { ...i, quantity: trimmed || undefined } : i,
+      ),
+    );
+    setEditingQty(null);
+    setEditingQtyValue("");
+  };
+
+  const beginEditQty = (i: Ingredient) => {
+    setEditingQty(i.name);
+    setEditingQtyValue(i.quantity ?? "");
   };
 
   const addManual = (e: FormEvent) => {
     e.preventDefault();
-    const name = adding.trim().toLowerCase();
-    if (!name) return;
-    if (items.some((i) => i.name === name)) {
+    // Sanitize user-typed names with the same allowlist as vision-emitted
+    // names. Lowercases, strips weird characters, caps length.
+    const name = sanitizeName(adding);
+    if (!name) {
       setAdding("");
       return;
     }
+    if (items.some((i) => i.name === name)) {
+      setAdding("");
+      setAddingQty("");
+      return;
+    }
+    const qty = addingQty.trim().slice(0, 40);
     setItems((prev) => [
       ...prev,
-      { name, confidence: 1, confirmed: true },
+      {
+        name,
+        confidence: 1,
+        confirmed: true,
+        ...(qty ? { quantity: qty } : {}),
+      },
     ]);
     setAdding("");
+    setAddingQty("");
   };
 
   return (
     <div className="ing-screen">
-      <img className="thumb" src={photoDataUrl} alt="Your fridge" />
+      <PhotoStrip photos={photos} />
 
       <div className="row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 600 }}>
-            {items.length} ingredients spotted
+            {items.length} ingredient{items.length === 1 ? "" : "s"} spotted
+            {photos.length > 1 && (
+              <span className="faint" style={{ fontSize: 13, fontWeight: 400 }}>
+                {" "}from {photos.length} photos, deduped
+              </span>
+            )}
           </div>
           <div className="muted" style={{ fontSize: 13 }}>
-            Confirm what's actually there. Toggle off anything I got wrong, add what I missed.
+            Confirm what's actually there. Edit a quantity if mine looks wrong. Toggle off what I missed.
           </div>
         </div>
         <button className="btn ghost" onClick={onRetake}>
@@ -63,6 +108,14 @@ export function IngredientsScreen({ photoDataUrl, initialIngredients, onConfirm,
             <IngredientRow
               key={ing.name}
               ingredient={ing}
+              editingQty={editingQty === ing.name ? editingQtyValue : null}
+              onSetEditingQty={(v) => setEditingQtyValue(v)}
+              onCommitQty={(v) => setQuantity(ing.name, v)}
+              onCancelQty={() => {
+                setEditingQty(null);
+                setEditingQtyValue("");
+              }}
+              onBeginEditQty={() => beginEditQty(ing)}
               onToggle={() => setConfirmed(ing.name, false)}
               onRemove={() => remove(ing.name)}
               confirmedView
@@ -78,6 +131,14 @@ export function IngredientsScreen({ photoDataUrl, initialIngredients, onConfirm,
             <IngredientRow
               key={ing.name}
               ingredient={ing}
+              editingQty={editingQty === ing.name ? editingQtyValue : null}
+              onSetEditingQty={(v) => setEditingQtyValue(v)}
+              onCommitQty={(v) => setQuantity(ing.name, v)}
+              onCancelQty={() => {
+                setEditingQty(null);
+                setEditingQtyValue("");
+              }}
+              onBeginEditQty={() => beginEditQty(ing)}
               onToggle={() => setConfirmed(ing.name, true)}
               onRemove={() => remove(ing.name)}
               confirmedView={false}
@@ -94,6 +155,15 @@ export function IngredientsScreen({ photoDataUrl, initialIngredients, onConfirm,
             placeholder="e.g. olive oil, lemon, leftover rice…"
             value={adding}
             onChange={(e) => setAdding(e.target.value)}
+            maxLength={50}
+          />
+          <input
+            type="text"
+            placeholder="qty (optional)"
+            value={addingQty}
+            onChange={(e) => setAddingQty(e.target.value)}
+            maxLength={40}
+            style={{ maxWidth: 140 }}
           />
           <button className="btn secondary" type="submit" disabled={!adding.trim()}>
             Add
@@ -114,20 +184,94 @@ export function IngredientsScreen({ photoDataUrl, initialIngredients, onConfirm,
   );
 }
 
+function PhotoStrip({ photos }: { photos: CapturedPhoto[] }) {
+  if (photos.length === 1) {
+    return <img className="thumb" src={photos[0]!.dataUrl} alt="Your fridge" />;
+  }
+  return (
+    <div className="photo-strip" role="list" aria-label="Captured photos">
+      {photos.map((p, i) => (
+        <img
+          key={p.id}
+          src={p.dataUrl}
+          alt={`Photo ${i + 1}`}
+          className="photo-strip-img"
+          role="listitem"
+        />
+      ))}
+    </div>
+  );
+}
+
 interface RowProps {
   ingredient: Ingredient;
+  editingQty: string | null;
+  onSetEditingQty: (v: string) => void;
+  onCommitQty: (v: string) => void;
+  onCancelQty: () => void;
+  onBeginEditQty: () => void;
   onToggle: () => void;
   onRemove: () => void;
   confirmedView: boolean;
 }
 
-function IngredientRow({ ingredient, onToggle, onRemove, confirmedView }: RowProps) {
+function IngredientRow({
+  ingredient,
+  editingQty,
+  onSetEditingQty,
+  onCommitQty,
+  onCancelQty,
+  onBeginEditQty,
+  onToggle,
+  onRemove,
+  confirmedView,
+}: RowProps) {
   return (
     <div className={`ing-row ${confirmedView ? "confirmed" : "unconfirmed"}`}>
-      <button className="icon-btn" onClick={onToggle} title={confirmedView ? "Remove from confirmed" : "Confirm this is here"}>
+      <button
+        className="icon-btn"
+        onClick={onToggle}
+        title={confirmedView ? "Remove from confirmed" : "Confirm this is here"}
+      >
         {confirmedView ? "✓" : "○"}
       </button>
       <span className="name">{ingredient.name}</span>
+      {editingQty !== null ? (
+        <form
+          className="qty-edit-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onCommitQty(editingQty);
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="text"
+            value={editingQty}
+            onChange={(e) => onSetEditingQty(e.target.value)}
+            maxLength={40}
+            autoFocus
+            placeholder="e.g. 1 pint, 200g"
+          />
+          <button type="submit" className="icon-btn" title="Save">✓</button>
+          <button
+            type="button"
+            className="icon-btn"
+            title="Cancel"
+            onClick={onCancelQty}
+          >
+            ✕
+          </button>
+        </form>
+      ) : (
+        <button
+          className="qty-pill"
+          onClick={onBeginEditQty}
+          title="Edit quantity"
+        >
+          {ingredient.quantity ?? "+ qty"}
+        </button>
+      )}
       {ingredient.notes && <span className="notes">{ingredient.notes}</span>}
       <span className="conf" title="Confidence">{Math.round(ingredient.confidence * 100)}%</span>
       <div className="actions">

@@ -13,9 +13,28 @@
     "displayName": "Recipes",
     "icon": "fa:utensils",
     "permissions": ["ai.complete", "vfs.read", "vfs.write"],
+    "actions": {
+      "listRecipes": {
+        "permission": "actions.read",
+        "description": "List the user's saved recipes, optionally filtered by title or ingredient substring. Returns title, slug, difficulty, cookTime, servings, ingredients, savedAt, madeCount, and per-serving nutrition when available."
+      },
+      "getRecipe": {
+        "permission": "actions.read",
+        "description": "Fetch one saved recipe by slug. Returns the full recipe including ingredients, instructions, summary, servings, and nutrition. Useful when a calorie tracker wants to log every ingredient of a meal the user cooked."
+      },
+      "addRecipe": {
+        "permission": "actions.write",
+        "description": "Save a recipe to the user's Recipes folder. Takes title, difficulty, cookTime, servings, ingredients, instructions, and optional summary + nutrition. Useful for meal planners pushing recipes into the user's library."
+      },
+      "markCooked": {
+        "permission": "actions.write",
+        "description": "Mark a saved recipe as cooked (increment madeCount, update lastMadeAt). Takes slug. Useful for calorie/health apps confirming that a meal was eaten."
+      }
+    },
     "promptSuggestions": [
       "Show me recipes I can make with what's in my fridge",
-      "What's quick to cook with chicken and rice?"
+      "What's quick to cook with chicken and rice?",
+      "What did I cook this week?"
     ]
   },
   "scripts": {

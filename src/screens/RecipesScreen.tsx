@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Ingredient, NutritionStrip, Recipe } from "../types";
 import { saveRecipe } from "../features/storage";
 import { computeNutrition, formatStrip, USING_DEMO_KEY } from "../features/nutrition";
+import { computeAvailability, scaleRecipe, type AvailabilityResult } from "../features/scaling";
 
 interface Props {
   recipes: Recipe[];
@@ -9,9 +10,7 @@ interface Props {
   onRestart: () => void;
 }
 
-/** Per-card nutrition lookup state. Three terminal shapes plus the in-flight
- *  marker — separated from the persisted NutritionStrip type so the UI can
- *  distinguish "USDA cap hit" from "ingredient genuinely not in the DB". */
+/** Per-card nutrition state. See nutrition.ts for the kind union semantics. */
 type CardNutrition =
   | { kind: "pending" }
   | { kind: "ok"; strip: NutritionStrip }
@@ -26,10 +25,20 @@ export function RecipesScreen({ recipes, ingredients, onRestart }: Props) {
   const [nutrition, setNutrition] = useState<CardNutrition[]>(
     () => recipes.map(() => ({ kind: "pending" as const })),
   );
-  // Once any per-recipe lookup hits a 429, surface the explanation banner
-  // at the screen level. Dismissible per session — clears on the next
-  // generation when nutrition state resets.
+  // Per-card scaling factor. Default 1; the stepper and the "scale to my
+  // ingredients" button drive it.
+  const [scaleFactors, setScaleFactors] = useState<number[]>(() => recipes.map(() => 1));
   const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  // Pre-compute availability per recipe based on what the user has — the
+  // "Scale to my ingredients" button uses it, the warning rendered next to
+  // a recipe's constraining ingredient uses it too. Memoized so the
+  // expensive parse doesn't re-fire on every keystroke.
+  const availability = useMemo<AvailabilityResult[]>(
+    () => recipes.map((r) => computeAvailability(r, ingredients)),
+    [recipes, ingredients],
+  );
+
   const anyRateLimited = nutrition.some(
     (n) => n.kind === "rate-limited" || n.kind === "partial",
   );
@@ -38,8 +47,6 @@ export function RecipesScreen({ recipes, ingredients, onRestart }: Props) {
     let cancelled = false;
     const ctrl = new AbortController();
     (async () => {
-      // Sequential per recipe so we don't fan out 3 × N USDA calls all at once.
-      // Within a recipe, nutrition.ts uses bounded concurrency on ingredients.
       for (let i = 0; i < recipes.length; i++) {
         if (cancelled) return;
         try {
@@ -75,7 +82,9 @@ export function RecipesScreen({ recipes, ingredients, onRestart }: Props) {
         cardState && (cardState.kind === "ok" || cardState.kind === "partial")
           ? cardState.strip
           : null;
-      const recipeWithNutrition: Recipe = { ...recipe, nutrition: strip };
+      // Save the SCALED version — what the user actually intends to cook.
+      const scaled = scaleRecipe(recipe, scaleFactors[idx] ?? 1);
+      const recipeWithNutrition: Recipe = { ...scaled, nutrition: strip };
       await saveRecipe(recipeWithNutrition);
       setSavedIdx((prev) => new Set(prev).add(idx));
     } catch (err) {
@@ -85,13 +94,31 @@ export function RecipesScreen({ recipes, ingredients, onRestart }: Props) {
     }
   };
 
+  const adjustServings = (idx: number, delta: number) => {
+    const recipe = recipes[idx]!;
+    const current = Math.max(1, Math.round(recipe.servings * (scaleFactors[idx] ?? 1)));
+    const next = Math.max(1, Math.min(24, current + delta));
+    const factor = next / recipe.servings;
+    setScaleFactors((prev) => prev.map((f, i) => (i === idx ? factor : f)));
+  };
+
+  const scaleToAvailable = (idx: number) => {
+    const a = availability[idx];
+    if (!a) return;
+    setScaleFactors((prev) => prev.map((f, i) => (i === idx ? a.factor : f)));
+  };
+
+  const resetScale = (idx: number) => {
+    setScaleFactors((prev) => prev.map((f, i) => (i === idx ? 1 : f)));
+  };
+
   return (
     <div className="recipes-screen">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
           <h2 style={{ margin: 0 }}>Three options</h2>
           <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-            From {ingredients.length} confirmed ingredient{ingredients.length === 1 ? "" : "s"}. Save the ones that look good.
+            From {ingredients.length} confirmed ingredient{ingredients.length === 1 ? "" : "s"}. Adjust servings or scale to what you have.
           </div>
         </div>
         <button className="btn ghost" onClick={onRestart}>
@@ -111,57 +138,194 @@ export function RecipesScreen({ recipes, ingredients, onRestart }: Props) {
       )}
 
       <div className="recipes-grid">
-        {recipes.map((r, i) => (
-          <article key={i} className="recipe-card">
-            <div className="row">
-              <h3>{r.title}</h3>
-            </div>
-            <div>
-              <span className={`pill ${r.difficulty}`}>{r.difficulty}</span>
-              <span className="pill">{r.cookTime} min</span>
-              <span className="pill">{r.servings} servings</span>
-            </div>
-            {r.summary && <p className="summary">{r.summary}</p>}
-            <NutritionLine state={nutrition[i] ?? { kind: "empty" }} />
-
-            <section>
-              <h4>Ingredients</h4>
-              <ul>
-                {r.ingredients.map((ing, j) => (
-                  <li key={j}>{ing}</li>
-                ))}
-              </ul>
-            </section>
-
-            <section>
-              <h4>Instructions</h4>
-              <ol>
-                {r.instructions.map((step, j) => (
-                  <li key={j}>{step}</li>
-                ))}
-              </ol>
-            </section>
-
-            <div className="row" style={{ marginTop: "auto" }}>
-              {savedIdx.has(i) ? (
-                <span className="muted" style={{ fontSize: 13 }}>✓ Saved to Recipes</span>
-              ) : (
-                <span />
-              )}
-              <button
-                className="btn"
-                disabled={savedIdx.has(i) || savingIdx !== null}
-                onClick={() => onSave(r, i)}
-              >
-                {savingIdx === i ? "Saving…" : savedIdx.has(i) ? "Saved" : "Save"}
-              </button>
-            </div>
-          </article>
-        ))}
+        {recipes.map((r, i) => {
+          const factor = scaleFactors[i] ?? 1;
+          const scaled = scaleRecipe(r, factor);
+          const avail = availability[i]!;
+          return (
+            <RecipeCard
+              key={i}
+              original={r}
+              scaled={scaled}
+              factor={factor}
+              availability={avail}
+              nutritionState={nutrition[i] ?? { kind: "empty" }}
+              saved={savedIdx.has(i)}
+              saving={savingIdx === i}
+              anySaving={savingIdx !== null}
+              onServingsChange={(delta) => adjustServings(i, delta)}
+              onScaleToAvailable={() => scaleToAvailable(i)}
+              onResetScale={() => resetScale(i)}
+              onSave={() => onSave(scaled, i)}
+            />
+          );
+        })}
       </div>
     </div>
   );
 }
+
+// ── Recipe card ───────────────────────────────────────────────────────
+
+interface RecipeCardProps {
+  original: Recipe;
+  scaled: Recipe;
+  factor: number;
+  availability: AvailabilityResult;
+  nutritionState: CardNutrition;
+  saved: boolean;
+  saving: boolean;
+  anySaving: boolean;
+  onServingsChange: (delta: number) => void;
+  onScaleToAvailable: () => void;
+  onResetScale: () => void;
+  onSave: () => void;
+}
+
+function RecipeCard({
+  original,
+  scaled,
+  factor,
+  availability,
+  nutritionState,
+  saved,
+  saving,
+  anySaving,
+  onServingsChange,
+  onScaleToAvailable,
+  onResetScale,
+  onSave,
+}: RecipeCardProps) {
+  // Constraining ingredient and a precomputed shortage map so we can show
+  // a "not enough X" annotation next to the offending recipe line.
+  const lineShortages = useMemo(() => {
+    const m = new Map<string, { ratio: number; constraining: boolean; available: number; needed: number; userIngredient: string }>();
+    for (const match of availability.matches) {
+      if (match.ratio < 0.999) {
+        m.set(match.recipeLine, {
+          ratio: match.ratio,
+          constraining: match.constraining,
+          available: match.available,
+          needed: match.needed,
+          userIngredient: match.userIngredient,
+        });
+      }
+    }
+    return m;
+  }, [availability]);
+
+  const scaleNeeded = availability.factor < 0.999;
+  const isScaled = factor !== 1;
+
+  return (
+    <article className="recipe-card">
+      <div className="row">
+        <h3>{original.title}</h3>
+      </div>
+      <div>
+        <span className={`pill ${original.difficulty}`}>{original.difficulty}</span>
+        <span className="pill">{original.cookTime} min</span>
+      </div>
+      {original.summary && <p className="summary">{original.summary}</p>}
+
+      {/* Servings stepper + scale-to-mine controls */}
+      <div className="scale-row">
+        <div className="serving-stepper">
+          <button
+            className="icon-btn"
+            onClick={() => onServingsChange(-1)}
+            disabled={scaled.servings <= 1}
+            title="Fewer servings"
+            aria-label="Decrease servings"
+          >
+            −
+          </button>
+          <span className="serving-count">{scaled.servings} serving{scaled.servings === 1 ? "" : "s"}</span>
+          <button
+            className="icon-btn"
+            onClick={() => onServingsChange(1)}
+            disabled={scaled.servings >= 24}
+            title="More servings"
+            aria-label="Increase servings"
+          >
+            +
+          </button>
+        </div>
+        {isScaled && (
+          <button className="btn ghost" onClick={onResetScale} style={{ padding: "4px 10px", fontSize: 12 }}>
+            Reset
+          </button>
+        )}
+      </div>
+
+      {/* "Scale to my ingredients" — only when shortage detected */}
+      {scaleNeeded && !isScaled && (
+        <div className="shortage-banner">
+          <div className="shortage-banner-text">
+            <strong>You don't have enough of everything.</strong>
+            <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+              Recipe scales to {(availability.factor * 100).toFixed(0)}% of original to fit what's on hand.
+            </div>
+          </div>
+          <button className="btn secondary" onClick={onScaleToAvailable} style={{ padding: "6px 12px", fontSize: 12 }}>
+            Scale to my ingredients
+          </button>
+        </div>
+      )}
+      {scaleNeeded && isScaled && (
+        <div className="muted" style={{ fontSize: 12 }}>
+          ✓ Scaled to fit your ingredients ({(factor * 100).toFixed(0)}%).
+        </div>
+      )}
+
+      <NutritionLine state={nutritionState} />
+
+      <section>
+        <h4>Ingredients{factor !== 1 && <span className="faint" style={{ fontWeight: 400, marginLeft: 6 }}>(scaled)</span>}</h4>
+        <ul>
+          {scaled.ingredients.map((ing, j) => {
+            const original_line = original.ingredients[j];
+            const shortage = original_line ? lineShortages.get(original_line) : undefined;
+            return (
+              <li key={j}>
+                {ing}
+                {shortage && (
+                  <div className="ing-shortage">
+                    {shortage.constraining ? "⚠ " : "· "}
+                    Need {Math.round(shortage.needed)}g, you have ~{Math.round(shortage.available)}g{" "}
+                    <span className="faint">({shortage.userIngredient})</span>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      <section>
+        <h4>Instructions</h4>
+        <ol>
+          {scaled.instructions.map((step, j) => (
+            <li key={j}>{step}</li>
+          ))}
+        </ol>
+      </section>
+
+      <div className="row" style={{ marginTop: "auto" }}>
+        {saved ? (
+          <span className="muted" style={{ fontSize: 13 }}>✓ Saved to Recipes</span>
+        ) : (
+          <span />
+        )}
+        <button className="btn" disabled={saved || anySaving} onClick={onSave}>
+          {saving ? "Saving…" : saved ? "Saved" : "Save"}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+// ── Nutrition + rate-limit components (unchanged) ─────────────────────
 
 function NutritionLine({ state }: { state: CardNutrition }) {
   switch (state.kind) {
@@ -208,9 +372,7 @@ function RateLimitBanner({ onDismiss }: { onDismiss: () => void }) {
     <div className="status-banner" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <span>ℹ</span>
-        <strong style={{ flex: 1 }}>
-          USDA's nutrition API rate-limited this lookup
-        </strong>
+        <strong style={{ flex: 1 }}>USDA's nutrition API rate-limited this lookup</strong>
         <button className="btn ghost" onClick={() => setExpanded((v) => !v)} style={{ padding: "4px 10px", fontSize: 12 }}>
           {expanded ? "Less" : "Why?"}
         </button>
@@ -229,9 +391,7 @@ function RateLimitBanner({ onDismiss }: { onDismiss: () => void }) {
               <p style={{ margin: "0 0 8px 0" }}>
                 <strong>Why:</strong> this app ships with USDA's public <code>DEMO_KEY</code> so it works out of the box without setup. USDA limits <code>DEMO_KEY</code> to 30 lookups per hour per public IP address — shared across everyone on your network (and anyone else worldwide hitting it from the same IP, e.g. mobile carriers).
               </p>
-              <p style={{ margin: "0 0 8px 0" }}>
-                <strong>What to do:</strong>
-              </p>
+              <p style={{ margin: "0 0 8px 0" }}><strong>What to do:</strong></p>
               <ul style={{ margin: "0 0 8px 18px", padding: 0 }}>
                 <li>Wait an hour — the cap resets and recipes already on screen will keep working from cache.</li>
                 <li>
@@ -244,7 +404,7 @@ function RateLimitBanner({ onDismiss }: { onDismiss: () => void }) {
           ) : (
             <>
               <p style={{ margin: "0 0 8px 0" }}>
-                <strong>Why:</strong> you're already using a personal USDA key, which is normally 1000 lookups/hr. Hitting that means an unusually heavy session — most ingredients are cached after first lookup, so this is rare.
+                <strong>Why:</strong> you're already using a personal USDA key, which is normally 1000 lookups/hr. Hitting that means an unusually heavy session.
               </p>
               <p style={{ margin: "0 0 8px 0" }}>
                 <strong>What to do:</strong> wait an hour; the limit resets automatically. Cached ingredients keep working in the meantime.

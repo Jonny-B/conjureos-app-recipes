@@ -10,10 +10,38 @@ export interface Ingredient {
   name: string;
   /** 0–1 confidence from the vision pass. User-added ingredients default to 1. */
   confidence: number;
-  /** Optional free-form note: quantity guess, condition ("looks past date"), etc. */
+  /**
+   * Best-effort quantity available, as a parseable string when possible
+   * ("1 pint", "200g", "half a carton", "~6 eggs"). The vision model is
+   * asked to estimate this from package size + fill level; the user can
+   * edit it. Used by the recipe scaler to decide whether the user has
+   * enough of an ingredient and to scale a recipe down if not.
+   * Free-form on purpose — vision-estimated quantities are imprecise and
+   * forcing a strict unit shape would lose useful signal ("half full").
+   */
+  quantity?: string;
+  /** Optional free-form note ("looks past date", "fresh, opened"). */
   notes?: string;
   /** True when the user has explicitly confirmed (or added) this item. */
   confirmed: boolean;
+}
+
+/**
+ * One captured photo + its prep metadata. Multi-image capture lets the
+ * user shoot fridge + pantry together, or several angles of the same
+ * shelf; the vision pass dedupes across them.
+ */
+export interface CapturedPhoto {
+  /** Stable id for React keys + per-photo removal. */
+  id: string;
+  /** `data:image/jpeg;base64,...` for <img src> + the bridge call. */
+  dataUrl: string;
+  /** Base64 without the `data:` prefix — what the AI bridge needs. */
+  base64: string;
+  mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif";
+  width: number;
+  height: number;
+  originalBytes: number;
 }
 
 export type Difficulty = "easy" | "medium" | "hard";
@@ -71,8 +99,8 @@ export interface SavedRecipe extends Recipe {
 
 export type Screen =
   | { kind: "capture" }
-  | { kind: "identifying"; photoDataUrl: string }
-  | { kind: "ingredients"; photoDataUrl: string; ingredients: Ingredient[] }
-  | { kind: "generating"; photoDataUrl: string; ingredients: Ingredient[] }
-  | { kind: "recipes"; photoDataUrl: string; ingredients: Ingredient[]; recipes: Recipe[] }
+  | { kind: "identifying"; photos: CapturedPhoto[] }
+  | { kind: "ingredients"; photos: CapturedPhoto[]; ingredients: Ingredient[] }
+  | { kind: "generating"; photos: CapturedPhoto[]; ingredients: Ingredient[] }
+  | { kind: "recipes"; photos: CapturedPhoto[]; ingredients: Ingredient[]; recipes: Recipe[] }
   | { kind: "browse" };

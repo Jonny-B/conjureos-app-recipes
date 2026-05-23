@@ -153,18 +153,34 @@ function yamlString(s: string): string {
   return s;
 }
 
+// Defensive caps when parsing saved markdown. Users (or other apps via the
+// VFS) can edit these files freely, and a malformed file should fail
+// gracefully rather than blow memory or break the browse list.
+const MAX_FILE_BYTES = 64 * 1024;
+const MAX_FRONTMATTER_LINES = 40;
+const MAX_FIELD_VALUE_LENGTH = 1000;
+const MAX_BODY_INGREDIENTS = 60;
+const MAX_BODY_INSTRUCTIONS = 60;
+const MAX_LINE_LENGTH = 400;
+
 function parseMarkdown(text: string, path: string, slug: string): SavedRecipe | null {
+  if (text.length > MAX_FILE_BYTES) return null;
   const fmMatch = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!fmMatch) return null;
   const [, fm, body] = fmMatch;
   if (!fm || !body) return null;
 
+  const fmLines = fm.split("\n");
+  if (fmLines.length > MAX_FRONTMATTER_LINES) return null;
+
   const front: Record<string, string> = {};
-  for (const line of fm.split("\n")) {
+  for (const line of fmLines) {
     const eq = line.indexOf(":");
     if (eq === -1) continue;
     const key = line.slice(0, eq).trim();
+    if (!key || key.length > 50) continue;
     let val = line.slice(eq + 1).trim();
+    if (val.length > MAX_FIELD_VALUE_LENGTH) continue;
     if (val.startsWith('"') && val.endsWith('"')) {
       try {
         val = JSON.parse(val);
@@ -216,18 +232,24 @@ function parseMarkdown(text: string, path: string, slug: string): SavedRecipe | 
     if (sec.startsWith("Ingredients\n")) {
       const lines = sec.split("\n").slice(1);
       for (const ln of lines) {
+        if (ingredients.length >= MAX_BODY_INGREDIENTS) break;
+        if (ln.length > MAX_LINE_LENGTH) continue;
         const m = ln.match(/^[-*]\s+(.+)$/);
         if (m) ingredients.push(m[1]!.trim());
       }
     } else if (sec.startsWith("Instructions\n")) {
       const lines = sec.split("\n").slice(1);
       for (const ln of lines) {
+        if (instructions.length >= MAX_BODY_INSTRUCTIONS) break;
+        if (ln.length > MAX_LINE_LENGTH) continue;
         const m = ln.match(/^\d+\.\s+(.+)$/);
         if (m) instructions.push(m[1]!.trim());
       }
     } else if (sec.startsWith("# ") || sec.startsWith("Summary\n")) {
       const text = sec.replace(/^#\s+[^\n]*\n+/, "").trim();
-      if (text && !text.startsWith("##")) summary = text;
+      if (text && !text.startsWith("##") && text.length <= MAX_FIELD_VALUE_LENGTH) {
+        summary = text;
+      }
     }
   }
 

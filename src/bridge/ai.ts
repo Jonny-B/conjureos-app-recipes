@@ -34,12 +34,19 @@ export interface CompleteRequest {
 }
 
 declare global {
-  interface Window {
-    __conjureos?: {
-      ai?: {
-        complete: (req: CompleteRequest) => Promise<{ content: string }>;
-      };
+  /**
+   * Shared shape across bridge modules. Each module (ai, actions, etc.)
+   * augments this interface with its own sub-property; TypeScript merges
+   * the declarations so `window.__conjureos.ai` and `window.__conjureos.actions`
+   * both exist on the same object without a conflict.
+   */
+  interface ConjureosBridge {
+    ai?: {
+      complete: (req: CompleteRequest) => Promise<{ content: string }>;
     };
+  }
+  interface Window {
+    __conjureos?: ConjureosBridge;
   }
 }
 
