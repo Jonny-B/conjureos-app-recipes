@@ -28,8 +28,15 @@ import type { NutritionStrip, Recipe } from "../types";
 
 const USDA_BASE = "https://api.nal.usda.gov/fdc/v1";
 const API_KEY = (import.meta.env.VITE_USDA_API_KEY as string | undefined) ?? "DEMO_KEY";
+export const USING_DEMO_KEY = API_KEY === "DEMO_KEY";
 const CACHE_PATH = "nutrition-cache.json";
 const SEARCH_CONCURRENCY = 3;
+/** Session-wide rate-limit short-circuit. When this is in the future, USDA
+ *  calls return immediately with rateLimited:true and never touch the network.
+ *  Set to now + 1h on the first 429 we see; cleared by the next session.
+ *  Prevents the user's recipe batch from burning through all 8 ingredients
+ *  with a fresh 429 each. */
+let rateLimitedUntil = 0;
 
 /** Per-100g macros from USDA. All values are floats; rounding happens at the strip level. */
 interface FoodMacros {
@@ -253,7 +260,21 @@ export function parseIngredient(line: string): ParsedIngredient | null {
 
 // ── USDA API ──────────────────────────────────────────────────────────
 
-async function searchUSDA(query: string, signal?: AbortSignal): Promise<FoodMacros | null> {
+/**
+ * Outcome of a single USDA call. Distinguishes "ingredient genuinely not
+ * in the database" (cache it as null forever) from "we got rate-limited"
+ * (don't cache; the cap resets in an hour). The UI separates them too so
+ * the user sees the right "why is this missing" message.
+ */
+type USDAFetchResult =
+  | { kind: "hit"; food: FoodMacros }
+  | { kind: "miss" } // 200 OK + empty foods[] — ingredient not in DB
+  | { kind: "rate-limited" } // 429 — cap reached
+  | { kind: "error" }; // network / 500 / unexpected — transient
+
+async function searchUSDA(query: string, signal?: AbortSignal): Promise<USDAFetchResult> {
+  if (rateLimitedUntil > Date.now()) return { kind: "rate-limited" };
+
   const url = new URL(`${USDA_BASE}/foods/search`);
   url.searchParams.set("api_key", API_KEY);
   url.searchParams.set("query", query);
@@ -263,13 +284,13 @@ async function searchUSDA(query: string, signal?: AbortSignal): Promise<FoodMacr
   try {
     resp = await fetch(url.toString(), { signal });
   } catch {
-    return null;
+    return { kind: "error" };
   }
-  if (!resp.ok) {
-    // 429 (rate-limited) is the common failure on DEMO_KEY. Cache as null so we
-    // don't hammer the API for the same ingredient repeatedly within a session.
-    return null;
+  if (resp.status === 429) {
+    rateLimitedUntil = Date.now() + 60 * 60 * 1000;
+    return { kind: "rate-limited" };
   }
+  if (!resp.ok) return { kind: "error" };
   const json = (await resp.json()) as {
     foods?: Array<{
       fdcId: number;
@@ -278,7 +299,7 @@ async function searchUSDA(query: string, signal?: AbortSignal): Promise<FoodMacr
     }>;
   };
   const food = json.foods?.[0];
-  if (!food) return null;
+  if (!food) return { kind: "miss" };
   let kcal = 0, protein = 0, fat = 0, carbs = 0;
   for (const n of food.foodNutrients ?? []) {
     const name = n.nutrientName ?? "";
@@ -288,52 +309,97 @@ async function searchUSDA(query: string, signal?: AbortSignal): Promise<FoodMacr
     else if (name === "Total lipid (fat)") fat = value;
     else if (name === "Carbohydrate, by difference") carbs = value;
   }
-  return { fdcId: food.fdcId, description: food.description, kcal, protein, fat, carbs };
+  return {
+    kind: "hit",
+    food: { fdcId: food.fdcId, description: food.description, kcal, protein, fat, carbs },
+  };
 }
 
 /**
  * Resolve a food name to its USDA macros. Cache-first; falls through to a
- * single live search and persists the result (success or null).
+ * single live search. Caches successes + DB misses forever (the entry won't
+ * appear by retrying); does NOT cache rate-limits or transient errors (those
+ * are time-bound).
  */
-async function resolveFood(name: string, signal?: AbortSignal): Promise<FoodMacros | null> {
+async function resolveFood(
+  name: string,
+  signal?: AbortSignal,
+): Promise<{ macros: FoodMacros | null; rateLimited: boolean }> {
   const key = name.toLowerCase().trim();
-  if (!key) return null;
+  if (!key) return { macros: null, rateLimited: false };
   const c = await loadCache();
   if (Object.prototype.hasOwnProperty.call(c.entries, key)) {
-    return c.entries[key] ?? null;
+    return { macros: c.entries[key] ?? null, rateLimited: false };
   }
-  const hit = await searchUSDA(key, signal);
-  c.entries[key] = hit;
-  await persistCache();
-  return hit;
+  const result = await searchUSDA(key, signal);
+  switch (result.kind) {
+    case "hit":
+      c.entries[key] = result.food;
+      await persistCache();
+      return { macros: result.food, rateLimited: false };
+    case "miss":
+      c.entries[key] = null;
+      await persistCache();
+      return { macros: null, rateLimited: false };
+    case "rate-limited":
+      return { macros: null, rateLimited: true };
+    case "error":
+      return { macros: null, rateLimited: false };
+  }
 }
 
 // ── Aggregation ────────────────────────────────────────────────────────
 
 /**
- * Run the lookup pipeline for a recipe and return a per-serving NutritionStrip.
- * Returns null if every ingredient failed to parse OR every USDA lookup missed —
- * in which case the UI just doesn't show the strip.
+ * Result of running the nutrition pipeline for one recipe.
+ *
+ * Two failure axes are deliberately separated:
+ *   - `strip` null + rateLimited false → either zero ingredients parsed, or
+ *     USDA genuinely had no match for any of them (permanent miss; will not
+ *     improve on retry).
+ *   - `strip` null + rateLimited true → cap on USDA lookups; the user's
+ *     network has hit DEMO_KEY's 30/hr ceiling. Resolves on its own in <1h
+ *     OR when the user bakes in their own VITE_USDA_API_KEY.
+ *   - `strip` non-null + rateLimited true → some ingredients hit USDA before
+ *     the 429, others didn't. The strip is partial; the UI flags it
+ *     "rough" and shows the rate-limit context separately so the user
+ *     understands why it's incomplete.
+ */
+export interface NutritionResult {
+  strip: NutritionStrip | null;
+  /** True if any USDA lookup in this recipe hit a 429. Implies further
+   *  ingredients (and likely the rest of this batch of recipes) won't be
+   *  looked up — the session-wide short-circuit is now active. */
+  rateLimited: boolean;
+  /** Count of ingredients we couldn't look up because of the rate limit
+   *  (not because they're missing from USDA). For the user message. */
+  missedDueToRateLimit: number;
+}
+
+/**
+ * Run the lookup pipeline for a recipe.
  */
 export async function computeNutrition(
   recipe: Recipe,
   signal?: AbortSignal,
-): Promise<NutritionStrip | null> {
+): Promise<NutritionResult> {
   const parsed = recipe.ingredients
     .map(parseIngredient)
     .filter((p): p is ParsedIngredient => p !== null && p.grams > 0);
-  if (parsed.length === 0) return null;
+  if (parsed.length === 0) {
+    return { strip: null, rateLimited: false, missedDueToRateLimit: 0 };
+  }
 
   // Bounded concurrency — DEMO_KEY rate limit is tight, and recipes are small
   // enough that 3-in-flight is plenty.
-  const results: Array<{ p: ParsedIngredient; macros: FoodMacros | null }> = [];
+  const results: Array<{ p: ParsedIngredient; macros: FoodMacros | null; rateLimited: boolean }> = [];
   let cursor = 0;
   async function worker(): Promise<void> {
     while (cursor < parsed.length) {
       const idx = cursor++;
       const p = parsed[idx]!;
-      const macros = await resolveFood(p.name, signal);
-      results.push({ p, macros });
+      const { macros, rateLimited } = await resolveFood(p.name, signal);
+      results.push({ p, macros, rateLimited });
     }
   }
   await Promise.all(
@@ -342,27 +408,45 @@ export async function computeNutrition(
 
   let kcal = 0, protein = 0, fat = 0, carbs = 0;
   let matched = 0;
+  let missedDueToRateLimit = 0;
+  let anyRateLimited = false;
   for (const r of results) {
-    if (!r.macros) continue;
-    const factor = r.p.grams / 100;
-    kcal += r.macros.kcal * factor;
-    protein += r.macros.protein * factor;
-    fat += r.macros.fat * factor;
-    carbs += r.macros.carbs * factor;
-    matched += 1;
+    if (r.macros) {
+      const factor = r.p.grams / 100;
+      kcal += r.macros.kcal * factor;
+      protein += r.macros.protein * factor;
+      fat += r.macros.fat * factor;
+      carbs += r.macros.carbs * factor;
+      matched += 1;
+    } else if (r.rateLimited) {
+      missedDueToRateLimit += 1;
+      anyRateLimited = true;
+    }
   }
-  if (matched === 0) return null;
+  if (matched === 0) {
+    return { strip: null, rateLimited: anyRateLimited, missedDueToRateLimit };
+  }
 
   const servings = Math.max(1, recipe.servings);
   return {
-    calories: Math.round(kcal / servings),
-    protein: Math.round(protein / servings),
-    fat: Math.round(fat / servings),
-    carbs: Math.round(carbs / servings),
-    matched,
-    total: recipe.ingredients.length,
-    est: true,
+    strip: {
+      calories: Math.round(kcal / servings),
+      protein: Math.round(protein / servings),
+      fat: Math.round(fat / servings),
+      carbs: Math.round(carbs / servings),
+      matched,
+      total: recipe.ingredients.length,
+      est: true,
+    },
+    rateLimited: anyRateLimited,
+    missedDueToRateLimit,
   };
+}
+
+/** When session-wide short-circuit will reset, or null if not active. */
+export function rateLimitResetsAt(): Date | null {
+  if (rateLimitedUntil <= Date.now()) return null;
+  return new Date(rateLimitedUntil);
 }
 
 /**
