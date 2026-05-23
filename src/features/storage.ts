@@ -25,7 +25,7 @@
  */
 
 import { vfs } from "../bridge/vfs";
-import type { Recipe, SavedRecipe, Difficulty } from "../types";
+import type { NutritionStrip, Recipe, SavedRecipe, Difficulty } from "../types";
 
 const RECIPES_DIR = "/home/Documents/Recipes";
 
@@ -35,6 +35,8 @@ export async function saveRecipe(recipe: Recipe): Promise<SavedRecipe> {
   const savedAt = new Date().toISOString();
   const saved: SavedRecipe = {
     ...recipe,
+    servings: recipe.servings || 2,
+    nutrition: recipe.nutrition ?? null,
     path: `${RECIPES_DIR}/${slug}.md`,
     slug,
     savedAt,
@@ -114,14 +116,26 @@ async function uniqueSlug(base: string): Promise<string> {
 }
 
 function toMarkdown(r: SavedRecipe): string {
+  const nutritionLines = r.nutrition
+    ? [
+        `nutritionCalories: ${r.nutrition.calories}`,
+        `nutritionProtein: ${r.nutrition.protein}`,
+        `nutritionFat: ${r.nutrition.fat}`,
+        `nutritionCarbs: ${r.nutrition.carbs}`,
+        `nutritionMatched: ${r.nutrition.matched}`,
+        `nutritionTotal: ${r.nutrition.total}`,
+      ]
+    : [];
   const fm = [
     "---",
     `title: ${yamlString(r.title)}`,
     `difficulty: ${r.difficulty}`,
     `cookTime: ${r.cookTime}`,
+    `servings: ${r.servings}`,
     `savedAt: ${r.savedAt}`,
     `madeCount: ${r.madeCount}`,
     `lastMadeAt: ${r.lastMadeAt ?? "null"}`,
+    ...nutritionLines,
     `source: conjureos-app-recipes`,
     "---",
     "",
@@ -164,10 +178,32 @@ function parseMarkdown(text: string, path: string, slug: string): SavedRecipe | 
   const title = front.title;
   const difficulty = isDifficulty(front.difficulty) ? front.difficulty : "medium";
   const cookTime = Number(front.cookTime);
+  const servings = Number(front.servings ?? "2");
   const savedAt = front.savedAt ?? new Date().toISOString();
   const madeCount = Number(front.madeCount ?? "0");
   const lastMadeAt =
     front.lastMadeAt && front.lastMadeAt !== "null" ? front.lastMadeAt : null;
+
+  let nutrition: NutritionStrip | null = null;
+  if (front.nutritionCalories) {
+    const calories = Number(front.nutritionCalories);
+    const protein = Number(front.nutritionProtein ?? "0");
+    const fat = Number(front.nutritionFat ?? "0");
+    const carbs = Number(front.nutritionCarbs ?? "0");
+    const matched = Number(front.nutritionMatched ?? "0");
+    const total = Number(front.nutritionTotal ?? "0");
+    if (Number.isFinite(calories)) {
+      nutrition = {
+        calories: Math.round(calories),
+        protein: Math.round(protein),
+        fat: Math.round(fat),
+        carbs: Math.round(carbs),
+        matched: Math.round(matched),
+        total: Math.round(total),
+        est: true,
+      };
+    }
+  }
 
   if (!title || !Number.isFinite(cookTime)) return null;
 
@@ -201,9 +237,11 @@ function parseMarkdown(text: string, path: string, slug: string): SavedRecipe | 
     title,
     difficulty,
     cookTime: Math.round(cookTime),
+    servings: Number.isFinite(servings) && servings > 0 ? Math.round(servings) : 2,
     summary,
     ingredients,
     instructions,
+    nutrition,
     path,
     slug,
     savedAt,

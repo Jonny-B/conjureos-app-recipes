@@ -1,6 +1,7 @@
-import { useState } from "react";
-import type { Ingredient, Recipe } from "../types";
+import { useEffect, useState } from "react";
+import type { Ingredient, NutritionStrip, Recipe } from "../types";
 import { saveRecipe } from "../features/storage";
+import { computeNutrition, formatStrip } from "../features/nutrition";
 
 interface Props {
   recipes: Recipe[];
@@ -12,12 +13,48 @@ export function RecipesScreen({ recipes, ingredients, onRestart }: Props) {
   const [savedIdx, setSavedIdx] = useState<Set<number>>(new Set());
   const [savingIdx, setSavingIdx] = useState<number | null>(null);
   const [saveErr, setSaveErr] = useState<string | null>(null);
+  // Per-card nutrition lookup state. Strip nullable so failed lookups stop
+  // re-firing on re-render and the UI can show a "—" placeholder.
+  const [nutrition, setNutrition] = useState<Array<NutritionStrip | null | "pending">>(
+    () => recipes.map(() => "pending"),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const ctrl = new AbortController();
+    (async () => {
+      // Sequential per recipe so we don't fan out 3 × N USDA calls all at once.
+      // Within a recipe, nutrition.ts uses bounded concurrency on ingredients.
+      for (let i = 0; i < recipes.length; i++) {
+        if (cancelled) return;
+        try {
+          const strip = await computeNutrition(recipes[i]!, ctrl.signal);
+          if (cancelled) return;
+          setNutrition((prev) => prev.map((s, j) => (j === i ? strip : s)));
+        } catch {
+          if (cancelled) return;
+          setNutrition((prev) => prev.map((s, j) => (j === i ? null : s)));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      ctrl.abort();
+    };
+  }, [recipes]);
 
   const onSave = async (recipe: Recipe, idx: number) => {
     setSavingIdx(idx);
     setSaveErr(null);
     try {
-      await saveRecipe(recipe);
+      // Inject the freshest nutrition data into the saved object so the strip
+      // travels with the markdown frontmatter and shows up immediately in Browse.
+      const strip = nutrition[idx];
+      const recipeWithNutrition: Recipe = {
+        ...recipe,
+        nutrition: strip && strip !== "pending" ? strip : null,
+      };
+      await saveRecipe(recipeWithNutrition);
       setSavedIdx((prev) => new Set(prev).add(idx));
     } catch (err) {
       setSaveErr(err instanceof Error ? err.message : String(err));
@@ -56,8 +93,10 @@ export function RecipesScreen({ recipes, ingredients, onRestart }: Props) {
             <div>
               <span className={`pill ${r.difficulty}`}>{r.difficulty}</span>
               <span className="pill">{r.cookTime} min</span>
+              <span className="pill">{r.servings} servings</span>
             </div>
             {r.summary && <p className="summary">{r.summary}</p>}
+            <NutritionLine state={nutrition[i] ?? null} />
 
             <section>
               <h4>Ingredients</h4>
@@ -94,6 +133,29 @@ export function RecipesScreen({ recipes, ingredients, onRestart }: Props) {
           </article>
         ))}
       </div>
+    </div>
+  );
+}
+
+function NutritionLine({ state }: { state: NutritionStrip | null | "pending" }) {
+  if (state === "pending") {
+    return (
+      <div className="muted" style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+        <div className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} />
+        Calculating nutrition…
+      </div>
+    );
+  }
+  if (!state) {
+    return (
+      <div className="faint" style={{ fontSize: 12 }}>
+        Nutrition unavailable
+      </div>
+    );
+  }
+  return (
+    <div className="muted" style={{ fontSize: 12, lineHeight: 1.4 }}>
+      {formatStrip(state)}
     </div>
   );
 }

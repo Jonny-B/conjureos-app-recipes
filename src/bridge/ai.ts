@@ -84,6 +84,7 @@ async function mockComplete(req: CompleteRequest): Promise<string> {
         title: "Spinach & Feta Scramble",
         difficulty: "easy",
         cookTime: 10,
+        servings: 2,
         summary: "Classic 10-minute scramble — wilted greens, briny cheese.",
         ingredients: ["3 eggs", "1 cup spinach", "30g feta", "1 tsp olive oil", "salt + pepper"],
         instructions: [
@@ -98,6 +99,7 @@ async function mockComplete(req: CompleteRequest): Promise<string> {
         title: "Roasted Pepper Frittata",
         difficulty: "medium",
         cookTime: 25,
+        servings: 4,
         summary: "Restaurant-feel weeknight bake. Serve with toast.",
         ingredients: ["6 eggs", "1 red bell pepper", "50g feta", "1/4 cup milk", "2 cloves garlic"],
         instructions: [
@@ -113,6 +115,7 @@ async function mockComplete(req: CompleteRequest): Promise<string> {
         title: "Shakshuka with Feta",
         difficulty: "hard",
         cookTime: 40,
+        servings: 4,
         summary: "Spiced tomato base, eggs poached in the sauce. Worth the extra time.",
         ingredients: ["4 eggs", "1 red bell pepper", "50g feta", "2 cloves garlic", "1 can tomatoes", "1 tsp cumin", "1 tsp paprika", "spinach handful"],
         instructions: [

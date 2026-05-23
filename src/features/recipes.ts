@@ -18,6 +18,7 @@ Schema:
   { "title": string,
     "difficulty": "easy" | "medium" | "hard",
     "cookTime": number,
+    "servings": number,
     "summary": string,
     "ingredients": string[],
     "instructions": string[]
@@ -30,8 +31,9 @@ Rules:
 - DO NOT suggest recipes that require ingredients far outside the user's list. If the list is too sparse for an ambitious recipe, generate three easy variations instead.
 - title: 2-6 words, evocative, no clickbait ("Best Ever…").
 - cookTime: integer minutes, prep + cook combined.
+- servings: integer, typically 2-4. Pick what naturally fits the ingredient quantities you specify.
 - summary: 1-2 sentences. Pitch why this recipe is worth making.
-- ingredients: full list with rough quantities (e.g. "2 eggs", "1 tbsp olive oil"). One per array element.
+- ingredients: full list with rough quantities scaled for the servings count (e.g. "2 eggs", "1 tbsp olive oil", "200g spinach"). One per array element. Prefer metric weights or standard US volumes — these get parsed for nutrition lookup, so "a handful" or "to taste" produces worse macro estimates than "30g" or "1 tsp".
 - instructions: numbered steps as separate array elements, no numbering in the strings themselves. 4-10 steps. Active voice, imperatives.`;
 
 export async function generateRecipes(ingredients: Ingredient[]): Promise<Recipe[]> {
@@ -100,13 +102,19 @@ function parseRecipesResponse(raw: string): Recipe[] {
       ? o.instructions.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
       : [];
     if (ingredients.length === 0 || instructions.length === 0) continue;
+    const servings =
+      typeof o.servings === "number" && o.servings > 0 && o.servings <= 24
+        ? Math.round(o.servings)
+        : 2;
     out.push({
       title: o.title.trim(),
       difficulty,
       cookTime,
+      servings,
       ingredients,
       instructions,
       summary: typeof o.summary === "string" ? o.summary.trim() : undefined,
+      nutrition: null,
     });
   }
   return out;

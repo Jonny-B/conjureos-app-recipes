@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SavedRecipe } from "../types";
 import { deleteRecipe, listSavedRecipes, markMade } from "../features/storage";
+import { formatStrip } from "../features/nutrition";
 
 type Sort = "recent" | "made";
 
@@ -129,7 +130,10 @@ export function BrowseScreen() {
                 <div className="meta">
                   <span className={`pill ${r.difficulty}`}>{r.difficulty}</span>
                   {" · "}
-                  {r.cookTime} min · saved {formatRelative(r.savedAt)}
+                  {r.cookTime} min
+                  {r.nutrition && ` · ~${r.nutrition.calories} cal/serv`}
+                  {" · saved "}
+                  {formatRelative(r.savedAt)}
                 </div>
               </div>
               {r.madeCount > 0 && (
@@ -184,11 +188,17 @@ function RecipeDetail({ recipe, onBack, onMade, onDelete }: DetailProps) {
         <div>
           <span className={`pill ${recipe.difficulty}`}>{recipe.difficulty}</span>
           <span className="pill">{recipe.cookTime} min</span>
+          <span className="pill">{recipe.servings} servings</span>
           {recipe.madeCount > 0 && (
             <span className="pill">made {recipe.madeCount}× · last {formatRelative(recipe.lastMadeAt!)}</span>
           )}
         </div>
         {recipe.summary && <p className="summary">{recipe.summary}</p>}
+        {recipe.nutrition && (
+          <div className="muted" style={{ fontSize: 12, lineHeight: 1.4 }}>
+            {formatStrip(recipe.nutrition)}
+          </div>
+        )}
 
         <section>
           <h4>Ingredients</h4>

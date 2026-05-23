@@ -23,12 +23,33 @@ export interface Recipe {
   difficulty: Difficulty;
   /** Total time in minutes (prep + cook). */
   cookTime: number;
+  /** How many servings the recipe yields. Defaults to 2 if the AI omits it. */
+  servings: number;
   /** Ingredients with rough quantities, e.g. "2 eggs", "1 tbsp olive oil". */
   ingredients: string[];
   /** Numbered steps, one string per step. */
   instructions: string[];
   /** Short pitch shown above the steps. */
   summary?: string;
+  /** Per-serving estimated macros from USDA FoodData Central. Null when lookup hasn't run yet or failed. */
+  nutrition?: NutritionStrip | null;
+}
+
+/**
+ * Estimated per-serving macros. All values are rounded integers. `est` is
+ * always true (this is a sum-of-USDA-100g-values × parsed-quantity calculation,
+ * not a lab-measured number). Display with a "~" prefix and an "est." footer.
+ */
+export interface NutritionStrip {
+  calories: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+  /** Number of ingredients we successfully matched to USDA entries. */
+  matched: number;
+  /** Total ingredient count. matched/total < 0.7 → display "rough" instead of "est." */
+  total: number;
+  est: true;
 }
 
 /**
