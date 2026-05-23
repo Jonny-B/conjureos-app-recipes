@@ -23,15 +23,14 @@ import type { Ingredient, Recipe, NutritionStrip } from "../types";
 
 // ── Quantity parsing for display ──────────────────────────────────────
 
-const UNICODE_FRACTIONS: Record<string, number> = {
-  "¼": 0.25, "½": 0.5, "¾": 0.75,
-  "⅐": 1 / 7, "⅑": 1 / 9, "⅒": 0.1,
-  "⅓": 1 / 3, "⅔": 2 / 3,
-  "⅕": 0.2, "⅖": 0.4, "⅗": 0.6, "⅘": 0.8,
-  "⅙": 1 / 6, "⅚": 5 / 6,
-  "⅛": 0.125, "⅜": 0.375, "⅝": 0.625, "⅞": 0.875,
-};
-
+/**
+ * Display-quantity parser — ASCII-only. See nutrition.ts for the full
+ * rationale on why we don't accept Unicode fraction characters: the
+ * literals corrupted in some ZIP-import pipelines, producing iframe-
+ * fatal "Invalid regular expression" errors. AI-generated recipes use
+ * ASCII fractions ("1/2 cup") universally, so this is zero practical
+ * loss.
+ */
 interface DisplayQuantity {
   /** Numeric coefficient, or null if the line carries no quantity. */
   count: number | null;
@@ -65,7 +64,7 @@ export function parseDisplayQuantity(line: string): DisplayQuantity {
   const tokens = line.trim().split(/\s+/);
   if (tokens.length === 0) return { count: null, unit: null, rest: line };
 
-  // Pull leading numeric tokens. Supports "2", "1.5", "1/2", "1 1/2", "1½".
+  // Pull leading numeric tokens. Supports "2", "1.5", "1/2", "1 1/2".
   let i = 0;
   let count: number | null = null;
   while (i < tokens.length) {
@@ -74,14 +73,6 @@ export function parseDisplayQuantity(line: string): DisplayQuantity {
     if (parsed === null) break;
     count = (count ?? 0) + parsed;
     i += 1;
-  }
-  // Unicode-fraction suffix like "1½" — split.
-  if (count === null && tokens[0]) {
-    const m = tokens[0].match(/^(\d+)([¼-¾⅐-⅞])$/);
-    if (m) {
-      count = Number(m[1]) + (UNICODE_FRACTIONS[m[2]!] ?? 0);
-      i = 1;
-    }
   }
 
   if (count === null) {
@@ -113,7 +104,6 @@ export function parseDisplayQuantity(line: string): DisplayQuantity {
 function parseNumericToken(token: string): number | null {
   if (/^\d+$/.test(token)) return Number(token);
   if (/^\d+\.\d+$/.test(token)) return Number(token);
-  if (UNICODE_FRACTIONS[token] !== undefined) return UNICODE_FRACTIONS[token]!;
   const m = token.match(/^(\d+)\/(\d+)$/);
   if (m) {
     const num = Number(m[1]);

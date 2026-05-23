@@ -149,22 +149,22 @@ interface ParsedIngredient {
   raw: string;
 }
 
-const UNICODE_FRACTIONS: Record<string, number> = {
-  "¼": 0.25, "½": 0.5, "¾": 0.75,
-  "⅐": 1 / 7, "⅑": 1 / 9, "⅒": 0.1,
-  "⅓": 1 / 3, "⅔": 2 / 3,
-  "⅕": 0.2, "⅖": 0.4, "⅗": 0.6, "⅘": 0.8,
-  "⅙": 1 / 6, "⅚": 5 / 6,
-  "⅛": 0.125, "⅜": 0.375, "⅝": 0.625, "⅞": 0.875,
-};
-
+/**
+ * Quantity-token parser — ASCII-only. Earlier versions accepted Unicode
+ * fraction characters (1/4, 1/2, 3/4, plus the U+2150..215E block) but
+ * the literals corrupted in some ZIP-import pipelines (PowerShell
+ * Compress-Archive's default code page, certain editors saving as UTF-16),
+ * producing "Invalid regular expression: Range out of order in character
+ * class" at iframe parse time. Removed wholesale rather than escaped:
+ * the AI generates "1/2 cup" not "1/2 cup", so dropping these is zero
+ * loss in practice and the source is now bulletproof against any
+ * encoding mishap.
+ */
 function parseQuantityToken(token: string): number | null {
   // Plain number.
   if (/^\d+$/.test(token)) return Number(token);
   if (/^\d+\.\d+$/.test(token)) return Number(token);
-  // Unicode fraction alone.
-  if (UNICODE_FRACTIONS[token] !== undefined) return UNICODE_FRACTIONS[token];
-  // "1/2", "3/4"
+  // ASCII fraction like "1/2" or "3/4".
   const m = token.match(/^(\d+)\/(\d+)$/);
   if (m) {
     const num = Number(m[1]);
@@ -179,12 +179,15 @@ export function parseIngredient(line: string): ParsedIngredient | null {
   if (!lower) return null;
   if (TRACE_INGREDIENTS.has(lower)) return null;
 
-  // Strip leading list marker / parenthetical asides at the end.
-  const trimmed = lower.replace(/^[-*•]\s*/, "").replace(/\s*\([^)]*\)\s*$/, "").trim();
+  // Strip leading list marker / parenthetical asides at the end. ASCII
+  // markers only (- and *); Unicode bullet stripped from the class for
+  // the same encoding-safety reason as the fraction parser above.
+  const trimmed = lower.replace(/^[-*]\s*/, "").replace(/\s*\([^)]*\)\s*$/, "").trim();
   const tokens = trimmed.split(/\s+/);
   if (tokens.length === 0) return null;
 
-  // Pull leading quantity. May be a mixed number ("1 1/2 cups") or unicode ("1½ cups").
+  // Pull leading quantity. Supports mixed numbers ("1 1/2 cups") via
+  // repeated parseQuantityToken application.
   let i = 0;
   let quantity: number | null = null;
   while (i < tokens.length) {
@@ -193,15 +196,6 @@ export function parseIngredient(line: string): ParsedIngredient | null {
     if (parsed === null) break;
     quantity = (quantity ?? 0) + parsed;
     i += 1;
-  }
-  // Unicode-fraction suffix like "1½" — split if needed.
-  if (quantity === null && tokens[0]) {
-    const first = tokens[0];
-    const m = first.match(/^(\d+)([¼-¾⅐-⅞])$/);
-    if (m) {
-      quantity = Number(m[1]) + (UNICODE_FRACTIONS[m[2]!] ?? 0);
-      i = 1;
-    }
   }
 
   // Find the unit (next token, possibly two for "fl oz")

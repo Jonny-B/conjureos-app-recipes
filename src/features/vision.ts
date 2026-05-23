@@ -171,15 +171,27 @@ export function sanitizeName(raw: unknown): string {
  */
 function sanitizeFreeForm(raw: unknown, maxLen: number): string | undefined {
   if (typeof raw !== "string") return undefined;
-  const cleaned = raw
-    .replace(/[ -]/g, "")
-    .replace(/[`"]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  // Strip char-by-char with charCodeAt rather than a regex literal —
+  // the regex form earlier had a literal NUL byte in the source that
+  // some ZIP-import pipelines corrupt mid-flight, producing iframe-
+  // fatal "Invalid regular expression" errors. Pure-ASCII source is
+  // bulletproof. Strips: ASCII control chars (0-31, 127),
+  // double-quote, backtick — same semantics as before. Quotes and
+  // backticks gone to prevent string-break injection when these
+  // values get spliced into the recipe-gen system prompt.
+  let stripped = "";
+  for (let i = 0; i < raw.length; i++) {
+    const code = raw.charCodeAt(i);
+    if (code < 0x20) continue;
+    if (code === 0x7F) continue;
+    if (code === 0x22) continue;
+    if (code === 0x60) continue;
+    stripped += raw[i];
+  }
+  const cleaned = stripped.replace(/\s+/g, " ").trim();
   if (!cleaned) return undefined;
   return cleaned.slice(0, maxLen);
 }
-
 function stripCodeFence(s: string): string {
   const fenced = s.match(/^```(?:json)?\s*([\s\S]*?)\s*```\s*$/);
   return fenced ? fenced[1]! : s;
