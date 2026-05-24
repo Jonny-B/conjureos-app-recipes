@@ -52,7 +52,7 @@ body,
 }
 
 body {
-  font-family: "Nunito", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-family: "Nunito", ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   background: var(--bg-0);
   color: var(--fg);
   font-size: 14px;
@@ -106,7 +106,7 @@ h1, h2, h3, h4,
 .btn,
 .nav-btn,
 .serving-count {
-  font-family: "Fredoka", "Nunito", system-ui, sans-serif;
+  font-family: "Fredoka", ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-serif;
 }
 
 button {
