@@ -73,7 +73,7 @@ export function RecipesScreen({ recipes, ingredients, onRestart }: Props) {
     };
   }, [recipes]);
 
-  const onSave = async (recipe: Recipe, idx: number) => {
+  const onSave = async (idx: number) => {
     setSavingIdx(idx);
     setSaveErr(null);
     try {
@@ -83,7 +83,10 @@ export function RecipesScreen({ recipes, ingredients, onRestart }: Props) {
           ? cardState.strip
           : null;
       // Save the SCALED version — what the user actually intends to cook.
-      const scaled = scaleRecipe(recipe, scaleFactors[idx] ?? 1);
+      // Scale from the ORIGINAL recipe exactly once; the card already
+      // renders a scaled copy but persistence must derive from the source
+      // so the factor isn't applied twice.
+      const scaled = scaleRecipe(recipes[idx]!, scaleFactors[idx] ?? 1);
       const recipeWithNutrition: Recipe = { ...scaled, nutrition: strip };
       await saveRecipe(recipeWithNutrition);
       setSavedIdx((prev) => new Set(prev).add(idx));
@@ -156,7 +159,7 @@ export function RecipesScreen({ recipes, ingredients, onRestart }: Props) {
               onServingsChange={(delta) => adjustServings(i, delta)}
               onScaleToAvailable={() => scaleToAvailable(i)}
               onResetScale={() => resetScale(i)}
-              onSave={() => onSave(scaled, i)}
+              onSave={() => onSave(i)}
             />
           );
         })}

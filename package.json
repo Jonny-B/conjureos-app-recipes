@@ -20,7 +20,7 @@
     "actions": {
       "listRecipes": {
         "permission": "actions.read",
-        "description": "List the user's saved recipes, optionally filtered by title or ingredient substring. Returns title, slug, difficulty, cookTime, servings, ingredients, savedAt, madeCount, and per-serving nutrition when available."
+        "description": "List the user's saved recipes, optionally filtered by title or ingredient substring. Returns title, slug, difficulty, cookTime, servings, ingredients, savedAt, madeCount, lastMadeAt, and per-serving nutrition when available."
       },
       "getRecipe": {
         "permission": "actions.read",

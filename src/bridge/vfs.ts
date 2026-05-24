@@ -48,7 +48,15 @@ export const vfs: VFSBridge = {
   async exists(path) {
     const r = real();
     if (r) return r.exists(path);
-    return memStore.has(path);
+    if (memStore.has(path)) return true;
+    // Directory semantics: a path "exists" if anything is stored beneath
+    // it. Without this the mock reports the Recipes dir as missing (mkdir
+    // is a no-op here), so the Saved tab stays empty in `npm run dev`.
+    const prefix = path.endsWith("/") ? path : path + "/";
+    for (const key of memStore.keys()) {
+      if (key.startsWith(prefix)) return true;
+    }
+    return false;
   },
   async ls(path) {
     const r = real();

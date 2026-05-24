@@ -155,6 +155,9 @@ interface ListedRecipe {
   ingredients: string[];
   savedAt: string;
   madeCount: number;
+  /** ISO timestamp of the most recent cook, or null. Lets calorie/health
+   *  apps answer "what did I cook this week?" without a getRecipe per item. */
+  lastMadeAt: string | null;
   nutrition: NutritionStrip | null;
 }
 
@@ -194,6 +197,7 @@ function projectListed(r: SavedRecipe): ListedRecipe {
     ingredients: r.ingredients,
     savedAt: r.savedAt,
     madeCount: r.madeCount,
+    lastMadeAt: r.lastMadeAt ?? null,
     nutrition: r.nutrition ?? null,
   };
 }
