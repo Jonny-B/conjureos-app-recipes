@@ -1,23 +1,42 @@
-/* Recipe app — visual language aligned with ConjureOS Modern-Whimsy.
- * Tokens mirror the kernel's :root variables so the app reads as a
- * first-class citizen when running inside the shell. */
+/* Recipe app — Modern-Whimsy visual language for ConjureOS.
+ * A playful candy-on-plum night kitchen: rounded display type, soft
+ * multi-hue glows, bouncy interactions. Tokens still echo the kernel's
+ * :root so the app reads as a first-class citizen inside the shell. */
 
 :root {
-  --bg-0: #0b1020;
-  --bg-1: #11172b;
-  --bg-2: #161e36;
-  --bg-3: #1d2742;
-  --fg: #e6ecff;
-  --fg-dim: #9aa6c5;
-  --fg-faint: #6b7796;
-  --accent: #7c6af7;
-  --accent-2: #6366f1;
-  --accent-soft: #a5b4fc;
-  --accent-warm: #f4a261;
-  --border: #232c4a;
-  --border-soft: rgba(255, 255, 255, 0.08);
-  --danger: #ef4444;
-  --success: #34d399;
+  /* Warm plum-indigo night, a little softer than cold navy. */
+  --bg-0: #16122b;
+  --bg-1: #1e1839;
+  --bg-2: #271f49;
+  --bg-3: #332859;
+  --fg: #f5f1ff;
+  --fg-dim: #b6abd6;
+  --fg-faint: #8479a6;
+
+  /* Candy accents — cohesive but cheerful. */
+  --grape: #b388ff;
+  --bubblegum: #ff8fc7;
+  --tangerine: #ffb24d;
+  --mint: #5eead4;
+  --sky: #82c8ff;
+  --butter: #ffe08a;
+
+  /* Semantic mappings (keep old names working). */
+  --accent: #b388ff;
+  --accent-2: #ff8fc7;
+  --accent-soft: #d9c3ff;
+  --accent-warm: #ffb24d;
+  --border: #3a2f63;
+  --border-soft: rgba(255, 255, 255, 0.07);
+  --danger: #ff6b8b;
+  --success: #5eead4;
+
+  --grad-primary: linear-gradient(135deg, #ff8fc7 0%, #b388ff 55%, #8e7bff 100%);
+  --grad-warm: linear-gradient(135deg, #ffd16a, #ffb24d);
+  --shadow-glow: 0 14px 40px -16px rgba(179, 136, 255, 0.55);
+  --shadow-soft: 0 8px 24px -12px rgba(8, 5, 22, 0.7);
+
+  --bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 * {
@@ -33,11 +52,61 @@ body,
 }
 
 body {
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-family: "Nunito", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   background: var(--bg-0);
   color: var(--fg);
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Floating, blurred color blobs behind everything — the "whimsy" base. */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  z-index: 0;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+body::before {
+  width: 460px;
+  height: 460px;
+  top: -160px;
+  right: -120px;
+  background: radial-gradient(circle at 30% 30%, var(--bubblegum), transparent 70%);
+  animation: float-a 16s ease-in-out infinite;
+}
+
+body::after {
+  width: 520px;
+  height: 520px;
+  bottom: -200px;
+  left: -160px;
+  background: radial-gradient(circle at 70% 70%, var(--grape), transparent 70%);
+  animation: float-b 20s ease-in-out infinite;
+}
+
+@keyframes float-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-30px, 40px) scale(1.08); }
+}
+
+@keyframes float-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(40px, -30px) scale(1.12); }
+}
+
+h1, h2, h3, h4,
+.app-header h1,
+.btn,
+.nav-btn,
+.serving-count {
+  font-family: "Fredoka", "Nunito", system-ui, sans-serif;
 }
 
 button {
@@ -46,7 +115,8 @@ button {
 }
 
 input,
-textarea {
+textarea,
+select {
   font: inherit;
   color: inherit;
 }
@@ -58,23 +128,46 @@ textarea {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 .app-header {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 18px;
+  padding: 14px 20px;
   border-bottom: 1px solid var(--border-soft);
-  background: linear-gradient(180deg, rgba(124, 106, 247, 0.10), transparent);
+  background: linear-gradient(180deg, rgba(179, 136, 255, 0.14), rgba(255, 143, 199, 0.04));
+  backdrop-filter: blur(8px);
   flex-shrink: 0;
 }
 
 .app-header h1 {
   margin: 0;
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.01em;
+  background: var(--grad-primary);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-header h1::before {
+  content: "🍳";
+  -webkit-text-fill-color: initial;
+  font-size: 22px;
+  animation: wiggle 4s ease-in-out infinite;
+}
+
+@keyframes wiggle {
+  0%, 88%, 100% { transform: rotate(0deg); }
+  92% { transform: rotate(-12deg); }
+  96% { transform: rotate(12deg); }
 }
 
 .app-header .header-spacer {
@@ -83,35 +176,40 @@ textarea {
 
 .app-nav {
   display: flex;
-  gap: 4px;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.18);
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
 }
 
 .nav-btn {
   background: transparent;
-  border: 1px solid transparent;
+  border: none;
   color: var(--fg-dim);
-  padding: 6px 12px;
-  border-radius: 8px;
+  padding: 7px 16px;
+  border-radius: 999px;
   cursor: pointer;
   font-size: 13px;
-  transition: background 0.12s, color 0.12s, border 0.12s;
+  font-weight: 500;
+  transition: background 0.2s, color 0.2s, transform 0.15s var(--bounce);
 }
 
 .nav-btn:hover {
   color: var(--fg);
-  background: var(--bg-2);
+  transform: translateY(-1px);
 }
 
 .nav-btn.active {
-  color: var(--fg);
-  background: var(--bg-3);
-  border-color: var(--border);
+  color: #2a1840;
+  background: var(--grad-primary);
+  box-shadow: 0 6px 16px -6px rgba(255, 143, 199, 0.7);
 }
 
 .app-body {
   flex: 1;
   overflow: auto;
-  padding: 24px;
+  padding: 28px 24px;
 }
 
 /* ── Cards + primitives ────────────────────────────────────────────── */
@@ -119,55 +217,69 @@ textarea {
 .card {
   background: var(--bg-1);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 20px;
+  border-radius: 20px;
+  padding: 22px;
+  box-shadow: var(--shadow-soft);
 }
 
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background: var(--grad-primary);
   border: none;
-  color: white;
-  padding: 10px 18px;
-  border-radius: 10px;
+  color: #2a1840;
+  padding: 11px 20px;
+  border-radius: 999px;
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 600;
   font-size: 14px;
-  transition: filter 0.12s, transform 0.05s;
+  box-shadow: 0 8px 20px -8px rgba(179, 136, 255, 0.75);
+  transition: transform 0.18s var(--bounce), box-shadow 0.18s, filter 0.18s;
 }
 
 .btn:hover {
-  filter: brightness(1.1);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 12px 26px -8px rgba(255, 143, 199, 0.8);
 }
 
 .btn:active {
-  transform: translateY(1px);
+  transform: translateY(0) scale(0.98);
 }
 
 .btn:disabled {
-  filter: grayscale(0.6) brightness(0.7);
+  filter: grayscale(0.5) brightness(0.75);
+  box-shadow: none;
+  transform: none;
   cursor: not-allowed;
 }
 
 .btn.secondary {
   background: var(--bg-3);
   border: 1px solid var(--border);
+  color: var(--fg);
+  box-shadow: var(--shadow-soft);
+}
+
+.btn.secondary:hover {
+  border-color: var(--grape);
 }
 
 .btn.danger {
-  background: linear-gradient(135deg, var(--danger), #b91c1c);
+  background: linear-gradient(135deg, #ff6b8b, #e23d6a);
+  color: #fff;
 }
 
 .btn.ghost {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
   color: var(--fg-dim);
+  box-shadow: none;
 }
 
 .btn.ghost:hover {
   color: var(--fg);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .muted {
@@ -190,29 +302,36 @@ textarea {
 
 .capture-screen h2 {
   margin: 0;
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.01em;
 }
 
 .capture-area {
-  border: 2px dashed var(--border);
-  border-radius: 14px;
-  padding: 40px 20px;
+  border: 2.5px dashed var(--border);
+  border-radius: 24px;
+  padding: 44px 20px;
   text-align: center;
-  background: var(--bg-1);
-  transition: border 0.15s, background 0.15s;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent);
+  transition: border-color 0.25s, background 0.25s, transform 0.25s var(--bounce);
 }
 
 .capture-area.dragover {
-  border-color: var(--accent);
-  background: rgba(124, 106, 247, 0.08);
+  border-color: var(--bubblegum);
+  background: rgba(255, 143, 199, 0.08);
+  transform: scale(1.015);
 }
 
 .capture-area .icon {
-  font-size: 48px;
+  font-size: 54px;
   margin-bottom: 12px;
-  opacity: 0.4;
+  filter: drop-shadow(0 6px 14px rgba(179, 136, 255, 0.4));
+  animation: bob 3.5s ease-in-out infinite;
+}
+
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
 }
 
 .capture-buttons {
@@ -224,10 +343,11 @@ textarea {
 
 .photo-preview {
   position: relative;
-  border-radius: 14px;
+  border-radius: 20px;
   overflow: hidden;
   background: var(--bg-1);
   border: 1px solid var(--border);
+  box-shadow: var(--shadow-soft);
 }
 
 .photo-preview img {
@@ -238,20 +358,25 @@ textarea {
   object-fit: contain;
 }
 
-/* Multi-photo gallery on the capture screen */
 .photo-gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .photo-tile {
   position: relative;
   aspect-ratio: 1;
-  border-radius: 10px;
+  border-radius: 16px;
   overflow: hidden;
   background: var(--bg-1);
   border: 1px solid var(--border);
+  box-shadow: var(--shadow-soft);
+  transition: transform 0.2s var(--bounce);
+}
+
+.photo-tile:hover {
+  transform: translateY(-3px) rotate(-1deg);
 }
 
 .photo-tile img {
@@ -263,13 +388,13 @@ textarea {
 
 .photo-tile-remove {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 24px;
-  height: 24px;
+  top: 7px;
+  right: 7px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  background: rgba(11, 16, 32, 0.85);
-  border: 1px solid var(--border);
+  background: rgba(22, 18, 43, 0.82);
+  border: 1px solid var(--border-soft);
   color: var(--fg);
   font-size: 12px;
   cursor: pointer;
@@ -277,11 +402,14 @@ textarea {
   align-items: center;
   justify-content: center;
   padding: 0;
+  backdrop-filter: blur(4px);
+  transition: background 0.18s, transform 0.18s var(--bounce);
 }
 
 .photo-tile-remove:hover {
   background: var(--danger);
   border-color: var(--danger);
+  transform: scale(1.15);
 }
 
 .photo-tile-meta {
@@ -289,10 +417,10 @@ textarea {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 4px 8px;
+  padding: 5px 9px;
   font-size: 10px;
   color: var(--fg-dim);
-  background: linear-gradient(180deg, transparent, rgba(11, 16, 32, 0.85));
+  background: linear-gradient(180deg, transparent, rgba(16, 12, 32, 0.9));
 }
 
 .capture-area.disabled {
@@ -300,10 +428,9 @@ textarea {
   cursor: not-allowed;
 }
 
-/* Photo strip on the ingredients screen (compact horizontal scroll) */
 .photo-strip {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   overflow-x: auto;
   padding-bottom: 4px;
 }
@@ -312,9 +439,10 @@ textarea {
   flex: 0 0 auto;
   height: 100px;
   width: auto;
-  border-radius: 8px;
+  border-radius: 14px;
   border: 1px solid var(--border-soft);
   object-fit: cover;
+  box-shadow: var(--shadow-soft);
 }
 
 /* ── Ingredients screen ────────────────────────────────────────────── */
@@ -331,8 +459,9 @@ textarea {
   width: 100%;
   max-height: 240px;
   object-fit: cover;
-  border-radius: 12px;
+  border-radius: 20px;
   border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-soft);
 }
 
 .ing-group {
@@ -343,36 +472,40 @@ textarea {
 
 .ing-group-label {
   font-size: 11px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--accent-soft);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .ing-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
+  padding: 11px 15px;
   background: var(--bg-1);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  transition: border 0.12s, background 0.12s;
+  border-radius: 14px;
+  transition: border-color 0.18s, background 0.18s, transform 0.18s var(--bounce);
+}
+
+.ing-row:hover {
+  transform: translateX(3px);
 }
 
 .ing-row.confirmed {
-  border-color: rgba(52, 211, 153, 0.4);
-  background: rgba(52, 211, 153, 0.05);
+  border-color: rgba(94, 234, 212, 0.45);
+  background: rgba(94, 234, 212, 0.06);
 }
 
 .ing-row.unconfirmed {
-  border-color: rgba(244, 162, 97, 0.4);
-  background: rgba(244, 162, 97, 0.04);
+  border-color: rgba(255, 178, 77, 0.45);
+  background: rgba(255, 178, 77, 0.05);
 }
 
 .ing-row .name {
   flex: 1;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .ing-row .notes {
@@ -382,10 +515,11 @@ textarea {
 
 .ing-row .conf {
   font-size: 11px;
-  padding: 2px 8px;
+  padding: 2px 9px;
   border-radius: 999px;
   background: var(--bg-3);
   color: var(--fg-dim);
+  font-weight: 700;
 }
 
 .ing-row .qty-pill {
@@ -393,16 +527,18 @@ textarea {
   border: 1px solid var(--border);
   color: var(--accent-soft);
   font-size: 12px;
-  padding: 3px 10px;
+  font-weight: 600;
+  padding: 4px 11px;
   border-radius: 999px;
   cursor: pointer;
   font-family: inherit;
+  transition: transform 0.15s var(--bounce), border-color 0.15s, color 0.15s;
 }
 
 .ing-row .qty-pill:hover {
-  background: var(--bg-2);
-  border-color: var(--accent);
+  border-color: var(--grape);
   color: var(--fg);
+  transform: scale(1.05);
 }
 
 .qty-edit-form {
@@ -413,10 +549,10 @@ textarea {
 
 .qty-edit-form input {
   background: var(--bg-2);
-  border: 1px solid var(--accent);
+  border: 1px solid var(--grape);
   color: var(--fg);
-  padding: 4px 8px;
-  border-radius: 6px;
+  padding: 5px 9px;
+  border-radius: 8px;
   font-size: 12px;
   outline: none;
   width: 110px;
@@ -431,15 +567,17 @@ textarea {
   background: transparent;
   border: none;
   color: var(--fg-dim);
-  padding: 4px 8px;
-  border-radius: 6px;
+  padding: 5px 9px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 13px;
+  transition: background 0.15s, color 0.15s, transform 0.15s var(--bounce);
 }
 
 .ing-row button.icon-btn:hover {
   background: var(--bg-3);
   color: var(--fg);
+  transform: scale(1.15);
 }
 
 .add-ing-form {
@@ -452,13 +590,15 @@ textarea {
   background: var(--bg-1);
   border: 1px solid var(--border);
   color: var(--fg);
-  padding: 10px 14px;
-  border-radius: 10px;
+  padding: 11px 15px;
+  border-radius: 14px;
   outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
 }
 
 .add-ing-form input:focus {
-  border-color: var(--accent);
+  border-color: var(--grape);
+  box-shadow: 0 0 0 3px rgba(179, 136, 255, 0.18);
 }
 
 /* ── Recipes screen ────────────────────────────────────────────────── */
@@ -474,67 +614,92 @@ textarea {
 .recipes-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 16px;
+  gap: 18px;
 }
 
 .recipe-card {
   background: var(--bg-1);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 18px;
+  border-radius: 22px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  box-shadow: var(--shadow-soft);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.25s var(--bounce), box-shadow 0.25s, border-color 0.25s;
+}
+
+/* A cheerful gradient ribbon along the top of each card. */
+.recipe-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--grad-primary);
+}
+
+.recipe-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-glow);
+  border-color: var(--grape);
 }
 
 .recipe-card h3 {
   margin: 0;
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.01em;
 }
 
-.recipe-card .pill {
+.recipe-card .pill,
+.browse-item .pill {
   display: inline-block;
   font-size: 11px;
-  padding: 2px 10px;
+  padding: 3px 11px;
   border-radius: 999px;
   background: var(--bg-3);
   color: var(--accent-soft);
-  letter-spacing: 0.04em;
-  font-weight: 500;
+  letter-spacing: 0.05em;
+  font-weight: 700;
   text-transform: uppercase;
   margin-right: 6px;
 }
 
-.recipe-card .pill.easy {
-  background: rgba(52, 211, 153, 0.15);
-  color: #6ee7b7;
+.recipe-card .pill.easy,
+.browse-item .pill.easy {
+  background: rgba(94, 234, 212, 0.18);
+  color: #8af0dd;
 }
 
-.recipe-card .pill.medium {
-  background: rgba(244, 162, 97, 0.15);
-  color: #fcd34d;
+.recipe-card .pill.medium,
+.browse-item .pill.medium {
+  background: rgba(255, 178, 77, 0.18);
+  color: var(--butter);
 }
 
-.recipe-card .pill.hard {
-  background: rgba(239, 68, 68, 0.15);
-  color: #fca5a5;
+.recipe-card .pill.hard,
+.browse-item .pill.hard {
+  background: rgba(255, 107, 139, 0.18);
+  color: #ffb0c0;
 }
 
 .recipe-card .summary {
   color: var(--fg-dim);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .recipe-card section h4 {
   margin: 0 0 6px 0;
   font-size: 11px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--fg-faint);
-  font-weight: 600;
+  color: var(--accent-soft);
+  font-weight: 700;
 }
 
 .recipe-card ul,
@@ -542,12 +707,36 @@ textarea {
   margin: 0;
   padding-left: 18px;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.65;
   color: var(--fg-dim);
 }
 
+.recipe-card ul {
+  list-style: none;
+  padding-left: 4px;
+}
+
+.recipe-card ul li {
+  position: relative;
+  padding-left: 20px;
+  margin-bottom: 3px;
+}
+
+.recipe-card ul li::before {
+  content: "•";
+  position: absolute;
+  left: 4px;
+  color: var(--bubblegum);
+  font-weight: 700;
+}
+
 .recipe-card ol li {
-  margin-bottom: 4px;
+  margin-bottom: 5px;
+}
+
+.recipe-card ol li::marker {
+  color: var(--grape);
+  font-weight: 700;
 }
 
 .recipe-card .row {
@@ -556,7 +745,6 @@ textarea {
   align-items: center;
 }
 
-/* Servings stepper + scale controls */
 .scale-row {
   display: flex;
   align-items: center;
@@ -571,37 +759,39 @@ textarea {
   background: var(--bg-2);
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 2px 4px;
+  padding: 3px 5px;
 }
 
 .serving-stepper button {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border: none;
   background: transparent;
   color: var(--fg-dim);
   cursor: pointer;
   border-radius: 50%;
-  font-size: 16px;
+  font-size: 17px;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
+  transition: background 0.15s, color 0.15s, transform 0.15s var(--bounce);
 }
 
 .serving-stepper button:hover:not(:disabled) {
-  background: var(--bg-3);
-  color: var(--fg);
+  background: var(--grad-primary);
+  color: #2a1840;
+  transform: scale(1.12);
 }
 
 .serving-stepper button:disabled {
-  opacity: 0.35;
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
 .serving-count {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   padding: 0 8px;
 }
 
@@ -609,16 +799,16 @@ textarea {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: rgba(244, 162, 97, 0.08);
-  border: 1px solid rgba(244, 162, 97, 0.35);
-  border-radius: 10px;
-  padding: 10px 12px;
+  background: rgba(255, 178, 77, 0.09);
+  border: 1px solid rgba(255, 178, 77, 0.4);
+  border-radius: 16px;
+  padding: 12px 14px;
 }
 
 .shortage-banner-text {
   flex: 1;
   font-size: 13px;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 .ing-shortage {
@@ -648,7 +838,7 @@ textarea {
 
 .browse-header h2 {
   margin: 0;
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 600;
 }
 
@@ -659,8 +849,14 @@ textarea {
   align-items: center;
   background: var(--bg-1);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0 12px;
+  border-radius: 999px;
+  padding: 0 16px;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+
+.browse-filter:focus-within {
+  border-color: var(--grape);
+  box-shadow: 0 0 0 3px rgba(179, 136, 255, 0.18);
 }
 
 .browse-filter input {
@@ -669,30 +865,33 @@ textarea {
   border: none;
   outline: none;
   color: var(--fg);
-  padding: 10px 0;
+  padding: 11px 0;
 }
 
 .browse-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .browse-item {
   background: var(--bg-1);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px 18px;
+  border-radius: 18px;
+  padding: 15px 20px;
   display: flex;
   align-items: center;
   gap: 14px;
   cursor: pointer;
-  transition: background 0.12s, border 0.12s;
+  box-shadow: var(--shadow-soft);
+  transition: background 0.18s, border-color 0.18s, transform 0.18s var(--bounce), box-shadow 0.18s;
 }
 
 .browse-item:hover {
   background: var(--bg-2);
-  border-color: var(--accent);
+  border-color: var(--grape);
+  transform: translateX(5px);
+  box-shadow: var(--shadow-glow);
 }
 
 .browse-item .title-block {
@@ -700,32 +899,46 @@ textarea {
 }
 
 .browse-item .title-block .title {
-  font-weight: 500;
-  font-size: 14px;
+  font-weight: 700;
+  font-size: 15px;
 }
 
 .browse-item .title-block .meta {
   font-size: 12px;
   color: var(--fg-faint);
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 .browse-item .made-pill {
   font-size: 12px;
-  color: var(--fg-dim);
+  font-weight: 700;
+  color: #2a1840;
+  background: var(--grad-warm);
+  padding: 4px 11px;
+  border-radius: 999px;
 }
 
 .empty-state {
   text-align: center;
-  padding: 60px 20px;
+  padding: 64px 20px;
   color: var(--fg-faint);
+  font-size: 15px;
+}
+
+.empty-state::before {
+  content: "🧺";
+  display: block;
+  font-size: 48px;
+  margin-bottom: 14px;
+  opacity: 0.8;
+  animation: bob 3.5s ease-in-out infinite;
 }
 
 /* ── Status / spinner / error ──────────────────────────────────────── */
 
 .status-banner {
-  padding: 12px 16px;
-  border-radius: 10px;
+  padding: 13px 17px;
+  border-radius: 16px;
   background: var(--bg-1);
   border: 1px solid var(--border);
   color: var(--fg-dim);
@@ -735,18 +948,19 @@ textarea {
 }
 
 .status-banner.error {
-  background: rgba(239, 68, 68, 0.08);
-  border-color: rgba(239, 68, 68, 0.4);
-  color: #fca5a5;
+  background: rgba(255, 107, 139, 0.09);
+  border-color: rgba(255, 107, 139, 0.45);
+  color: #ffb0c0;
 }
 
 .spinner {
   width: 16px;
   height: 16px;
   border: 2px solid var(--border);
-  border-top-color: var(--accent);
+  border-top-color: var(--bubblegum);
+  border-right-color: var(--grape);
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  animation: spin 0.7s linear infinite;
 }
 
 @keyframes spin {
@@ -760,13 +974,13 @@ textarea {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 60px 20px;
+  gap: 14px;
+  padding: 64px 20px;
 }
 
 .center-spinner .spinner {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-width: 3px;
 }
 
@@ -774,7 +988,7 @@ textarea {
 
 @media (max-width: 640px) {
   .app-body {
-    padding: 16px;
+    padding: 18px 14px;
   }
 
   .app-header {
@@ -792,5 +1006,13 @@ textarea {
 
   .browse-filter {
     width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  body::before,
+  body::after {
+    animation: none !important;
   }
 }
