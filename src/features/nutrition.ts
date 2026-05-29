@@ -31,16 +31,43 @@
 import { vfs } from "../bridge/vfs";
 import type { NutritionStrip, Recipe } from "../types";
 
+/** Dev-project usda-proxy. Used ONLY as the convenience default for the
+ *  local Vite dev server — see resolveProxyUrl for why production builds
+ *  don't fall back to it. */
+const DEV_PROXY_URL = "https://mqpvjlsywrptefgwuztn.supabase.co/functions/v1/usda-proxy";
+
 /**
  * USDA lookups route through the ConjureOS `usda-proxy` edge function (see
- * the module header for WHY). The proxy URL is non-secret — it's just a
- * function endpoint — so baking it in is fine. Defaults to the ConjureOS
- * dev project; override at build time with `VITE_USDA_PROXY_URL` to point
- * at prod (or a locally-served proxy).
+ * the module header for WHY). The URL is non-secret (just a function
+ * endpoint), so it's a build-time value.
+ *
+ * The footgun this guards against: dev and the prod embed are built by the
+ * SAME command (`build:inline`), so a hardcoded default can't tell them
+ * apart — a prod bundle would silently call the DEV proxy. So:
+ *   - Vite dev server (`npm run dev`, import.meta.env.DEV): default to the
+ *     dev proxy. Local iteration should always hit dev; zero config.
+ *   - Any production build (PROD): REQUIRE an explicit VITE_USDA_PROXY_URL.
+ *     If it's missing we return null → nutrition disables itself and logs
+ *     loudly, rather than quietly phoning the wrong environment. A misbuilt
+ *     embed is then obvious (blank macros + console error) instead of a
+ *     subtle cross-env data path nobody notices until prod traffic hits a
+ *     dev quota.
+ * Every embedded build (dev embed included) therefore passes the var
+ * explicitly; only the dev server enjoys the default.
  */
-const PROXY_URL =
-  (import.meta.env.VITE_USDA_PROXY_URL as string | undefined) ??
-  "https://mqpvjlsywrptefgwuztn.supabase.co/functions/v1/usda-proxy";
+function resolveProxyUrl(): string | null {
+  const explicit = import.meta.env.VITE_USDA_PROXY_URL as string | undefined;
+  if (explicit) return explicit;
+  if (import.meta.env.DEV) return DEV_PROXY_URL;
+  console.error(
+    "[nutrition] VITE_USDA_PROXY_URL is not set for this production build — " +
+      "nutrition lookups are disabled. Set it to the target ConjureOS " +
+      "project's usda-proxy URL at build time (e.g. VITE_USDA_PROXY_URL=" +
+      "https://<project-ref>.supabase.co/functions/v1/usda-proxy).",
+  );
+  return null;
+}
+const PROXY_URL = resolveProxyUrl();
 const CACHE_PATH = "nutrition-cache.json";
 const SEARCH_CONCURRENCY = 3;
 
@@ -348,6 +375,10 @@ type USDAFetchResult =
 
 async function searchUSDA(query: string, signal?: AbortSignal): Promise<USDAFetchResult> {
   if (rateLimitedUntil > Date.now()) return { kind: "rate-limited" };
+  // No proxy configured — a production build that didn't set
+  // VITE_USDA_PROXY_URL. Fail soft: nutrition stays blank, recipes still
+  // generate. resolveProxyUrl already logged the why at module load.
+  if (!PROXY_URL) return { kind: "error" };
 
   // Hit the proxy, not USDA directly. The api_key is injected server-side
   // by usda-proxy; we just pass the search params it forwards.

@@ -1,9 +1,11 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  /** Override the USDA proxy endpoint at build time (e.g. point at the
-   *  prod ConjureOS project). Defaults to the dev project in nutrition.ts.
-   *  Non-secret — it's just a function URL. */
+  /** The USDA proxy endpoint, baked in at build time. Non-secret — just a
+   *  function URL. REQUIRED for any production build (build / build:inline):
+   *  if unset, nutrition disables itself rather than defaulting to a hardcoded
+   *  environment. The local Vite dev server falls back to the dev project.
+   *  See resolveProxyUrl in features/nutrition.ts. */
   readonly VITE_USDA_PROXY_URL?: string;
 }
 
