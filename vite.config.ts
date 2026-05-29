@@ -1,6 +1,13 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { viteSingleFile } from "vite-plugin-singlefile";
+import { readFileSync } from "node:fs";
+
+// Inject the package.json version at build time so the running app can
+// display it in the Info popover. Read once at config-load; bump `version`
+// in package.json before building to see the new value in-app.
+const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
+const APP_VERSION = pkg.version as string;
 
 // Two build outputs from the same source:
 //   - `npm run build`        → dist/index.html, JS + CSS as separate files.
@@ -19,6 +26,9 @@ import { viteSingleFile } from "vite-plugin-singlefile";
 export default defineConfig(({ mode }) => {
   const inline = mode === "inline";
   return {
+    define: {
+      __APP_VERSION__: JSON.stringify(APP_VERSION),
+    },
     plugins: [
       react(),
       // Only active in inline mode. Walks <link rel="stylesheet"> and
