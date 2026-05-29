@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Ingredient, NutritionStrip, Recipe } from "../types";
 import { saveRecipe } from "../features/storage";
-import { computeNutrition, formatStrip, USING_DEMO_KEY } from "../features/nutrition";
+import { computeNutrition, formatStrip, isUsingDemoKey } from "../features/nutrition";
 import { computeAvailability, scaleRecipe, type AvailabilityResult } from "../features/scaling";
 
 interface Props {
@@ -389,25 +389,24 @@ function RateLimitBanner({ onDismiss }: { onDismiss: () => void }) {
             <strong>Who:</strong> the U.S. Department of Agriculture, which runs the free FoodData Central database we use for per-serving macros.{" "}
             <em>Not ConjureOS, not the recipe app, not Claude.</em>
           </p>
-          {USING_DEMO_KEY ? (
+          {isUsingDemoKey() ? (
             <>
               <p style={{ margin: "0 0 8px 0" }}>
-                <strong>Why:</strong> this app ships with USDA's public <code>DEMO_KEY</code> so it works out of the box without setup. USDA limits <code>DEMO_KEY</code> to 30 lookups per hour per public IP address — shared across everyone on your network (and anyone else worldwide hitting it from the same IP, e.g. mobile carriers).
+                <strong>Why:</strong> nutrition lookups run through a ConjureOS proxy that's currently on USDA's public <code>DEMO_KEY</code> so it works without setup. USDA limits <code>DEMO_KEY</code> to 30 lookups per hour per IP — shared across everyone hitting the proxy.
               </p>
               <p style={{ margin: "0 0 8px 0" }}><strong>What to do:</strong></p>
               <ul style={{ margin: "0 0 8px 18px", padding: 0 }}>
-                <li>Wait an hour — the cap resets and recipes already on screen will keep working from cache.</li>
+                <li>Wait an hour — the cap resets and recipes already on screen keep working from cache.</li>
                 <li>
-                  Grab a free personal key (~30 seconds at{" "}
-                  <a href="https://api.data.gov/signup/" target="_blank" rel="noreferrer">api.data.gov/signup</a>), set{" "}
-                  <code>VITE_USDA_API_KEY</code> in the source repo, rebuild — gets you 1000 lookups per hour to yourself.
+                  If you run this ConjureOS instance, grab a free key (~30 seconds at{" "}
+                  <a href="https://api.data.gov/signup/" target="_blank" rel="noreferrer">api.data.gov/signup</a>) and set it as the proxy's <code>USDA_API_KEY</code> secret — bumps everyone to 1000 lookups/hr.
                 </li>
               </ul>
             </>
           ) : (
             <>
               <p style={{ margin: "0 0 8px 0" }}>
-                <strong>Why:</strong> you're already using a personal USDA key, which is normally 1000 lookups/hr. Hitting that means an unusually heavy session.
+                <strong>Why:</strong> the nutrition proxy is on a personal USDA key, normally 1000 lookups/hr. Hitting that means an unusually heavy session.
               </p>
               <p style={{ margin: "0 0 8px 0" }}>
                 <strong>What to do:</strong> wait an hour; the limit resets automatically. Cached ingredients keep working in the meantime.

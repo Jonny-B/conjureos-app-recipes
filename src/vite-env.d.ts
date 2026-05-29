@@ -1,7 +1,10 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_USDA_API_KEY?: string;
+  /** Override the USDA proxy endpoint at build time (e.g. point at the
+   *  prod ConjureOS project). Defaults to the dev project in nutrition.ts.
+   *  Non-secret — it's just a function URL. */
+  readonly VITE_USDA_PROXY_URL?: string;
 }
 
 interface ImportMeta {
