@@ -434,6 +434,13 @@ select {
   margin-bottom: 12px;
   filter: drop-shadow(0 6px 14px rgba(179, 136, 255, 0.4));
   animation: bob 3.5s ease-in-out infinite;
+  line-height: 0;
+}
+
+.capture-area .icon svg {
+  width: 58px;
+  height: 58px;
+  display: block;
 }
 
 @keyframes bob {
