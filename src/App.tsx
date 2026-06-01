@@ -228,7 +228,7 @@ function InfoButton() {
           <div className="info-row">
             <span className="info-label">USDA nutrition</span>
             <span className="info-value">
-              {usage.usingDemoKey ? "Free shared tier" : "Your own key"}
+              {usage.usingDemoKey ? "Shared demo key" : "ConjureOS key"}
             </span>
           </div>
           <div className="info-row">
@@ -245,8 +245,8 @@ function InfoButton() {
           ) : (
             <p className="info-help">
               {usage.usingDemoKey
-                ? "Free shared key — ~30 nutrition lookups per hour across everyone on your network. Hit the cap? Recipes still generate; macros stay blank until it clears."
-                : "Your registered key — ~1000 lookups per hour."}
+                ? "Nutrition runs through a ConjureOS proxy on USDA's shared demo key — ~30 lookups/hr across everyone on this instance. Hit the cap? Recipes still generate; macros stay blank until it clears."
+                : "Nutrition runs through a ConjureOS proxy on a registered USDA key — ~1000 lookups/hr."}
             </p>
           )}
         </div>

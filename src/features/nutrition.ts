@@ -7,13 +7,18 @@
  * matches in the strip so the UI can show "rough" instead of "est." when
  * coverage is poor.
  *
- * API: https://api.nal.usda.gov/fdc/v1/foods/search — free, requires an
- * API key. We ship with `DEMO_KEY` (30/hr per IP) as the default; users
- * who fork + rebuild can set `VITE_USDA_API_KEY` for the 1000/hr limit
- * a real signup-key gets. Heavy caching to `/apps/<slug>/nutrition-cache.json`
- * means most users never see a request after the first ~50 unique
- * ingredients — every saved recipe shares its core ingredients with
- * everything else the user cooks.
+ * API: USDA FoodData Central `/foods/search` — free, but requires an
+ * api_key. We DON'T call it directly anymore: the key would have to be
+ * baked into this client bundle (a `VITE_*` var compiles into the shipped
+ * JS, so it's publicly extractable). Instead we route through the ConjureOS
+ * `usda-proxy` Supabase edge function, which holds the key as a server-side
+ * secret and forwards the search. The browser never sees a key. The proxy
+ * uses USDA's `DEMO_KEY` (30/hr shared) until its `USDA_API_KEY` secret is
+ * set, then a signup key (1000/hr); it tells us which via response headers
+ * so the UI can show the right limit. Heavy caching to
+ * `/apps/<slug>/nutrition-cache.json` means most users never see a request
+ * after the first ~50 unique ingredients — every saved recipe shares its
+ * core ingredients with everything else the user cooks.
  *
  * Accuracy: ~±25-40% on totals. The big sources of error are
  * (a) ambiguous quantity strings ("a pinch", "to taste") which we skip;
@@ -26,18 +31,61 @@
 import { vfs } from "../bridge/vfs";
 import type { NutritionStrip, Recipe } from "../types";
 
-const USDA_BASE = "https://api.nal.usda.gov/fdc/v1";
-const API_KEY = (import.meta.env.VITE_USDA_API_KEY as string | undefined) ?? "DEMO_KEY";
-export const USING_DEMO_KEY = API_KEY === "DEMO_KEY";
-/** USDA's rate-limit ceilings. DEMO_KEY is 30/hour/IP; a registered
- *  signup key is 1000/hour. We can't be 100% sure which tier the user
- *  is on (the API doesn't tell us until it 429s) — surfacing the DEMO
- *  ceiling on DEMO_KEY and the registered ceiling otherwise is the
- *  best static approximation. The Info popover labels this as
- *  "approximate" so users don't read it as gospel. */
-const USDA_HOURLY_LIMIT = USING_DEMO_KEY ? 30 : 1000;
+/** Dev-project usda-proxy. Used ONLY as the convenience default for the
+ *  local Vite dev server — see resolveProxyUrl for why production builds
+ *  don't fall back to it. */
+const DEV_PROXY_URL = "https://mqpvjlsywrptefgwuztn.supabase.co/functions/v1/usda-proxy";
+
+/**
+ * USDA lookups route through the ConjureOS `usda-proxy` edge function (see
+ * the module header for WHY). The URL is non-secret (just a function
+ * endpoint), so it's a build-time value.
+ *
+ * The footgun this guards against: dev and the prod embed are built by the
+ * SAME command (`build:inline`), so a hardcoded default can't tell them
+ * apart — a prod bundle would silently call the DEV proxy. So:
+ *   - Vite dev server (`npm run dev`, import.meta.env.DEV): default to the
+ *     dev proxy. Local iteration should always hit dev; zero config.
+ *   - Any production build (PROD): REQUIRE an explicit VITE_USDA_PROXY_URL.
+ *     If it's missing we return null → nutrition disables itself and logs
+ *     loudly, rather than quietly phoning the wrong environment. A misbuilt
+ *     embed is then obvious (blank macros + console error) instead of a
+ *     subtle cross-env data path nobody notices until prod traffic hits a
+ *     dev quota.
+ * Every embedded build (dev embed included) therefore passes the var
+ * explicitly; only the dev server enjoys the default.
+ */
+function resolveProxyUrl(): string | null {
+  const explicit = import.meta.env.VITE_USDA_PROXY_URL as string | undefined;
+  if (explicit) return explicit;
+  if (import.meta.env.DEV) return DEV_PROXY_URL;
+  console.error(
+    "[nutrition] VITE_USDA_PROXY_URL is not set for this production build — " +
+      "nutrition lookups are disabled. Set it to the target ConjureOS " +
+      "project's usda-proxy URL at build time (e.g. VITE_USDA_PROXY_URL=" +
+      "https://<project-ref>.supabase.co/functions/v1/usda-proxy).",
+  );
+  return null;
+}
+const PROXY_URL = resolveProxyUrl();
 const CACHE_PATH = "nutrition-cache.json";
 const SEARCH_CONCURRENCY = 3;
+
+/**
+ * Which key tier the proxy is serving, learned from the X-USDA-Tier /
+ * X-USDA-Limit headers on each live response. We can't know this at load
+ * time anymore (the key lives server-side), so we start pessimistic —
+ * assume the shared DEMO_KEY 30/hr ceiling — and upgrade the instant the
+ * first response says the proxy has a real signup key. These back the
+ * Info popover copy + limit; both are module-mutable on purpose.
+ *
+ * Exported as a live getter (not a const) so importers like RecipesScreen
+ * see the upgraded value once a fetch has happened, rather than the
+ * load-time pessimistic default.
+ */
+let usingDemoKey = true;
+let usdaHourlyLimit = 30;
+export const isUsingDemoKey = (): boolean => usingDemoKey;
 /** Session-wide rate-limit short-circuit. When this is in the future, USDA
  *  calls return immediately with rateLimited:true and never touch the network.
  *  Set to now + 1h on the first 429 we see; cleared by the next session.
@@ -89,11 +137,11 @@ export function getUSDAUsage(): USDAUsageSnapshot {
   const recent = recentFetchTimestamps.length;
   return {
     recentInLastHour: recent,
-    approxLimit: USDA_HOURLY_LIMIT,
-    approxRemaining: Math.max(0, USDA_HOURLY_LIMIT - recent),
+    approxLimit: usdaHourlyLimit,
+    approxRemaining: Math.max(0, usdaHourlyLimit - recent),
     rateLimited: rateLimitedUntil > now,
     rateLimitedUntil,
-    usingDemoKey: USING_DEMO_KEY,
+    usingDemoKey,
   };
 }
 
@@ -327,9 +375,14 @@ type USDAFetchResult =
 
 async function searchUSDA(query: string, signal?: AbortSignal): Promise<USDAFetchResult> {
   if (rateLimitedUntil > Date.now()) return { kind: "rate-limited" };
+  // No proxy configured — a production build that didn't set
+  // VITE_USDA_PROXY_URL. Fail soft: nutrition stays blank, recipes still
+  // generate. resolveProxyUrl already logged the why at module load.
+  if (!PROXY_URL) return { kind: "error" };
 
-  const url = new URL(`${USDA_BASE}/foods/search`);
-  url.searchParams.set("api_key", API_KEY);
+  // Hit the proxy, not USDA directly. The api_key is injected server-side
+  // by usda-proxy; we just pass the search params it forwards.
+  const url = new URL(PROXY_URL);
   url.searchParams.set("query", query);
   url.searchParams.set("pageSize", "1");
   url.searchParams.set("dataType", "Foundation,SR Legacy");
@@ -343,6 +396,17 @@ async function searchUSDA(query: string, signal?: AbortSignal): Promise<USDAFetc
     resp = await fetch(url.toString(), { signal });
   } catch {
     return { kind: "error" };
+  }
+  // Learn the proxy's key tier from its headers (present on every proxy
+  // response, including errors). This is what flips the Info popover from
+  // the pessimistic DEMO_KEY default to the real signup limit once we've
+  // actually heard back. Missing headers leave the prior values untouched.
+  const tierHeader = resp.headers.get("X-USDA-Tier");
+  if (tierHeader) usingDemoKey = tierHeader === "demo";
+  const limitHeader = resp.headers.get("X-USDA-Limit");
+  if (limitHeader) {
+    const parsedLimit = Number(limitHeader);
+    if (Number.isFinite(parsedLimit) && parsedLimit > 0) usdaHourlyLimit = parsedLimit;
   }
   if (resp.status === 429) {
     rateLimitedUntil = Date.now() + 60 * 60 * 1000;
@@ -359,14 +423,25 @@ async function searchUSDA(query: string, signal?: AbortSignal): Promise<USDAFetc
   const food = json.foods?.[0];
   if (!food) return { kind: "miss" };
   let kcal = 0, protein = 0, fat = 0, carbs = 0;
+  let kjFallback = 0;
   for (const n of food.foodNutrients ?? []) {
     const name = n.nutrientName ?? "";
     const value = typeof n.value === "number" ? n.value : 0;
-    if (name === "Energy") kcal = value;
-    else if (name === "Protein") protein = value;
+    if (name === "Energy") {
+      // USDA returns Energy twice for many foods: once in KCAL and once in
+      // kJ (~4.184× the kcal value). The old code took whichever appeared
+      // last, so a trailing kJ row would clobber calories ~4× too high.
+      // Prefer the KCAL row; convert kJ only as a fallback. A missing
+      // unitName is treated as kcal (the search endpoint's default, and
+      // what the old unit-blind code effectively assumed).
+      const unit = (n.unitName ?? "").toUpperCase();
+      if (unit === "KJ") kjFallback = value / 4.184;
+      else kcal = value; // KCAL or unspecified
+    } else if (name === "Protein") protein = value;
     else if (name === "Total lipid (fat)") fat = value;
     else if (name === "Carbohydrate, by difference") carbs = value;
   }
+  if (kcal === 0 && kjFallback > 0) kcal = kjFallback;
   return {
     kind: "hit",
     food: { fdcId: food.fdcId, description: food.description, kcal, protein, fat, carbs },
@@ -415,9 +490,10 @@ async function resolveFood(
  *   - `strip` null + rateLimited false → either zero ingredients parsed, or
  *     USDA genuinely had no match for any of them (permanent miss; will not
  *     improve on retry).
- *   - `strip` null + rateLimited true → cap on USDA lookups; the user's
- *     network has hit DEMO_KEY's 30/hr ceiling. Resolves on its own in <1h
- *     OR when the user bakes in their own VITE_USDA_API_KEY.
+ *   - `strip` null + rateLimited true → cap on USDA lookups; the proxy's
+ *     key has hit its hourly ceiling (30/hr if it's still on the shared
+ *     DEMO_KEY, 1000/hr on a signup key). Resolves on its own in <1h, or
+ *     when the operator sets the proxy's USDA_API_KEY secret.
  *   - `strip` non-null + rateLimited true → some ingredients hit USDA before
  *     the 429, others didn't. The strip is partial; the UI flags it
  *     "rough" and shows the rate-limit context separately so the user

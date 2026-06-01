@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.2.0",
+  "version": "0.2.4",
   "description": "Recipe-from-fridge — an app for ConjureOS. Point your camera at the fridge, get recipes you can make tonight.",
   "type": "module",
   "license": "MIT",
@@ -20,7 +20,7 @@
     "actions": {
       "listRecipes": {
         "permission": "actions.read",
-        "description": "List the user's saved recipes, optionally filtered by title or ingredient substring. Returns title, slug, difficulty, cookTime, servings, ingredients, savedAt, madeCount, and per-serving nutrition when available."
+        "description": "List the user's saved recipes, optionally filtered by title or ingredient substring. Returns title, slug, difficulty, cookTime, servings, ingredients, savedAt, madeCount, lastMadeAt, and per-serving nutrition when available."
       },
       "getRecipe": {
         "permission": "actions.read",
@@ -53,6 +53,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@conjureos/pack": "^0.0.2",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",

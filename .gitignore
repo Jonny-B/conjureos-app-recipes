@@ -6,3 +6,6 @@ dist
 .env
 .env.local
 *.tsbuildinfo
+
+# Packed distributable produced by @conjureos/pack — a build artifact, not source.
+*.conj
