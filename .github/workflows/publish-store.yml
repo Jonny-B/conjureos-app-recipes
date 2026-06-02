@@ -74,9 +74,12 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         uses: Jonny-B/ConjureOS/.github/actions/publish-anchor-app@claude/conjureos-anchor-app-ci-s6pLw
         with:
-          supabase-url: ${{ secrets.SUPABASE_DEV_URL }}
-          supabase-anon-key: ${{ secrets.SUPABASE_DEV_ANON_KEY }}
-          bot-email: ${{ secrets.PUBLISH_BOT_DEV_EMAIL }}
+          # URL built from the existing SUPABASE_DEV_PROJECT_REF secret.
+          supabase-url: https://${{ secrets.SUPABASE_DEV_PROJECT_REF }}.supabase.co
+          # Anon key is public by design (shipped in every browser); RLS still
+          # applies. Safe to keep in the workflow.
+          supabase-anon-key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1xcHZqbHN5d3JwdGVmZ3d1enRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MTA3OTMsImV4cCI6MjA5NTQ4Njc5M30.ITZjX5KkMNgbJuFEHS5-IqFFJC6A39OynVgOznZeqD8
+          bot-email: conjureosbot@gmail.com
           bot-password: ${{ secrets.PUBLISH_BOT_DEV_PASSWORD }}
           html-path: dist/index.html
           slug: recipes
@@ -87,9 +90,12 @@ jobs:
         if: github.event_name == 'release'
         uses: Jonny-B/ConjureOS/.github/actions/publish-anchor-app@claude/conjureos-anchor-app-ci-s6pLw
         with:
-          supabase-url: ${{ secrets.SUPABASE_PROD_URL }}
-          supabase-anon-key: ${{ secrets.SUPABASE_PROD_ANON_KEY }}
-          bot-email: ${{ secrets.PUBLISH_BOT_PROD_EMAIL }}
+          # URL built from the existing SUPABASE_PROD_PROJECT_REF secret.
+          supabase-url: https://${{ secrets.SUPABASE_PROD_PROJECT_REF }}.supabase.co
+          # Anon key is public by design (shipped in every browser); RLS still
+          # applies. Safe to keep in the workflow.
+          supabase-anon-key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im50Z2VsYnRlcGVjcXNxbG94bWN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwOTkzMzEsImV4cCI6MjA5MzY3NTMzMX0.fgRCszkeAbHANaK-JJAGmTwWHyOh-3b6-od1c3s3V0w
+          bot-email: conjureosbot@gmail.com
           bot-password: ${{ secrets.PUBLISH_BOT_PROD_PASSWORD }}
           html-path: dist/index.html
           slug: recipes
