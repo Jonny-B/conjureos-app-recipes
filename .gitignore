@@ -9,3 +9,6 @@ dist
 
 # Packed distributable produced by @conjureos/pack — a build artifact, not source.
 *.conj
+
+# esbuild dev server output (conj-pack dev)
+.devserve
