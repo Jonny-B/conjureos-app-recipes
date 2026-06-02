@@ -104,6 +104,7 @@ export function App() {
           />
         )}
       </main>
+      <footer className="app-version">v{__APP_VERSION__}</footer>
     </div>
   );
 }
