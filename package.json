@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Recipe-from-fridge — an app for ConjureOS. Point your camera at the fridge, get recipes you can make tonight.",
   "type": "module",
   "license": "MIT",
@@ -41,11 +41,8 @@
       "What did I cook this week?"
     ]
   },
+  "//": "No Vite. This app is pure source — ConjureOS bundles it with @bundle (esbuild + jspm importmap) at publish time, exactly like a user-published store app. Bump `version` here AND in src/version.ts together.",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "build:inline": "tsc -b && vite build --mode inline",
-    "preview": "vite preview",
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
@@ -53,12 +50,8 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@conjureos/pack": "^0.0.2",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "@vitejs/plugin-react": "^4.3.4",
-    "typescript": "^5.6.3",
-    "vite": "^5.4.11",
-    "vite-plugin-singlefile": "^2.3.3"
+    "typescript": "^5.6.3"
   }
 }

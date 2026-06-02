@@ -31,41 +31,29 @@
 import { vfs } from "../bridge/vfs";
 import type { NutritionStrip, Recipe } from "../types";
 
-/** Dev-project usda-proxy. Used ONLY as the convenience default for the
- *  local Vite dev server — see resolveProxyUrl for why production builds
- *  don't fall back to it. */
+/** Dev-project usda-proxy — the runtime default until the host advertises one. */
 const DEV_PROXY_URL = "https://mqpvjlsywrptefgwuztn.supabase.co/functions/v1/usda-proxy";
 
 /**
- * USDA lookups route through the ConjureOS `usda-proxy` edge function (see
- * the module header for WHY). The URL is non-secret (just a function
- * endpoint), so it's a build-time value.
+ * USDA lookups route through the ConjureOS `usda-proxy` edge function. As a
+ * store app we ship ONE artifact that runs in both dev and prod, so the proxy
+ * URL is resolved at RUNTIME, not baked in at build time:
  *
- * The footgun this guards against: dev and the prod embed are built by the
- * SAME command (`build:inline`), so a hardcoded default can't tell them
- * apart — a prod bundle would silently call the DEV proxy. So:
- *   - Vite dev server (`npm run dev`, import.meta.env.DEV): default to the
- *     dev proxy. Local iteration should always hit dev; zero config.
- *   - Any production build (PROD): REQUIRE an explicit VITE_USDA_PROXY_URL.
- *     If it's missing we return null → nutrition disables itself and logs
- *     loudly, rather than quietly phoning the wrong environment. A misbuilt
- *     embed is then obvious (blank macros + console error) instead of a
- *     subtle cross-env data path nobody notices until prod traffic hits a
- *     dev quota.
- * Every embedded build (dev embed included) therefore passes the var
- * explicitly; only the dev server enjoys the default.
+ *   1. If the ConjureOS host advertises a usda-proxy URL on the bridge
+ *      (`window.__conjureos.env.usdaProxyUrl`), use it — that's the URL for
+ *      whichever project the app is actually running in. (Bridge field is
+ *      additive/future; absent today.)
+ *   2. Otherwise fall back to the dev project's usda-proxy. It's a read-only
+ *      nutrition lookup, so dev-vs-prod cross-talk is harmless data-wise.
+ *
+ * TODO(backend): deploy `usda-proxy` to prod and expose `env.usdaProxyUrl` on
+ * the host bridge so prod installs hit the prod proxy automatically.
  */
 function resolveProxyUrl(): string | null {
-  const explicit = import.meta.env.VITE_USDA_PROXY_URL as string | undefined;
-  if (explicit) return explicit;
-  if (import.meta.env.DEV) return DEV_PROXY_URL;
-  console.error(
-    "[nutrition] VITE_USDA_PROXY_URL is not set for this production build — " +
-      "nutrition lookups are disabled. Set it to the target ConjureOS " +
-      "project's usda-proxy URL at build time (e.g. VITE_USDA_PROXY_URL=" +
-      "https://<project-ref>.supabase.co/functions/v1/usda-proxy).",
-  );
-  return null;
+  const fromHost = (
+    globalThis as { __conjureos?: { env?: { usdaProxyUrl?: string } } }
+  ).__conjureos?.env?.usdaProxyUrl;
+  return fromHost || DEV_PROXY_URL;
 }
 const PROXY_URL = resolveProxyUrl();
 const CACHE_PATH = "nutrition-cache.json";
