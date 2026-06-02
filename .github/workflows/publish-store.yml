@@ -72,7 +72,7 @@ jobs:
       # workflow_dispatch -> DEV project. Test path; publishes to dev users.
       - name: Publish to App Store (dev)
         if: github.event_name == 'workflow_dispatch'
-        uses: Jonny-B/ConjureOS/.github/actions/publish-anchor-app@claude/conjureos-anchor-app-ci-s6pLw
+        uses: Jonny-B/ConjureOS/.github/actions/publish-anchor-app@dev
         with:
           # URL built from the existing SUPABASE_DEV_PROJECT_REF secret.
           supabase-url: https://${{ secrets.SUPABASE_DEV_PROJECT_REF }}.supabase.co
@@ -88,7 +88,7 @@ jobs:
       # release published -> PROD project. Ships to real users.
       - name: Publish to App Store (prod)
         if: github.event_name == 'release'
-        uses: Jonny-B/ConjureOS/.github/actions/publish-anchor-app@claude/conjureos-anchor-app-ci-s6pLw
+        uses: Jonny-B/ConjureOS/.github/actions/publish-anchor-app@dev
         with:
           # URL built from the existing SUPABASE_PROD_PROJECT_REF secret.
           supabase-url: https://${{ secrets.SUPABASE_PROD_PROJECT_REF }}.supabase.co
