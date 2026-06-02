@@ -1,0 +1,77 @@
+name: Publish to ConjureOS App Store
+
+# Builds the recipes anchor app to a single self-contained HTML file and
+# publishes a new App Store version via the shared composite action in the
+# conjureos monorepo. Steady-state path: a published GitHub Release ships a
+# new version that installed users see as an available update.
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_URL          https://<ref>.supabase.co
+#   SUPABASE_ANON_KEY     project anon key
+#   PUBLISH_BOT_EMAIL     bot publisher account email
+#   PUBLISH_BOT_PASSWORD  bot publisher account password
+# See ANCHOR_APP_CI_SETUP.md in the conjureos repo for the one-time setup.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      changelog:
+        description: Changelog for this version
+        required: false
+        default: ""
+
+concurrency:
+  group: publish-store-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout app source
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build single-file HTML
+        run: npm run build:inline
+
+      - name: Resolve changelog
+        id: changelog
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            text="${{ github.event.release.body }}"
+            [ -z "$text" ] && text="${{ github.event.release.name }}"
+            [ -z "$text" ] && text="${{ github.event.release.tag_name }}"
+          else
+            text="${{ github.event.inputs.changelog }}"
+          fi
+          # Pass through a delimited heredoc so multi-line release notes survive.
+          {
+            echo "text<<__CHANGELOG__"
+            echo "$text"
+            echo "__CHANGELOG__"
+          } >> "$GITHUB_OUTPUT"
+
+      # The action lives on the conjureos `dev` branch. Until this pipeline is
+      # merged to dev, pin to the feature branch you're testing on, e.g.
+      # @claude/conjureos-anchor-app-ci-s6pLw.
+      - name: Publish to App Store
+        uses: Jonny-B/ConjureOS/.github/actions/publish-anchor-app@dev
+        with:
+          supabase-url: ${{ secrets.SUPABASE_URL }}
+          supabase-anon-key: ${{ secrets.SUPABASE_ANON_KEY }}
+          bot-email: ${{ secrets.PUBLISH_BOT_EMAIL }}
+          bot-password: ${{ secrets.PUBLISH_BOT_PASSWORD }}
+          html-path: dist/index.html
+          slug: recipes
+          changelog: ${{ steps.changelog.outputs.text }}
