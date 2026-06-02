@@ -2,14 +2,17 @@ name: Publish to ConjureOS App Store
 
 # Builds the recipes anchor app to a single self-contained HTML file and
 # publishes a new App Store version via the shared composite action in the
-# conjureos monorepo. Steady-state path: a published GitHub Release ships a
-# new version that installed users see as an available update.
+# conjureos monorepo.
 #
-# Required repo secrets (Settings → Secrets and variables → Actions):
-#   SUPABASE_URL          https://<ref>.supabase.co
-#   SUPABASE_ANON_KEY     project anon key
-#   PUBLISH_BOT_EMAIL     bot publisher account email
-#   PUBLISH_BOT_PASSWORD  bot publisher account password
+# Two Supabase projects (Phase 24 split), selected by trigger:
+#   - workflow_dispatch  -> DEV  project (test against dev.conjureos.pages.dev)
+#   - release published  -> PROD project (ships to real users)
+#
+# Required repo secrets (Settings -> Secrets and variables -> Actions):
+#   Dev:   SUPABASE_DEV_URL  SUPABASE_DEV_ANON_KEY
+#          PUBLISH_BOT_DEV_EMAIL  PUBLISH_BOT_DEV_PASSWORD
+#   Prod:  SUPABASE_PROD_URL SUPABASE_PROD_ANON_KEY
+#          PUBLISH_BOT_PROD_EMAIL PUBLISH_BOT_PROD_PASSWORD
 # See ANCHOR_APP_CI_SETUP.md in the conjureos repo for the one-time setup.
 
 on:
@@ -63,15 +66,31 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       # The action lives on the conjureos `dev` branch. Until this pipeline is
-      # merged to dev, pin to the feature branch you're testing on, e.g.
-      # @claude/conjureos-anchor-app-ci-s6pLw.
-      - name: Publish to App Store
+      # merged to dev, pin both steps to the feature branch you're testing on,
+      # e.g. @claude/conjureos-anchor-app-ci-s6pLw.
+
+      # workflow_dispatch -> DEV project. Test path; publishes to dev users.
+      - name: Publish to App Store (dev)
+        if: github.event_name == 'workflow_dispatch'
         uses: Jonny-B/ConjureOS/.github/actions/publish-anchor-app@dev
         with:
-          supabase-url: ${{ secrets.SUPABASE_URL }}
-          supabase-anon-key: ${{ secrets.SUPABASE_ANON_KEY }}
-          bot-email: ${{ secrets.PUBLISH_BOT_EMAIL }}
-          bot-password: ${{ secrets.PUBLISH_BOT_PASSWORD }}
+          supabase-url: ${{ secrets.SUPABASE_DEV_URL }}
+          supabase-anon-key: ${{ secrets.SUPABASE_DEV_ANON_KEY }}
+          bot-email: ${{ secrets.PUBLISH_BOT_DEV_EMAIL }}
+          bot-password: ${{ secrets.PUBLISH_BOT_DEV_PASSWORD }}
+          html-path: dist/index.html
+          slug: recipes
+          changelog: ${{ steps.changelog.outputs.text }}
+
+      # release published -> PROD project. Ships to real users.
+      - name: Publish to App Store (prod)
+        if: github.event_name == 'release'
+        uses: Jonny-B/ConjureOS/.github/actions/publish-anchor-app@dev
+        with:
+          supabase-url: ${{ secrets.SUPABASE_PROD_URL }}
+          supabase-anon-key: ${{ secrets.SUPABASE_PROD_ANON_KEY }}
+          bot-email: ${{ secrets.PUBLISH_BOT_PROD_EMAIL }}
+          bot-password: ${{ secrets.PUBLISH_BOT_PROD_PASSWORD }}
           html-path: dist/index.html
           slug: recipes
           changelog: ${{ steps.changelog.outputs.text }}
