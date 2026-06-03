@@ -8,6 +8,7 @@ import { identifyIngredients } from "./features/vision";
 import { generateRecipes } from "./features/recipes";
 import { registerActions } from "./bridge/actions";
 import { getUSDAUsage, type USDAUsageSnapshot } from "./features/nutrition";
+import { APP_VERSION } from "./version";
 
 type Tab = "build" | "browse";
 
@@ -104,6 +105,7 @@ export function App() {
           />
         )}
       </main>
+      <footer className="app-version">v{APP_VERSION}</footer>
     </div>
   );
 }
@@ -222,7 +224,7 @@ function InfoButton() {
         <div className="info-popover" role="dialog" aria-label="App info">
           <div className="info-row">
             <span className="info-label">Version</span>
-            <span className="info-value mono">{__APP_VERSION__}</span>
+            <span className="info-value mono">{APP_VERSION}</span>
           </div>
           <div className="info-divider" />
           <div className="info-row">

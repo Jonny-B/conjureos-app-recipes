@@ -1,0 +1,82 @@
+name: Publish to ConjureOS App Store
+
+# This app is pure source (no Vite). ConjureOS's own bundler (@bundle, inside
+# the shared composite action) builds it into a single store HTML — exactly the
+# pipeline a user-imported store app goes through.
+#
+# Two Supabase projects (Phase 24 split), selected by trigger:
+#   - workflow_dispatch  -> DEV  project (test against dev.conjureos.pages.dev)
+#   - release published  -> PROD project (ships to real users)
+#
+# Only secret you must add per repo is the bot password (dev + prod). URL is
+# derived from the existing SUPABASE_DEV/PROD_PROJECT_REF secrets; anon key + bot
+# email are public/non-secret and inlined below. See ANCHOR_APP_CI_SETUP.md.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      changelog:
+        description: Changelog for this version
+        required: false
+        default: ""
+
+concurrency:
+  group: publish-store-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout app source
+        uses: actions/checkout@v4
+
+      - name: Resolve changelog
+        id: changelog
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            text="${{ github.event.release.body }}"
+            [ -z "$text" ] && text="${{ github.event.release.name }}"
+            [ -z "$text" ] && text="${{ github.event.release.tag_name }}"
+          else
+            text="${{ github.event.inputs.changelog }}"
+          fi
+          {
+            echo "text<<__CHANGELOG__"
+            echo "$text"
+            echo "__CHANGELOG__"
+          } >> "$GITHUB_OUTPUT"
+
+      # The action lives on the conjureos `dev` branch (pinned to the feature
+      # branch until merged). It builds this repo's source with @bundle.
+
+      # workflow_dispatch -> DEV project. Test path; publishes to dev users.
+      - name: Publish to App Store (dev)
+        if: github.event_name == 'workflow_dispatch'
+        uses: Jonny-B/ConjureOS/.github/actions/publish-anchor-app@dev
+        with:
+          supabase-url: https://${{ secrets.SUPABASE_DEV_PROJECT_REF }}.supabase.co
+          # Anon key is public by design (shipped in every browser); RLS applies.
+          supabase-anon-key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1xcHZqbHN5d3JwdGVmZ3d1enRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MTA3OTMsImV4cCI6MjA5NTQ4Njc5M30.ITZjX5KkMNgbJuFEHS5-IqFFJC6A39OynVgOznZeqD8
+          bot-email: conjureosbot@gmail.com
+          bot-password: ${{ secrets.PUBLISH_BOT_DEV_PASSWORD }}
+          source-path: .
+          project-name: Recipes
+          slug: recipes
+          changelog: ${{ steps.changelog.outputs.text }}
+
+      # release published -> PROD project. Ships to real users.
+      - name: Publish to App Store (prod)
+        if: github.event_name == 'release'
+        uses: Jonny-B/ConjureOS/.github/actions/publish-anchor-app@dev
+        with:
+          supabase-url: https://${{ secrets.SUPABASE_PROD_PROJECT_REF }}.supabase.co
+          supabase-anon-key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im50Z2VsYnRlcGVjcXNxbG94bWN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwOTkzMzEsImV4cCI6MjA5MzY3NTMzMX0.fgRCszkeAbHANaK-JJAGmTwWHyOh-3b6-od1c3s3V0w
+          bot-email: conjureosbot@gmail.com
+          bot-password: ${{ secrets.PUBLISH_BOT_PROD_PASSWORD }}
+          source-path: .
+          project-name: Recipes
+          slug: recipes
+          changelog: ${{ steps.changelog.outputs.text }}
