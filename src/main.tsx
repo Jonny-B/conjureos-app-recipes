@@ -15,6 +15,15 @@ import "./styles.css";
 
 const container = document.getElementById("root");
 if (!container) throw new Error("#root not found");
+
+// Activate the Modern Whimsy tokens. They're scoped to `.cui-ui`, and the whole
+// app's palette resolves through that class being on <body>. Local `conj-pack
+// dev` gets it from index.html, but ConjureOS @bundle generates its own HTML
+// shell and drops the body class — so set it at runtime so the bundled build
+// picks up the tokens too. Without this, every var(--cui-*) is undefined and
+// the app renders unstyled (black text, no backgrounds).
+document.body.classList.add("cui-ui");
+
 createRoot(container).render(
   <StrictMode>
     <App />
