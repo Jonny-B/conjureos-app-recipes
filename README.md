@@ -2,7 +2,7 @@
 
 Point your phone camera at the inside of your fridge. Get three recipes you can actually make tonight.
 
-The first Phase 12a anchor app for [ConjureOS](https://github.com/Jonny-B/ConjureOS). Built as a standalone Vite + React + TypeScript project, imported into ConjureOS via the Phase 8 bundler.
+The first Phase 12a anchor app for [ConjureOS](https://github.com/Jonny-B/ConjureOS). A pure React + TypeScript source project — **no Vite**. Developed locally with `conj-pack dev` and **published to the ConjureOS App Store from CI**, where it's built by ConjureOS `@bundle` — the exact same pipeline a user-published app goes through.
 
 ## How it works
 
@@ -24,11 +24,7 @@ Declared in `package.json` under `conjureos.permissions`:
 
 Each generated recipe gets a per-serving macros strip (`~520 cal · 32g P · 18g F · 48g C · est.`) from the [USDA FoodData Central API](https://fdc.nal.usda.gov/api-guide.html). Ingredient quantities are parsed locally, looked up against FDC's `Foundation` + `SR Legacy` datasets, and aggregated. Cached to the app's VFS folder so repeat ingredients (eggs, olive oil, garlic) only hit the network once per user, ever.
 
-**The bundled build ships with `DEMO_KEY`** — usable out of the box but rate-limited to 30 requests/hour per IP. The aggressive cache means most users won't hit the limit after their first few cooks. If you want the full 1000 req/hour limit:
-
-1. Get a free key at [api.data.gov/signup](https://api.data.gov/signup/) (instant).
-2. Set `VITE_USDA_API_KEY=your-key` in a `.env` file at the project root.
-3. `npm run build` — the key gets baked into the bundle. ZIP and re-import.
+**The USDA key is never in the client bundle.** Lookups route through a server-side `usda-proxy` Supabase Edge Function that holds `USDA_API_KEY` as a server secret and relays the request. The app resolves the proxy URL **at runtime** — `globalThis.__conjureos?.env?.usdaProxyUrl`, injected by ConjureOS — so there's no build-time key and no `VITE_*` env to set. Outside ConjureOS (e.g. `conj-pack dev`) the resolver falls back to a dev proxy and the strip degrades gracefully if none is reachable.
 
 Accuracy is ~±25-40% on totals — fine for "should I cook this?" but not medical-grade. The strip displays `rough` instead of `est.` when fewer than 70% of ingredients matched.
 
@@ -36,20 +32,21 @@ Accuracy is ~±25-40% on totals — fine for "should I cook this?" but not medic
 
 ```bash
 npm install
-npm run dev
+npm run dev        # = conj-pack dev — esbuild dev server (no Vite), live reload
 ```
 
-The dev server runs the UI but mocks the AI and VFS bridges (they only exist inside ConjureOS). For full-fidelity testing, build a ZIP and import it into ConjureOS.
+The dev server runs the UI but mocks the AI and VFS bridges (they only exist inside ConjureOS). For full-fidelity testing, publish to the dev App Store (below) and run the app inside ConjureOS.
 
-## Import into ConjureOS
+Bump `version` in **both** `package.json` and `src/version.ts` together — the in-app version footer reads the latter.
 
-```bash
-npm run build
-# zip the dist/ directory
-# in ConjureOS: launcher → Import project… → drop the ZIP
-```
+## Publishing to the ConjureOS App Store (CI)
 
-The Phase 8 bundler handles the ingest. Author + repository fields from `package.json` surface on the installed app's manifest.
+There is no manual ZIP-import step. CI builds this source with ConjureOS `@bundle` and publishes a new store version:
+
+- **Dev:** Actions → "Publish to ConjureOS App Store" → Run workflow (`workflow_dispatch`).
+- **Prod:** publish a GitHub Release (the release notes become the changelog).
+
+Installed users see the new version as an update. Full mechanics, secrets, and the one-time bootstrap are in [`ANCHOR_APP_CI_SETUP.md`](https://github.com/Jonny-B/ConjureOS/blob/dev/ANCHOR_APP_CI_SETUP.md) in the ConjureOS repo. Author + repository fields from `package.json` surface on the installed app's manifest.
 
 ## Cross-app integration
 
