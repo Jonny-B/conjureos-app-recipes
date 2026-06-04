@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import type { CapturedPhoto, Ingredient } from "../types";
 import { sanitizeName } from "../features/vision";
+import { Icon } from "../icons";
 
 interface Props {
   photos: CapturedPhoto[];
@@ -82,22 +83,27 @@ export function IngredientsScreen({ photos, initialIngredients, onConfirm, onRet
     <div className="ing-screen">
       <PhotoStrip photos={photos} />
 
-      <div className="row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+      <div className="row" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 600 }}>
-            {items.length} ingredient{items.length === 1 ? "" : "s"} spotted
+            Found {items.length} ingredient{items.length === 1 ? "" : "s"}
             {photos.length > 1 && (
               <span className="faint" style={{ fontSize: 13, fontWeight: 400 }}>
-                {" "}from {photos.length} photos, deduped
+                {" "}across {photos.length} photos
               </span>
             )}
           </div>
           <div className="muted" style={{ fontSize: 13 }}>
-            Confirm what's actually there. Edit a quantity if mine looks wrong. Toggle off what I missed.
+            Check what's really in your kitchen. Tap a quantity to fix it, or uncheck anything that isn't there.
           </div>
         </div>
-        <button className="btn ghost" onClick={onRetake}>
-          ↺ Retake
+        <button
+          className="btn ghost"
+          onClick={onRetake}
+          style={{ flex: "0 0 auto", whiteSpace: "nowrap", padding: "8px 14px" }}
+        >
+          <Icon name="camera" />
+          Retake
         </button>
       </div>
 
@@ -148,7 +154,7 @@ export function IngredientsScreen({ photos, initialIngredients, onConfirm, onRet
       )}
 
       <div className="ing-group">
-        <div className="ing-group-label">Add an ingredient</div>
+        <div className="ing-group-label">Missing an ingredient? Add it here</div>
         <form className="add-ing-form" onSubmit={addManual}>
           <input
             type="text"
@@ -159,11 +165,10 @@ export function IngredientsScreen({ photos, initialIngredients, onConfirm, onRet
           />
           <input
             type="text"
-            placeholder="qty (optional)"
+            placeholder="Amount (optional)"
             value={addingQty}
             onChange={(e) => setAddingQty(e.target.value)}
             maxLength={40}
-            style={{ maxWidth: 140 }}
           />
           <button className="btn secondary" type="submit" disabled={!adding.trim()}>
             Add
@@ -233,7 +238,7 @@ function IngredientRow({
         onClick={onToggle}
         title={confirmedView ? "Remove from confirmed" : "Confirm this is here"}
       >
-        {confirmedView ? "✓" : "○"}
+        <Icon name={confirmedView ? "check" : "circle"} />
       </button>
       <span className="name">{ingredient.name}</span>
       {editingQty !== null ? (
@@ -253,14 +258,16 @@ function IngredientRow({
             autoFocus
             placeholder="e.g. 1 pint, 200g"
           />
-          <button type="submit" className="icon-btn" title="Save">✓</button>
+          <button type="submit" className="icon-btn" title="Save">
+            <Icon name="check" />
+          </button>
           <button
             type="button"
             className="icon-btn"
             title="Cancel"
             onClick={onCancelQty}
           >
-            ✕
+            <Icon name="xmark" />
           </button>
         </form>
       ) : (
@@ -269,14 +276,13 @@ function IngredientRow({
           onClick={onBeginEditQty}
           title="Edit quantity"
         >
-          {ingredient.quantity ?? "+ qty"}
+          {ingredient.quantity ?? "+ amount"}
         </button>
       )}
       {ingredient.notes && <span className="notes">{ingredient.notes}</span>}
-      <span className="conf" title="Confidence">{Math.round(ingredient.confidence * 100)}%</span>
       <div className="actions">
         <button className="icon-btn" onClick={onRemove} title="Remove">
-          ✕
+          <Icon name="xmark" />
         </button>
       </div>
     </div>

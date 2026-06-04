@@ -3,10 +3,12 @@ import type { Ingredient, NutritionStrip, Recipe } from "../types";
 import { saveRecipe } from "../features/storage";
 import { computeNutrition, formatStrip, isUsingDemoKey } from "../features/nutrition";
 import { computeAvailability, scaleRecipe, type AvailabilityResult } from "../features/scaling";
+import { Icon } from "../icons";
 
 interface Props {
   recipes: Recipe[];
   ingredients: Ingredient[];
+  onEditIngredients: () => void;
   onRestart: () => void;
 }
 
@@ -18,7 +20,7 @@ type CardNutrition =
   | { kind: "rate-limited"; missedDueToRateLimit: number }
   | { kind: "empty" };
 
-export function RecipesScreen({ recipes, ingredients, onRestart }: Props) {
+export function RecipesScreen({ recipes, ingredients, onEditIngredients, onRestart }: Props) {
   const [savedIdx, setSavedIdx] = useState<Set<number>>(new Set());
   const [savingIdx, setSavingIdx] = useState<number | null>(null);
   const [saveErr, setSaveErr] = useState<string | null>(null);
@@ -124,14 +126,19 @@ export function RecipesScreen({ recipes, ingredients, onRestart }: Props) {
             From {ingredients.length} confirmed ingredient{ingredients.length === 1 ? "" : "s"}. Adjust servings or scale to what you have.
           </div>
         </div>
-        <button className="btn ghost" onClick={onRestart}>
-          ↺ Try different ingredients
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button className="btn secondary" onClick={onEditIngredients}>
+            Edit ingredients
+          </button>
+          <button className="btn ghost" onClick={onRestart}>
+            Start over
+          </button>
+        </div>
       </div>
 
       {saveErr && (
         <div className="status-banner error">
-          <span>⚠</span>
+          <Icon name="wand" />
           <span>{saveErr}</span>
         </div>
       )}
@@ -276,8 +283,8 @@ function RecipeCard({
         </div>
       )}
       {scaleNeeded && isScaled && (
-        <div className="muted" style={{ fontSize: 12 }}>
-          ✓ Scaled to fit your ingredients ({(factor * 100).toFixed(0)}%).
+        <div className="muted" style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+          <Icon name="check" /> Scaled to fit your ingredients ({(factor * 100).toFixed(0)}%).
         </div>
       )}
 
@@ -294,7 +301,7 @@ function RecipeCard({
                 {ing}
                 {shortage && (
                   <div className="ing-shortage">
-                    {shortage.constraining ? "⚠ " : "· "}
+                    {shortage.constraining ? <Icon name="triangle-exclamation" /> : "· "}{" "}
                     Need {Math.round(shortage.needed)}g, you have ~{Math.round(shortage.available)}g{" "}
                     <span className="faint">({shortage.userIngredient})</span>
                   </div>
@@ -316,7 +323,7 @@ function RecipeCard({
 
       <div className="row" style={{ marginTop: "auto" }}>
         {saved ? (
-          <span className="muted" style={{ fontSize: 13 }}>✓ Saved to Recipes</span>
+          <span className="muted" style={{ fontSize: 13, display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="check" /> Saved to Recipes</span>
         ) : (
           <span />
         )}
@@ -374,7 +381,7 @@ function RateLimitBanner({ onDismiss }: { onDismiss: () => void }) {
   return (
     <div className="status-banner" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span>ℹ</span>
+        <Icon name="circle-info" />
         <strong style={{ flex: 1 }}>USDA's nutrition API rate-limited this lookup</strong>
         <button className="btn ghost" onClick={() => setExpanded((v) => !v)} style={{ padding: "4px 10px", fontSize: 12 }}>
           {expanded ? "Less" : "Why?"}

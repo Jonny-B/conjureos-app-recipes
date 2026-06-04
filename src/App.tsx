@@ -4,13 +4,15 @@ import { CaptureScreen } from "./screens/CaptureScreen";
 import { IngredientsScreen } from "./screens/IngredientsScreen";
 import { RecipesScreen } from "./screens/RecipesScreen";
 import { BrowseScreen } from "./screens/BrowseScreen";
+import { CreateScreen } from "./screens/CreateScreen";
 import { identifyIngredients } from "./features/vision";
 import { generateRecipes } from "./features/recipes";
 import { registerActions } from "./bridge/actions";
 import { getUSDAUsage, type USDAUsageSnapshot } from "./features/nutrition";
+import { Icon } from "./icons";
 import { APP_VERSION } from "./version";
 
-type Tab = "build" | "browse";
+type Tab = "build" | "create" | "browse";
 
 export function App() {
   const [tab, setTab] = useState<Tab>("build");
@@ -33,6 +35,17 @@ export function App() {
     setScreen({ kind: "capture" });
     setError(null);
   }, []);
+
+  // Back one step: recipes → ingredients, preserving the photos and the
+  // confirmed ingredient list so the user can tweak what they have without
+  // re-shooting or regenerating from scratch.
+  const editIngredients = useCallback(
+    (photos: CapturedPhoto[], ingredients: Ingredient[]) => {
+      setError(null);
+      setScreen({ kind: "ingredients", photos, ingredients });
+    },
+    [],
+  );
 
   const onIdentify = useCallback(async (photos: CapturedPhoto[]) => {
     setError(null);
@@ -64,14 +77,20 @@ export function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>Recipes</h1>
+        <h1><Icon name="utensils" className="brand-icon" />Recipes</h1>
         <div className="header-spacer" />
         <nav className="app-nav">
           <button
             className={`nav-btn${tab === "build" ? " active" : ""}`}
             onClick={() => setTab("build")}
           >
-            Cook now
+            Scan fridge
+          </button>
+          <button
+            className={`nav-btn${tab === "create" ? " active" : ""}`}
+            onClick={() => setTab("create")}
+          >
+            Create
           </button>
           <button
             className={`nav-btn${tab === "browse" ? " active" : ""}`}
@@ -85,7 +104,7 @@ export function App() {
       <main className="app-body">
         {error && (
           <div className="status-banner error" style={{ marginBottom: 16 }}>
-            <span>⚠</span>
+            <Icon name="wand" />
             <span>{error}</span>
             <div style={{ flex: 1 }} />
             <button className="btn ghost" onClick={() => setError(null)}>
@@ -96,11 +115,14 @@ export function App() {
 
         {tab === "browse" ? (
           <BrowseScreen />
+        ) : tab === "create" ? (
+          <CreateScreen />
         ) : (
           <BuildPane
             screen={screen}
             onIdentify={onIdentify}
             onIngredientsConfirmed={onIngredientsConfirmed}
+            onEditIngredients={editIngredients}
             onReset={reset}
           />
         )}
@@ -114,10 +136,11 @@ interface BuildPaneProps {
   screen: Screen;
   onIdentify: (photos: CapturedPhoto[]) => void;
   onIngredientsConfirmed: (photos: CapturedPhoto[], ingredients: Ingredient[]) => void;
+  onEditIngredients: (photos: CapturedPhoto[], ingredients: Ingredient[]) => void;
   onReset: () => void;
 }
 
-function BuildPane({ screen, onIdentify, onIngredientsConfirmed, onReset }: BuildPaneProps) {
+function BuildPane({ screen, onIdentify, onIngredientsConfirmed, onEditIngredients, onReset }: BuildPaneProps) {
   switch (screen.kind) {
     case "capture":
       return <CaptureScreen onIdentify={onIdentify} />;
@@ -144,6 +167,7 @@ function BuildPane({ screen, onIdentify, onIngredientsConfirmed, onReset }: Buil
         <RecipesScreen
           recipes={screen.recipes as Recipe[]}
           ingredients={screen.ingredients}
+          onEditIngredients={() => onEditIngredients(screen.photos, screen.ingredients)}
           onRestart={onReset}
         />
       );
@@ -218,7 +242,7 @@ function InfoButton() {
         title="App info"
         aria-expanded={open}
       >
-        i
+        <Icon name="circle-info" />
       </button>
       {open && (
         <div className="info-popover" role="dialog" aria-label="App info">
@@ -228,27 +252,27 @@ function InfoButton() {
           </div>
           <div className="info-divider" />
           <div className="info-row">
-            <span className="info-label">USDA nutrition</span>
-            <span className="info-value">
-              {usage.usingDemoKey ? "Shared demo key" : "ConjureOS key"}
-            </span>
+            <span className="info-label">Nutrition</span>
+            <span className="info-value">USDA food database</span>
           </div>
-          <div className="info-row">
-            <span className="info-label">Used this hour</span>
-            <span className="info-value mono">
-              ~{usage.recentInLastHour} / {usage.approxLimit}
-            </span>
-          </div>
+          {usage.tierKnown && (
+            <div className="info-row">
+              <span className="info-label">Lookups this hour</span>
+              <span className="info-value mono">
+                ~{usage.recentInLastHour} / {usage.approxLimit}
+              </span>
+            </div>
+          )}
           {usage.rateLimited ? (
             <p className="info-help warn">
-              Hit the cap. Nutrition lookups pause for ~{rateLimitClearsIn} min,
-              then resume. Recipes still generate; macros just stay blank.
+              The hourly nutrition limit was reached. Recipes still work; some
+              calorie and macro numbers fill in again in ~{rateLimitClearsIn} min.
             </p>
           ) : (
             <p className="info-help">
-              {usage.usingDemoKey
-                ? "Nutrition runs through a ConjureOS proxy on USDA's shared demo key — ~30 lookups/hr across everyone on this instance. Hit the cap? Recipes still generate; macros stay blank until it clears."
-                : "Nutrition runs through a ConjureOS proxy on a registered USDA key — ~1000 lookups/hr."}
+              {usage.tierKnown
+                ? "Calorie and macro estimates come from the free USDA food database, which limits how many lookups happen per hour. You're well within it."
+                : "Calorie and macro estimates come from the free USDA food database. Your hourly usage shows here once you generate your first recipe."}
             </p>
           )}
         </div>

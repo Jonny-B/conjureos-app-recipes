@@ -1,6 +1,30 @@
-import { useRef, useState, type DragEvent, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent, type ChangeEvent } from "react";
 import { preparePhoto, formatBytes } from "../features/capture";
+import { Icon } from "../icons";
 import type { CapturedPhoto } from "../types";
+
+/**
+ * True on touch devices (phones/tablets): a coarse pointer. We use this to
+ * shape the capture affordances — "Take photo" (camera capture) only makes
+ * sense with a camera-backed coarse pointer, and "drag photos here" only
+ * makes sense with a mouse. A desktop window narrowed to phone width still
+ * reports a fine pointer, which is correct: it has no camera to capture from.
+ */
+function usePointerCoarse(): boolean {
+  const [coarse, setCoarse] = useState<boolean>(() =>
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(pointer: coarse)").matches
+      : false,
+  );
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(pointer: coarse)");
+    const onChange = () => setCoarse(mq.matches);
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, []);
+  return coarse;
+}
 
 interface Props {
   onIdentify: (photos: CapturedPhoto[]) => void;
@@ -15,6 +39,7 @@ export function CaptureScreen({ onIdentify }: Props) {
   const [err, setErr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+  const isTouch = usePointerCoarse();
 
   const addFiles = async (files: FileList | File[]) => {
     setErr(null);
@@ -86,6 +111,14 @@ export function CaptureScreen({ onIdentify }: Props) {
       )}
 
       {photos.length > 0 && (
+        <div className="capture-buttons" style={{ marginTop: 4 }}>
+          <button className="btn" disabled={busy} onClick={() => onIdentify(photos)}>
+            {`Identify ingredients from ${photos.length} photo${photos.length === 1 ? "" : "s"} →`}
+          </button>
+        </div>
+      )}
+
+      {photos.length > 0 && (
         <div className="photo-gallery">
           {photos.map((p, i) => (
             <div key={p.id} className="photo-tile">
@@ -96,7 +129,7 @@ export function CaptureScreen({ onIdentify }: Props) {
                 aria-label="Remove photo"
                 title="Remove"
               >
-                ✕
+                <Icon name="xmark" />
               </button>
               <div className="photo-tile-meta">
                 {p.width}×{p.height} · {formatBytes(p.originalBytes)}
@@ -118,15 +151,14 @@ export function CaptureScreen({ onIdentify }: Props) {
       >
         <div className="icon">
           {/* Font Awesome free "camera" (solid). Inlined as SVG rather than
-              pulled from a CDN/icon-font so the single-file embed build
-              (vite-plugin-singlefile) stays fully self-contained. Filled
-              with the candy gradient to match the shell's whimsy. */}
+              pulled from a CDN/icon-font so the single-file embed build stays
+              fully self-contained. Filled with the Modern Whimsy accent
+              gradient (purple → blue). */}
           <svg viewBox="0 0 512 512" role="img" aria-label="Camera">
             <defs>
               <linearGradient id="camGrad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#ff8fc7" />
-                <stop offset="55%" stopColor="#b388ff" />
-                <stop offset="100%" stopColor="#8e7bff" />
+                <stop offset="0%" stopColor="#a5b4fc" />
+                <stop offset="100%" stopColor="#7c6af7" />
               </linearGradient>
             </defs>
             <path
@@ -140,24 +172,33 @@ export function CaptureScreen({ onIdentify }: Props) {
             ? "Preparing photos…"
             : canAddMore
             ? photos.length === 0
-              ? "Drag photos here, or:"
+              ? isTouch
+                ? "Add a photo:"
+                : "Drag photos here, or:"
               : `Add up to ${room} more, or:`
             : `${MAX_PHOTOS}-photo limit reached.`}
         </div>
         <div className="capture-buttons">
+          {/* "Take photo" (camera capture) only on touch devices; a desktop
+              has no camera to capture from, so it would just open a file
+              dialog — confusing. There, "Choose files" is the primary action. */}
+          {isTouch && (
+            <button
+              className="btn"
+              disabled={busy || !canAddMore}
+              onClick={() => cameraRef.current?.click()}
+            >
+              <Icon name="camera" />
+              Take photo
+            </button>
+          )}
           <button
-            className="btn"
-            disabled={busy || !canAddMore}
-            onClick={() => cameraRef.current?.click()}
-          >
-            📸 Take photo
-          </button>
-          <button
-            className="btn secondary"
+            className={`btn${isTouch ? " secondary" : ""}`}
             disabled={busy || !canAddMore}
             onClick={() => fileRef.current?.click()}
           >
-            🖼 Choose from library
+            <Icon name="images" />
+            {isTouch ? "Choose from library" : "Choose files"}
           </button>
         </div>
         <input
@@ -180,22 +221,10 @@ export function CaptureScreen({ onIdentify }: Props) {
 
       {err && (
         <div className="status-banner error">
-          <span>⚠</span>
+          <Icon name="wand" />
           <span>{err}</span>
         </div>
       )}
-
-      <div className="capture-buttons" style={{ marginTop: 4 }}>
-        <button
-          className="btn"
-          disabled={photos.length === 0 || busy}
-          onClick={() => onIdentify(photos)}
-        >
-          {photos.length === 0
-            ? "Add a photo to continue"
-            : `Identify ingredients from ${photos.length} photo${photos.length === 1 ? "" : "s"} →`}
-        </button>
-      </div>
 
       <div className="faint" style={{ fontSize: 12, textAlign: "center" }}>
         Photos are downscaled locally before being sent to the AI. Up to {MAX_PHOTOS} per session.

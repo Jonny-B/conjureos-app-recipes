@@ -3,39 +3,48 @@
  * multi-hue glows, bouncy interactions. Tokens still echo the kernel's
  * :root so the app reads as a first-class citizen inside the shell. */
 
-:root {
-  /* Warm plum-indigo night, a little softer than cold navy. */
-  --bg-0: #16122b;
-  --bg-1: #1e1839;
-  --bg-2: #271f49;
-  --bg-3: #332859;
-  --fg: #f5f1ff;
-  --fg-dim: #b6abd6;
-  --fg-faint: #8479a6;
+/* The app's tokens are re-pointed at @conjureos/ui's Modern Whimsy tokens so
+   the whole app inherits ConjureOS's canonical palette, shadows, and motion
+   from one place. Defined on `.cui-ui` (the <body> wrapper) rather than :root
+   because the --cui-* tokens live on .cui-ui — a custom property can only read
+   another one defined on the same element or an ancestor, and :root (html) is
+   the parent of body, not a descendant. Old token NAMES are kept so every
+   existing rule keeps working; only the VALUES change. */
+.cui-ui {
+  --bg-0: var(--cui-bg);
+  --bg-1: var(--cui-bg-1);
+  --bg-2: var(--cui-bg-2);
+  --bg-3: var(--cui-bg-3);
+  --fg: var(--cui-fg);
+  --fg-dim: var(--cui-fg-mute);
+  --fg-faint: var(--cui-fg-dim);
 
-  /* Candy accents — cohesive but cheerful. */
-  --grape: #b388ff;
-  --bubblegum: #ff8fc7;
-  --tangerine: #ffb24d;
-  --mint: #5eead4;
-  --sky: #82c8ff;
-  --butter: #ffe08a;
+  /* Accent: purple primary + indigo soft. The old pink (bubblegum) was app
+     drift off the canonical palette; it now resolves to the indigo soft accent. */
+  --grape: var(--cui-accent);
+  --bubblegum: var(--cui-accent-soft);
+  --tangerine: var(--cui-warn);
+  --mint: var(--cui-success);
+  --sky: var(--cui-accent-soft);
+  --butter: var(--cui-warn);
 
-  /* Semantic mappings (keep old names working). */
-  --accent: #b388ff;
-  --accent-2: #ff8fc7;
-  --accent-soft: #d9c3ff;
-  --accent-warm: #ffb24d;
-  --border: #3a2f63;
-  --border-soft: rgba(255, 255, 255, 0.07);
-  --danger: #ff6b8b;
-  --success: #5eead4;
+  --accent: var(--cui-accent);
+  --accent-2: var(--cui-accent-soft);
+  --accent-soft: var(--cui-accent-soft);
+  --accent-warm: var(--cui-warn);
+  --border: var(--cui-border);
+  --border-soft: var(--cui-border);
+  --danger: var(--cui-error);
+  --success: var(--cui-success);
 
-  --grad-primary: linear-gradient(135deg, #ff8fc7 0%, #b388ff 55%, #8e7bff 100%);
-  --grad-warm: linear-gradient(135deg, #ffd16a, #ffb24d);
-  --shadow-glow: 0 14px 40px -16px rgba(179, 136, 255, 0.55);
-  --shadow-soft: 0 8px 24px -12px rgba(8, 5, 22, 0.7);
+  /* Vivid purple→blue for filled buttons + active pills (the signature
+     gradient applied as an opaque fill, not the soft hero wash). */
+  --grad-primary: linear-gradient(135deg, var(--cui-accent), #4a9eff);
+  --grad-warm: linear-gradient(135deg, var(--cui-accent-soft), var(--cui-accent));
+  --shadow-glow: var(--cui-shadow-accent);
+  --shadow-soft: var(--cui-shadow);
 
+  /* Reserved bouncy curve for character moments (error banner rise, etc.). */
   --bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -52,7 +61,7 @@ body,
 }
 
 body {
-  font-family: "Nunito", ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-family: var(--cui-font-sans);
   background: var(--bg-0);
   color: var(--fg);
   font-size: 14px;
@@ -69,7 +78,7 @@ body::after {
   z-index: 0;
   border-radius: 50%;
   filter: blur(70px);
-  opacity: 0.5;
+  opacity: 0.3;
   pointer-events: none;
 }
 
@@ -101,12 +110,14 @@ body::after {
   50% { transform: translate(40px, -30px) scale(1.12); }
 }
 
+/* Modern Whimsy uses system fonts only (no web fonts); headings and controls
+   share the same sans stack as body, differentiated by weight/size. */
 h1, h2, h3, h4,
 .app-header h1,
 .btn,
 .nav-btn,
 .serving-count {
-  font-family: "Fredoka", ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-serif;
+  font-family: var(--cui-font-sans);
 }
 
 button {
@@ -137,8 +148,12 @@ select {
   align-items: center;
   gap: 12px;
   padding: 14px 20px;
-  border-bottom: 1px solid var(--border-soft);
-  background: linear-gradient(180deg, rgba(179, 136, 255, 0.14), rgba(255, 143, 199, 0.04));
+  border-bottom: 1px solid var(--cui-border);
+  /* Modern Whimsy accent-gradient hero strip. */
+  background: linear-gradient(180deg,
+    rgba(124, 106, 247, 0.12),
+    rgba(74, 158, 255, 0.04) 60%,
+    transparent);
   backdrop-filter: blur(8px);
   flex-shrink: 0;
 }
@@ -157,17 +172,10 @@ select {
   gap: 8px;
 }
 
-.app-header h1::before {
-  content: "🍳";
-  -webkit-text-fill-color: initial;
-  font-size: 22px;
-  animation: wiggle 4s ease-in-out infinite;
-}
-
-@keyframes wiggle {
-  0%, 88%, 100% { transform: rotate(0deg); }
-  92% { transform: rotate(-12deg); }
-  96% { transform: rotate(12deg); }
+.app-header h1 .brand-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--bubblegum);
 }
 
 .app-header .header-spacer {
@@ -176,34 +184,42 @@ select {
 
 .app-nav {
   display: flex;
-  gap: 6px;
-  background: rgba(0, 0, 0, 0.18);
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.22);
   padding: 4px;
-  border-radius: 999px;
-  border: 1px solid var(--border-soft);
+  border-radius: var(--cui-radius-pill);
+  border: 1px solid var(--cui-border);
 }
 
 .nav-btn {
   background: transparent;
   border: none;
-  color: var(--fg-dim);
+  color: var(--cui-fg-mute);
   padding: 7px 16px;
-  border-radius: 999px;
+  border-radius: var(--cui-radius-pill);
   cursor: pointer;
   font-size: 13px;
-  font-weight: 500;
-  transition: background 0.2s, color 0.2s, transform 0.15s var(--bounce);
+  font-weight: var(--cui-weight-medium);
+  white-space: nowrap;
+  transition: background var(--cui-duration-fast) var(--cui-ease),
+              color var(--cui-duration-fast) var(--cui-ease);
 }
 
 .nav-btn:hover {
-  color: var(--fg);
-  transform: translateY(-1px);
+  color: var(--cui-fg);
+  background: var(--cui-accent-mute);
 }
 
+/* Pill-shaped active state: accent-gradient backing + accent-tint ring +
+   soft accent glow (the canonical Modern Whimsy selected-affordance). */
 .nav-btn.active {
-  color: #2a1840;
-  background: var(--grad-primary);
-  box-shadow: 0 6px 16px -6px rgba(255, 143, 199, 0.7);
+  color: #fff;
+  background: linear-gradient(135deg,
+    rgba(124, 106, 247, 0.6),
+    rgba(74, 158, 255, 0.45));
+  box-shadow: 0 0 0 1px var(--cui-accent-tint),
+              0 4px 12px rgba(124, 106, 247, 0.25);
 }
 
 /* ── Info popover (version + USDA quota) ──────────────────────────────
@@ -221,27 +237,26 @@ select {
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  border: 1px solid var(--border);
+  border: none;
   background: transparent;
-  color: var(--fg-dim);
-  font-family: serif;
-  font-style: italic;
-  font-weight: 600;
-  font-size: 14px;
-  line-height: 1;
+  color: var(--cui-fg-mute);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.12s, color 0.12s, border-color 0.12s, transform 0.15s var(--bounce);
+  transition: background var(--cui-duration-fast) var(--cui-ease),
+              color var(--cui-duration-fast) var(--cui-ease);
+}
+
+.info-btn .fa-icon {
+  width: 15px;
+  height: 15px;
 }
 
 .info-btn:hover,
 .info-btn.active {
-  background: var(--bg-3);
-  color: var(--fg);
-  border-color: var(--grape);
-  transform: translateY(-1px);
+  background: var(--cui-accent-mute);
+  color: var(--cui-fg);
 }
 
 .info-popover {
@@ -256,17 +271,6 @@ select {
   border-radius: 14px;
   box-shadow: var(--shadow-soft);
   z-index: 50;
-}
-/* Soft accent gradient strip along the top edge — echoes --grad-primary
-   without depending on the shell's CSS. */
-.info-popover::before {
-  content: "";
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, rgba(255, 143, 199, 0.55), rgba(179, 136, 255, 0.4), transparent);
-  border-radius: 14px 14px 0 0;
-  pointer-events: none;
 }
 
 .info-row {
@@ -344,19 +348,31 @@ select {
   gap: 8px;
   background: var(--grad-primary);
   border: none;
-  color: #2a1840;
+  color: #fff;
   padding: 11px 20px;
   border-radius: 999px;
   cursor: pointer;
   font-weight: 600;
   font-size: 14px;
-  box-shadow: 0 8px 20px -8px rgba(179, 136, 255, 0.75);
-  transition: transform 0.18s var(--bounce), box-shadow 0.18s, filter 0.18s;
+  box-shadow: var(--cui-shadow-accent);
+  transition: transform var(--cui-duration-fast) var(--cui-ease), box-shadow var(--cui-duration) var(--cui-ease), filter var(--cui-duration) var(--cui-ease);
 }
 
+/* Modern Whimsy hover: a gentle 1px lift with an accent-tinted shadow — no
+   scale. The lift is a wink, not a flash. */
 .btn:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 12px 26px -8px rgba(255, 143, 199, 0.8);
+  transform: translateY(-1px);
+  box-shadow: var(--cui-shadow-accent);
+  filter: brightness(1.06);
+}
+
+/* Inline Font Awesome glyph (see icons.tsx) — sized to the surrounding
+   text, inherits color via fill="currentColor". */
+.fa-icon {
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  vertical-align: -0.125em;
 }
 
 .btn:active {
@@ -416,6 +432,127 @@ select {
   gap: 18px;
 }
 
+.create-screen {
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.create-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 150px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px 16px;
+  color: var(--fg);
+  font: inherit;
+  line-height: 1.5;
+}
+
+.create-input:focus {
+  outline: none;
+  border-color: var(--grape);
+}
+
+/* One-line hint above the editable Create preview. */
+
+/* Click-to-edit text in the Create preview. The dashed underline + always-on
+   pen make it obvious each line is tappable; hover deepens the affordance. */
+.editable {
+  cursor: text;
+  border-radius: 6px;
+  padding: 1px 5px;
+  margin: -1px -5px;
+  border-bottom: 1px dashed var(--grape);
+  transition: background 0.15s, border-color 0.15s;
+  outline: none;
+}
+
+.editable:hover,
+.editable:focus-visible {
+  background: rgba(179, 136, 255, 0.14);
+  border-bottom-color: var(--bubblegum);
+}
+
+.edit-hint {
+  width: 0.7em;
+  height: 0.7em;
+  margin-left: 6px;
+  color: var(--grape);
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+
+.editable:hover .edit-hint,
+.editable:focus-visible .edit-hint {
+  opacity: 1;
+}
+
+.inline-edit {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-1);
+  border: 1px solid var(--grape);
+  border-radius: 8px;
+  padding: 6px 9px;
+  color: var(--fg);
+  font: inherit;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.inline-edit:focus {
+  outline: none;
+}
+
+.edit-list .edit-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.edit-line .editable {
+  flex: 1;
+}
+
+.line-remove {
+  flex: 0 0 auto;
+  opacity: 0.4;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+}
+
+.edit-line:hover .line-remove,
+.line-remove:focus-visible {
+  opacity: 0.8;
+}
+
+.line-remove:hover {
+  opacity: 1;
+  color: var(--danger);
+}
+
+.add-line-btn {
+  margin-top: 8px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--fg-dim);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.add-line-btn:hover {
+  border-color: var(--grape);
+  color: var(--fg);
+}
+
 .capture-screen h2 {
   margin: 0;
   font-size: 26px;
@@ -441,8 +578,7 @@ select {
 .capture-area .icon {
   font-size: 54px;
   margin-bottom: 12px;
-  filter: drop-shadow(0 6px 14px rgba(179, 136, 255, 0.4));
-  animation: bob 3.5s ease-in-out infinite;
+  filter: drop-shadow(0 6px 14px rgba(124, 106, 247, 0.4));
   line-height: 0;
 }
 
@@ -450,6 +586,7 @@ select {
   width: 58px;
   height: 58px;
   display: block;
+  margin: 0 auto;
 }
 
 @keyframes bob {
@@ -483,8 +620,10 @@ select {
 
 .photo-gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px;
+  /* Compact thumbnails so a full 6-photo batch stays a couple of short
+     rows instead of pushing the dropzone + Identify CTA below the fold. */
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 10px;
 }
 
 .photo-tile {
@@ -712,11 +851,11 @@ select {
 
 .add-ing-form {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .add-ing-form input {
-  flex: 1;
   background: var(--bg-1);
   border: 1px solid var(--border);
   color: var(--fg);
@@ -724,6 +863,21 @@ select {
   border-radius: 14px;
   outline: none;
   transition: border-color 0.18s, box-shadow 0.18s;
+}
+
+/* Name field takes the lion's share (its own row when space is tight); the
+   quantity field is narrower; the Add button keeps its natural size and never
+   gets crushed against the edge. */
+.add-ing-form input:first-of-type {
+  flex: 3 1 200px;
+}
+
+.add-ing-form input:nth-of-type(2) {
+  flex: 1 1 120px;
+}
+
+.add-ing-form .btn {
+  flex: 0 0 auto;
 }
 
 .add-ing-form input:focus {
@@ -750,7 +904,7 @@ select {
 .recipe-card {
   background: var(--bg-1);
   border: 1px solid var(--border);
-  border-radius: 22px;
+  border-radius: var(--cui-radius-lg);
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -758,24 +912,23 @@ select {
   box-shadow: var(--shadow-soft);
   position: relative;
   overflow: hidden;
-  transition: transform 0.25s var(--bounce), box-shadow 0.25s, border-color 0.25s;
-}
-
-/* A cheerful gradient ribbon along the top of each card. */
-.recipe-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: var(--grad-primary);
+  transition: transform var(--cui-duration) var(--cui-ease),
+              box-shadow var(--cui-duration) var(--cui-ease),
+              border-color var(--cui-duration) var(--cui-ease);
 }
 
 .recipe-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-1px);
   box-shadow: var(--shadow-glow);
-  border-color: var(--grape);
+  border-color: var(--cui-border-strong);
+}
+
+/* The Create preview reuses .recipe-card for layout, but it's a static editing
+   surface (not a browsable result), so no hover lift. */
+.recipe-card--static:hover {
+  transform: none;
+  box-shadow: var(--shadow-soft);
+  border-color: var(--border);
 }
 
 .recipe-card h3 {
@@ -998,6 +1151,103 @@ select {
   padding: 11px 0;
 }
 
+.browse-filter .fa-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--fg-faint);
+}
+
+/* Custom sort dropdown (replaces the native <select>, whose OS popup couldn't
+   be themed). Trigger + popover, both on Modern Whimsy surfaces. */
+.dropdown {
+  position: relative;
+  display: inline-flex;
+}
+
+.dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--cui-border);
+  color: var(--cui-fg-mute);
+  border-radius: var(--cui-radius-pill);
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: var(--cui-weight-medium);
+  cursor: pointer;
+  transition: background var(--cui-duration-fast) var(--cui-ease),
+              border-color var(--cui-duration-fast) var(--cui-ease),
+              color var(--cui-duration-fast) var(--cui-ease);
+}
+
+.dropdown-trigger:hover {
+  color: var(--cui-fg);
+  background: var(--cui-bg-2);
+  border-color: var(--cui-border-strong);
+}
+
+.dropdown-caret {
+  width: 11px;
+  height: 11px;
+  color: var(--cui-fg-mute);
+  transition: transform var(--cui-duration) var(--cui-ease);
+}
+
+.dropdown-caret.open {
+  transform: rotate(180deg);
+}
+
+.dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  min-width: 180px;
+  background: var(--cui-bg-3);
+  border: 1px solid var(--cui-border);
+  border-radius: var(--cui-radius);
+  box-shadow: var(--cui-shadow);
+  animation: dropdown-rise var(--cui-duration) var(--cui-ease-out) both;
+}
+
+@keyframes dropdown-rise {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.dropdown-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: var(--cui-radius-sm);
+  color: var(--cui-fg-mute);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--cui-duration-fast) var(--cui-ease),
+              color var(--cui-duration-fast) var(--cui-ease);
+}
+
+.dropdown-option:hover {
+  background: var(--cui-bg-2);
+  color: var(--cui-fg);
+}
+
+.dropdown-option.active {
+  background: var(--cui-accent-mute);
+  color: var(--cui-accent-soft);
+}
+
+.dropdown-option .fa-icon {
+  width: 12px;
+  height: 12px;
+}
+
 .browse-list {
   display: flex;
   flex-direction: column;
@@ -1055,12 +1305,13 @@ select {
   font-size: 15px;
 }
 
-.empty-state::before {
-  content: "🧺";
+.empty-icon {
   display: block;
-  font-size: 48px;
-  margin-bottom: 14px;
-  opacity: 0.8;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 14px;
+  color: var(--grape);
+  opacity: 0.7;
   animation: bob 3.5s ease-in-out infinite;
 }
 
@@ -1136,6 +1387,21 @@ select {
 
   .browse-filter {
     width: 100%;
+  }
+
+  /* Keep the sort dropdown hugging its trigger in the stacked header (the
+     column's align-items: stretch would otherwise widen the wrapper to full
+     width and fling the menu's right: 0 anchor to the screen edge). */
+  .dropdown {
+    align-self: flex-start;
+  }
+
+  /* In the stacked header the trigger sits at the left, so anchor the menu's
+     LEFT edge to it (extends rightward, on-screen) instead of right: 0 (which
+     extended left and clipped off the screen edge). */
+  .dropdown-menu {
+    right: auto;
+    left: 0;
   }
 
   /* On a phone-width card, give the inline quantity editor its own full
