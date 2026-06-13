@@ -55,11 +55,16 @@ jobs:
       # `uses: Jonny-B/ConjureOS/...@dev`, so check ConjureOS out with a
       # read-only PAT and reference the action by local path below. ConjureOS's
       # @bundle + scripts/ + lib/bundle ride along in this checkout.
+      # Pinned to ConjureOS `main` (stable, prod) rather than `dev`: the publish
+      # tooling (scripts/bundle-app.ts + lib/bundle) must be self-consistent, and
+      # `dev` is mid-migration from lib/bundle to @conjureos/pack — lib/bundle was
+      # removed there while bundle-app.ts still imports it, which breaks the build.
+      # `main` carries the stable tooling, so prod (and dev) publishes use it.
       - name: Checkout ConjureOS (shared publish action)
         uses: actions/checkout@v4
         with:
           repository: Jonny-B/ConjureOS
-          ref: dev
+          ref: main
           token: ${{ secrets.CONJUREOS_REPO_TOKEN }}
           path: .conjureos
 
