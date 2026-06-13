@@ -72,6 +72,37 @@ export async function complete(req: CompleteRequest): Promise<string> {
  */
 async function mockComplete(req: CompleteRequest): Promise<string> {
   await new Promise((r) => setTimeout(r, 600));
+  // Custom-recipe reviewer call (text-only, "recipe reviewer" system). Echoes
+  // back a cleaned-looking single recipe so the dev tidy button does something.
+  if (req.system.includes("recipe reviewer")) {
+    return JSON.stringify({
+      title: "Your Tidied Recipe",
+      difficulty: "easy",
+      cookTime: 25,
+      servings: 2,
+      summary: "A simple, comforting dish that comes together in about 25 minutes.",
+      ingredients: ["2 cups tomatoes", "1 tbsp olive oil", "salt + pepper to taste"],
+      instructions: ["Prep the ingredients.", "Cook over medium heat until done.", "Season and serve."],
+    });
+  }
+
+  // Custom-recipe structuring call (text-only, "recipe formatter" system).
+  if (req.system.includes("recipe formatter")) {
+    return JSON.stringify({
+      title: "Your Tidied Recipe",
+      difficulty: "easy",
+      cookTime: 25,
+      servings: 2,
+      summary: "A simple, comforting dish that comes together in about 25 minutes.",
+      ingredients: ["2 cups of your main ingredient", "1 tbsp olive oil", "salt + pepper to taste"],
+      instructions: [
+        "Prep your ingredients as described.",
+        "Cook over medium heat until done.",
+        "Season and serve.",
+      ],
+    });
+  }
+
   const hasImages = req.messages.some((m) => m.images && m.images.length > 0);
   if (hasImages) {
     return JSON.stringify({

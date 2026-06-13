@@ -1,9 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SavedRecipe } from "../types";
 import { deleteRecipe, listSavedRecipes, markMade } from "../features/storage";
 import { formatStrip } from "../features/nutrition";
+import { Icon } from "../icons";
 
 type Sort = "recent" | "made";
+
+const SORT_OPTIONS: { value: Sort; label: string }[] = [
+  { value: "recent", label: "Most recent" },
+  { value: "made", label: "Most made" },
+];
 
 export function BrowseScreen() {
   const [items, setItems] = useState<SavedRecipe[] | null>(null);
@@ -85,7 +91,7 @@ export function BrowseScreen() {
       <div className="browse-header">
         <h2>Saved recipes</h2>
         <div className="browse-filter">
-          <span>🔍</span>
+          <Icon name="magnifying-glass" />
           <input
             type="text"
             placeholder="Filter by title or ingredient…"
@@ -93,20 +99,12 @@ export function BrowseScreen() {
             onChange={(e) => setFilter(e.target.value)}
           />
         </div>
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as Sort)}
-          className="btn ghost"
-          style={{ padding: "10px 14px" }}
-        >
-          <option value="recent">Most recent</option>
-          <option value="made">Most made</option>
-        </select>
+        <SortDropdown value={sort} onChange={setSort} />
       </div>
 
       {error && (
         <div className="status-banner error">
-          <span>⚠</span>
+          <Icon name="wand" />
           <span>{error}</span>
         </div>
       )}
@@ -117,9 +115,12 @@ export function BrowseScreen() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="empty-state">
-          {items.length === 0
-            ? "No recipes saved yet. Snap a photo of your fridge to get started."
-            : "No recipes match that filter."}
+          <Icon name="bowl-food" className="empty-icon" />
+          <div>
+            {items.length === 0
+              ? "No recipes saved yet. Snap a photo of your fridge to get started."
+              : "No recipes match that filter."}
+          </div>
         </div>
       ) : (
         <div className="browse-list">
@@ -147,6 +148,68 @@ export function BrowseScreen() {
   );
 }
 
+/**
+ * Custom sort dropdown. A native <select>'s open popup is OS-rendered and
+ * can't be themed (it showed as a jarring white list), so this is a styled
+ * button + popover that matches the Modern Whimsy surfaces. Closes on
+ * outside-click or Escape.
+ */
+function SortDropdown({ value, onChange }: { value: Sort; onChange: (s: Sort) => void }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const current = SORT_OPTIONS.find((o) => o.value === value) ?? SORT_OPTIONS[0]!;
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="dropdown" ref={wrapRef}>
+      <button
+        type="button"
+        className="dropdown-trigger"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span>{current.label}</span>
+        <Icon name="chevron-down" className={`dropdown-caret${open ? " open" : ""}`} />
+      </button>
+      {open && (
+        <ul className="dropdown-menu" role="listbox">
+          {SORT_OPTIONS.map((o) => (
+            <li
+              key={o.value}
+              role="option"
+              aria-selected={o.value === value}
+              className={`dropdown-option${o.value === value ? " active" : ""}`}
+              onClick={() => {
+                onChange(o.value);
+                setOpen(false);
+              }}
+            >
+              <span>{o.label}</span>
+              {o.value === value && <Icon name="check" />}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 interface DetailProps {
   recipe: SavedRecipe;
   onBack: () => void;
@@ -164,7 +227,7 @@ function RecipeDetail({ recipe, onBack, onMade, onDelete }: DetailProps) {
         </button>
         <div style={{ flex: 1 }} />
         <button className="btn secondary" onClick={onMade}>
-          ✓ I made this
+          <Icon name="check" /> I made this
         </button>
         {confirmDelete ? (
           <>

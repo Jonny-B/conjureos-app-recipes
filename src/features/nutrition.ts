@@ -73,6 +73,10 @@ const SEARCH_CONCURRENCY = 3;
  */
 let usingDemoKey = true;
 let usdaHourlyLimit = 30;
+// Have we actually heard back from the proxy yet? Until the first response,
+// `usingDemoKey`/`usdaHourlyLimit` are pessimistic guesses, not facts — so the
+// Info popover shouldn't assert a tier/limit before a lookup has happened.
+let tierKnown = false;
 export const isUsingDemoKey = (): boolean => usingDemoKey;
 /** Session-wide rate-limit short-circuit. When this is in the future, USDA
  *  calls return immediately with rateLimited:true and never touch the network.
@@ -106,6 +110,9 @@ export interface USDAUsageSnapshot {
   rateLimitedUntil: number;
   /** Are we on DEMO_KEY (vs. a registered key)? Determines the limit + the help copy. */
   usingDemoKey: boolean;
+  /** True once the proxy has reported its tier (i.e. a lookup has happened).
+   *  Before this, usingDemoKey/approxLimit are pessimistic guesses. */
+  tierKnown: boolean;
 }
 
 export function getUSDAUsage(): USDAUsageSnapshot {
@@ -130,6 +137,7 @@ export function getUSDAUsage(): USDAUsageSnapshot {
     rateLimited: rateLimitedUntil > now,
     rateLimitedUntil,
     usingDemoKey,
+    tierKnown,
   };
 }
 
@@ -390,7 +398,10 @@ async function searchUSDA(query: string, signal?: AbortSignal): Promise<USDAFetc
   // the pessimistic DEMO_KEY default to the real signup limit once we've
   // actually heard back. Missing headers leave the prior values untouched.
   const tierHeader = resp.headers.get("X-USDA-Tier");
-  if (tierHeader) usingDemoKey = tierHeader === "demo";
+  if (tierHeader) {
+    usingDemoKey = tierHeader === "demo";
+    tierKnown = true;
+  }
   const limitHeader = resp.headers.get("X-USDA-Limit");
   if (limitHeader) {
     const parsedLimit = Number(limitHeader);
