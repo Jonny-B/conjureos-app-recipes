@@ -9,7 +9,7 @@
  * match-ranking / Plan-My-Week surfaces call.
  */
 
-import rawCatalog from "../data/catalog.json";
+import { CATALOG } from "../data/catalog";
 import type { CatalogRecipe, Difficulty, NutritionStrip, Recipe } from "../types";
 
 /** Compact on-disk record. Keys are short to keep the bundled JSON small. */
@@ -36,7 +36,7 @@ interface RawCatalog {
   r: RawRecord[];
 }
 
-const raw = rawCatalog as unknown as RawCatalog;
+const raw = CATALOG as unknown as RawCatalog;
 
 let memo: CatalogRecipe[] | null = null;
 

@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Recipes for ConjureOS: browse a catalog, keep a pantry, get suggestions ranked by what you have, and plan a week of meals that shares a shopping list.",
   "type": "module",
   "license": "MIT",
@@ -44,6 +44,7 @@
   "//": "No Vite. `npm run dev` is the esbuild dev server from @conjureos/pack; the published build goes through ConjureOS @bundle in CI (same as a user-published app). Bump `version` here AND in src/version.ts together.",
   "scripts": {
     "dev": "conj-pack dev",
+    "build": "npx -y tsx scripts/build-bundle.mjs",
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
@@ -51,7 +52,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@conjureos/pack": "^0.0.4",
+    "@conjureos/pack": "^0.1.1",
     "@conjureos/ui": "^0.1.2",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

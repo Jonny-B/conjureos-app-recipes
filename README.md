@@ -51,12 +51,18 @@ Accuracy is ~±25-40% on totals — fine for "should I cook this?" but not medic
 
 ```bash
 npm install
-npm run dev        # = conj-pack dev — esbuild dev server (no Vite), live reload
+npm run dev          # conj-pack dev: esbuild dev server (no Vite), live reload
+npm run build        # the REAL store bundle (ConjureOS @bundle) -> dist/recipes.html
 ```
 
-The dev server runs the UI but mocks the AI and VFS bridges (they only exist inside ConjureOS). For full-fidelity testing, publish to the dev App Store (below) and run the app inside ConjureOS.
+`npm run dev` is a fast esbuild dev server with mocked AI + VFS bridges. It is **not** the same pipeline as the store build, so code can pass in dev and still break on import. (Concrete example that bit us: a `.json` import works in dev, but the store bundler's loader map has no JSON loader and hands back `undefined`, crashing at runtime. Ship bundled data as a `.ts` module instead, see `src/data/catalog.ts`.)
 
-Bump `version` in **both** `package.json` and `src/version.ts` together — the in-app version footer reads the latter.
+**Always verify with the store bundle before publishing:**
+
+1. `npm run build` runs the same `@conjureos/pack` `bundle()` that CI's `@bundle` uses, writing `dist/recipes.html`.
+2. Serve `dist/` (any static server) and open `dist/recipes.html` in a browser. It runs standalone with the same mocked bridges, so confirm it renders with a clean console. A crash here is a real store-build bug.
+
+Treat "`dist/recipes.html` loads clean" as the gate for publishing. Bump `version` in **both** `package.json` and `src/version.ts` together (the in-app footer reads the latter, and CI fails the publish if they disagree).
 
 ## Publishing to the ConjureOS App Store (CI)
 
