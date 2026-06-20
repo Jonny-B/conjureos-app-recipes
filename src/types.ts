@@ -95,6 +95,27 @@ export interface SavedRecipe extends Recipe {
   madeCount: number;
   /** ISO timestamp of the most recent "made this" click, or null. */
   lastMadeAt: string | null;
+  /** User-flagged favorite. Persisted as `favorite: true` in frontmatter. */
+  favorite?: boolean;
+}
+
+/**
+ * A recipe from the bundled, AllRecipes-sourced catalog (see
+ * scripts/build-catalog.ts + src/data/catalog.json). A superset of Recipe
+ * with provenance + precomputed match tokens. Never persisted as-is: saving
+ * goes through catalog.toRecipe() -> storage.saveRecipe().
+ */
+export interface CatalogRecipe extends Recipe {
+  /** Stable catalog id, e.g. "ar-3f9c51c7a881". */
+  id: string;
+  /** One of the ~12 taxonomy categories (catalog `categories` list). */
+  category: string;
+  /** Derived flags: "quick", "high-protein", "vegetarian", etc. */
+  tags: string[];
+  /** Original AllRecipes URL, kept for attribution + provenance. */
+  sourceUrl: string;
+  /** Canonical ingredient names (parseIngredient), precomputed at build time. */
+  tokens: string[];
 }
 
 export type Screen =

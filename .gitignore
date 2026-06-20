@@ -12,3 +12,6 @@ dist
 
 # esbuild dev server output (conj-pack dev)
 .devserve
+
+# Catalog build cache (the scraped dump + peeks; the built src/data/catalog.json IS committed)
+scripts/.cache
