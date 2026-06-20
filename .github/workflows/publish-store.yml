@@ -54,7 +54,14 @@ jobs:
       # GitHub can't resolve an action in another private *personal* repo via
       # `uses: Jonny-B/ConjureOS/...@dev`, so check ConjureOS out with a
       # read-only PAT and reference the action by local path below. ConjureOS's
-      # @bundle + scripts/ + lib/bundle ride along in this checkout.
+      # @bundle build action + scripts/ + the @conjureos/pack bundler ride along.
+      # Pinned to ConjureOS `dev`: the publish tooling (scripts/bundle-app.ts +
+      # the shared @conjureos/pack bundler) is canonical and up-to-date on dev.
+      # (Was briefly pinned to `main` as a workaround while dev's lib/bundle ->
+      # @conjureos/pack migration left bundle-app.ts importing a deleted module,
+      # which broke the build. Fixed in ConjureOS 0.8.5, so dev is correct again.
+      # main's stale lib/bundle produced a broken ~1.8KB stub bundle — do NOT pin
+      # back to main until that fix also reaches ConjureOS main.)
       - name: Checkout ConjureOS (shared publish action)
         uses: actions/checkout@v4
         with:
