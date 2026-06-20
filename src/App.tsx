@@ -1,44 +1,101 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CapturedPhoto, Ingredient, Recipe, Screen } from "./types";
+import type { CapturedPhoto, Ingredient, PantryItem, Recipe, Screen } from "./types";
 import { CaptureScreen } from "./screens/CaptureScreen";
 import { IngredientsScreen } from "./screens/IngredientsScreen";
 import { RecipesScreen } from "./screens/RecipesScreen";
-import { BrowseScreen } from "./screens/BrowseScreen";
 import { CreateScreen } from "./screens/CreateScreen";
+import { RecipesBrowseScreen } from "./screens/RecipesBrowseScreen";
+import { PantryScreen } from "./screens/PantryScreen";
 import { identifyIngredients } from "./features/vision";
 import { generateRecipes } from "./features/recipes";
 import { registerActions } from "./bridge/actions";
+import { loadPantry } from "./features/pantry";
 import { getUSDAUsage, type USDAUsageSnapshot } from "./features/nutrition";
 import { Icon } from "./icons";
 import { APP_VERSION } from "./version";
 
-type Tab = "build" | "create" | "browse";
+type Tab = "cook" | "recipes" | "favorites" | "pantry" | "plan";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "cook", label: "Cook" },
+  { id: "recipes", label: "Recipes" },
+  { id: "favorites", label: "Favorites" },
+  { id: "pantry", label: "Pantry" },
+  { id: "plan", label: "Plan" },
+];
 
 export function App() {
-  const [tab, setTab] = useState<Tab>("build");
-  const [screen, setScreen] = useState<Screen>({ kind: "capture" });
-  const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("cook");
+  const [pantry, setPantry] = useState<PantryItem[] | null>(null);
 
-  // Register cross-app action handlers once on boot. Other apps (calorie
-  // tracker, meal planner, shopping list, etc.) can invoke these via
-  // window.__conjureos.actions.invoke('/apps/recipes', actionName, params).
-  // Failure to register is non-fatal — the app stays usable, only the
-  // cross-app integrations break.
+  // Register cross-app action handlers once on boot, and load the persistent
+  // pantry so the Recipes feed can rank against it the moment the user opens
+  // that tab. Registration failure is non-fatal: the app stays usable, only
+  // the cross-app integrations break.
   useEffect(() => {
     registerActions().catch((err) => {
       // eslint-disable-next-line no-console
       console.warn("[recipes] action registration failed:", err);
     });
+    loadPantry()
+      .then(setPantry)
+      .catch(() => setPantry([]));
   }, []);
+
+  return (
+    <div className="app">
+      <header className="app-header">
+        <h1>
+          <Icon name="utensils" className="brand-icon" />
+          Recipes
+        </h1>
+        <div className="header-spacer" />
+        <nav className="app-nav">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              className={`nav-btn${tab === t.id ? " active" : ""}`}
+              onClick={() => setTab(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+          <InfoButton />
+        </nav>
+      </header>
+      <main className="app-body">
+        {tab === "cook" && <CookTab />}
+        {tab === "recipes" && (
+          <RecipesBrowseScreen mode="browse" pantry={pantry} onOpenPantry={() => setTab("pantry")} />
+        )}
+        {tab === "favorites" && (
+          <RecipesBrowseScreen mode="favorites" pantry={pantry} onOpenPantry={() => setTab("pantry")} />
+        )}
+        {tab === "pantry" && <PantryScreen pantry={pantry} onChange={setPantry} />}
+        {tab === "plan" && <PlanPlaceholder />}
+      </main>
+      <footer className="app-version">v{APP_VERSION}</footer>
+    </div>
+  );
+}
+
+/**
+ * The Cook tab hosts the original scan-to-recipe flow plus a "Write your own"
+ * mode (the former Create tab, folded in here to keep the top nav to five
+ * primary destinations without dropping the feature).
+ */
+function CookTab() {
+  const [mode, setMode] = useState<"scan" | "write">("scan");
+  const [screen, setScreen] = useState<Screen>({ kind: "capture" });
+  const [error, setError] = useState<string | null>(null);
 
   const reset = useCallback(() => {
     setScreen({ kind: "capture" });
     setError(null);
   }, []);
 
-  // Back one step: recipes → ingredients, preserving the photos and the
-  // confirmed ingredient list so the user can tweak what they have without
-  // re-shooting or regenerating from scratch.
+  // Back one step: recipes -> ingredients, preserving photos + confirmed
+  // ingredients so the user can tweak without re-shooting or regenerating.
   const editIngredients = useCallback(
     (photos: CapturedPhoto[], ingredients: Ingredient[]) => {
       setError(null);
@@ -75,59 +132,53 @@ export function App() {
   );
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1><Icon name="utensils" className="brand-icon" />Recipes</h1>
-        <div className="header-spacer" />
-        <nav className="app-nav">
-          <button
-            className={`nav-btn${tab === "build" ? " active" : ""}`}
-            onClick={() => setTab("build")}
-          >
-            Scan fridge
-          </button>
-          <button
-            className={`nav-btn${tab === "create" ? " active" : ""}`}
-            onClick={() => setTab("create")}
-          >
-            Create
-          </button>
-          <button
-            className={`nav-btn${tab === "browse" ? " active" : ""}`}
-            onClick={() => setTab("browse")}
-          >
-            Saved
-          </button>
-          <InfoButton />
-        </nav>
-      </header>
-      <main className="app-body">
-        {error && (
-          <div className="status-banner error" style={{ marginBottom: 16 }}>
-            <Icon name="wand" />
-            <span>{error}</span>
-            <div style={{ flex: 1 }} />
-            <button className="btn ghost" onClick={() => setError(null)}>
-              Dismiss
-            </button>
-          </div>
-        )}
+    <>
+      <div className="feed-toolbar">
+        <button
+          className={`nav-btn${mode === "scan" ? " active" : ""}`}
+          onClick={() => setMode("scan")}
+        >
+          <Icon name="camera" /> Scan fridge
+        </button>
+        <button
+          className={`nav-btn${mode === "write" ? " active" : ""}`}
+          onClick={() => setMode("write")}
+        >
+          <Icon name="pen" /> Write your own
+        </button>
+      </div>
 
-        {tab === "browse" ? (
-          <BrowseScreen />
-        ) : tab === "create" ? (
-          <CreateScreen />
-        ) : (
-          <BuildPane
-            screen={screen}
-            onIdentify={onIdentify}
-            onIngredientsConfirmed={onIngredientsConfirmed}
-            onEditIngredients={editIngredients}
-            onReset={reset}
-          />
-        )}
-      </main>
-      <footer className="app-version">v{APP_VERSION}</footer>
+      {error && mode === "scan" && (
+        <div className="status-banner error" style={{ marginBottom: 16 }}>
+          <Icon name="wand" />
+          <span>{error}</span>
+          <div style={{ flex: 1 }} />
+          <button className="btn ghost" onClick={() => setError(null)}>
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {mode === "write" ? (
+        <CreateScreen />
+      ) : (
+        <BuildPane
+          screen={screen}
+          onIdentify={onIdentify}
+          onIngredientsConfirmed={onIngredientsConfirmed}
+          onEditIngredients={editIngredients}
+          onReset={reset}
+        />
+      )}
+    </>
+  );
+}
+
+function PlanPlaceholder() {
+  return (
+    <div className="empty-state">
+      <Icon name="calendar-days" className="empty-icon" />
+      <div>Plan My Week is coming together. Hang tight.</div>
     </div>
   );
 }
@@ -171,8 +222,6 @@ function BuildPane({ screen, onIdentify, onIngredientsConfirmed, onEditIngredien
           onRestart={onReset}
         />
       );
-    case "browse":
-      return <BrowseScreen />;
   }
 }
 

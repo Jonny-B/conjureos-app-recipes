@@ -388,6 +388,22 @@ export function computeCoverage(
   return { total, have, short, missing, haveNames, shortNames, missingNames, score };
 }
 
+/**
+ * Tidy a canonical ingredient name for chip/label display. parseIngredient
+ * leaves leading parenthetical sizes ("(10.75 ounce) can chicken broth") and
+ * stray unit words ("fluid ounce melon liqueur") on some catalog lines; strip
+ * those so chips read "chicken broth" / "melon liqueur". Falls back to the
+ * input if stripping would empty it.
+ */
+const LEADING_NOISE =
+  /^((can|cans|jar|jars|package|packages|pkg|bottle|bottles|container|fluid|ounce|ounces|oz|lb|lbs|pound|pounds|cup|cups|tablespoon|tablespoons|tbsp|teaspoon|teaspoons|tsp|small|medium|large)\s+)+/i;
+
+export function prettyIngredient(name: string): string {
+  let s = name.replace(/^\([^)]*\)\s*/, "").replace(LEADING_NOISE, "").trim();
+  if (!s) s = name.trim();
+  return s;
+}
+
 /** Loose name presence: exact-normalized, else either-contains-other. */
 function nameInPantry(targetNorm: string, userNorms: string[]): boolean {
   if (!targetNorm) return false;

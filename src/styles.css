@@ -1374,6 +1374,13 @@ select {
 
   .app-header {
     padding: 12px 14px;
+    flex-wrap: wrap;
+  }
+
+  /* Five primary tabs + Info wrap onto a second row rather than clipping. */
+  .app-nav {
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
   .recipes-grid {
@@ -1423,4 +1430,180 @@ select {
   body::after {
     animation: none !important;
   }
+}
+
+/* ── Feed toolbar (mode toggles: Cook scan/write, Recipes browse/suggest) ── */
+
+.feed-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.feed-toolbar .nav-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--cui-border);
+}
+
+.feed-toolbar .nav-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.feed-toolbar .nav-btn .fa-icon {
+  width: 12px;
+  height: 12px;
+  margin-right: 3px;
+  vertical-align: -1px;
+}
+
+.feed-toolbar-cta {
+  margin-left: auto;
+  padding: 7px 12px;
+  font-size: 12px;
+}
+
+/* ── Pantry-coverage match chips (mint = have, amber = short, coral = miss) ── */
+
+.cov-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.cov-chip,
+.miss-chip,
+.short-chip,
+.more-chip {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.cov-chip {
+  background: var(--bg-3);
+  color: var(--fg-dim);
+  font-weight: 700;
+}
+
+.cov-chip.complete {
+  background: rgba(52, 211, 153, 0.16);
+  color: var(--mint);
+}
+
+.miss-chip {
+  background: rgba(248, 113, 113, 0.14);
+  color: #fca5a5;
+  font-weight: 600;
+}
+
+.short-chip {
+  background: rgba(251, 191, 36, 0.15);
+  color: var(--tangerine);
+  font-weight: 600;
+}
+
+.more-chip {
+  background: transparent;
+  color: var(--fg-faint);
+  font-weight: 600;
+}
+
+.pill.cat {
+  background: rgba(124, 106, 247, 0.16);
+  color: var(--accent-soft);
+}
+
+.browse-item .title .fav-mark {
+  width: 12px;
+  height: 12px;
+  color: var(--grape);
+  margin-left: 8px;
+  vertical-align: -1px;
+}
+
+/* ── Recipe detail: coverage banner, per-line "not in pantry", actions ── */
+
+.cov-banner {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  padding: 11px 14px;
+  border-radius: 14px;
+  background: rgba(251, 191, 36, 0.09);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  color: var(--fg);
+}
+
+.cov-banner.complete {
+  background: rgba(52, 211, 153, 0.1);
+  border-color: rgba(52, 211, 153, 0.4);
+}
+
+.cov-banner .fa-icon {
+  width: 15px;
+  height: 15px;
+  color: var(--tangerine);
+  flex: 0 0 auto;
+}
+
+.cov-banner.complete .fa-icon {
+  color: var(--mint);
+}
+
+.ing-missing {
+  font-size: 11px;
+  color: #fca5a5;
+  margin-top: 2px;
+  padding-left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ing-missing .fa-icon {
+  width: 10px;
+  height: 10px;
+}
+
+.detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.back-caret {
+  transform: rotate(90deg);
+  width: 12px;
+  height: 12px;
+}
+
+.fav-btn .fa-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.fav-btn.on,
+.fav-btn.on:hover {
+  color: var(--grape);
+  border-color: var(--grape);
+}
+
+.fav-btn.on .fa-icon {
+  color: var(--grape);
+}
+
+.source-link {
+  color: var(--accent-soft);
+  text-decoration: none;
+}
+
+.source-link:hover {
+  text-decoration: underline;
 }

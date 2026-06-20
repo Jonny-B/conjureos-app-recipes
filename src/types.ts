@@ -134,10 +134,18 @@ export interface PantryItem {
   addedAt: string;
 }
 
+/**
+ * A recipe as shown in the browse/favorites feed: either a bundled catalog
+ * recipe or one the user saved. `favorite` is resolved at render time (catalog
+ * favorites from the index, saved favorites from frontmatter).
+ */
+export type FeedRecipe =
+  | { kind: "catalog"; id: string; recipe: CatalogRecipe; favorite: boolean }
+  | { kind: "saved"; recipe: SavedRecipe; favorite: boolean };
+
 export type Screen =
   | { kind: "capture" }
   | { kind: "identifying"; photos: CapturedPhoto[] }
   | { kind: "ingredients"; photos: CapturedPhoto[]; ingredients: Ingredient[] }
   | { kind: "generating"; photos: CapturedPhoto[]; ingredients: Ingredient[] }
-  | { kind: "recipes"; photos: CapturedPhoto[]; ingredients: Ingredient[]; recipes: Recipe[] }
-  | { kind: "browse" };
+  | { kind: "recipes"; photos: CapturedPhoto[]; ingredients: Ingredient[]; recipes: Recipe[] };
