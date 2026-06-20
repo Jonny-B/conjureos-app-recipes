@@ -396,7 +396,7 @@ export function computeCoverage(
  * input if stripping would empty it.
  */
 const LEADING_NOISE =
-  /^((can|cans|jar|jars|package|packages|pkg|bottle|bottles|container|fluid|ounce|ounces|oz|lb|lbs|pound|pounds|cup|cups|tablespoon|tablespoons|tbsp|teaspoon|teaspoons|tsp|small|medium|large)\s+)+/i;
+  /^((can|cans|jar|jars|package|packages|pkg|bottle|bottles|container|containers|packet|packets|fluid|ounce|ounces|oz|lb|lbs|pound|pounds|cup|cups|tablespoon|tablespoons|tbsp|teaspoon|teaspoons|tsp|clove|cloves|slice|slices|pinch|dash|head|stalk|stalks|sprig|sprigs|bunch|piece|pieces|strip|strips|fillet|fillets|sheet|sheets|small|medium|large)\s+)+/i;
 
 export function prettyIngredient(name: string): string {
   let s = name.replace(/^\([^)]*\)\s*/, "").replace(LEADING_NOISE, "").trim();

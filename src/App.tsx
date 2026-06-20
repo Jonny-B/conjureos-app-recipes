@@ -6,6 +6,7 @@ import { RecipesScreen } from "./screens/RecipesScreen";
 import { CreateScreen } from "./screens/CreateScreen";
 import { RecipesBrowseScreen } from "./screens/RecipesBrowseScreen";
 import { PantryScreen } from "./screens/PantryScreen";
+import { PlanWeekScreen } from "./screens/PlanWeekScreen";
 import { identifyIngredients } from "./features/vision";
 import { generateRecipes } from "./features/recipes";
 import { registerActions } from "./bridge/actions";
@@ -72,7 +73,7 @@ export function App() {
           <RecipesBrowseScreen mode="favorites" pantry={pantry} onOpenPantry={() => setTab("pantry")} />
         )}
         {tab === "pantry" && <PantryScreen pantry={pantry} onChange={setPantry} />}
-        {tab === "plan" && <PlanPlaceholder />}
+        {tab === "plan" && <PlanWeekScreen pantry={pantry} />}
       </main>
       <footer className="app-version">v{APP_VERSION}</footer>
     </div>
@@ -174,14 +175,6 @@ function CookTab() {
   );
 }
 
-function PlanPlaceholder() {
-  return (
-    <div className="empty-state">
-      <Icon name="calendar-days" className="empty-icon" />
-      <div>Plan My Week is coming together. Hang tight.</div>
-    </div>
-  );
-}
 
 interface BuildPaneProps {
   screen: Screen;

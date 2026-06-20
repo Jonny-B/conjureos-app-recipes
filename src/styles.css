@@ -1607,3 +1607,158 @@ select {
 .source-link:hover {
   text-decoration: underline;
 }
+
+/* ── Plan My Week ──────────────────────────────────────────────────────── */
+
+.plan-steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.plan-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-faint);
+}
+
+.plan-step.active {
+  color: var(--fg);
+}
+
+.plan-step.done {
+  color: var(--mint);
+}
+
+.plan-step-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  background: var(--bg-3);
+  color: var(--fg-dim);
+  border: 1px solid var(--cui-border);
+}
+
+.plan-step.active .plan-step-dot {
+  background: var(--grad-primary);
+  color: #fff;
+  border-color: transparent;
+}
+
+.plan-step.done .plan-step-dot {
+  background: rgba(52, 211, 153, 0.18);
+  color: var(--mint);
+  border-color: transparent;
+}
+
+.plan-step.done .plan-step-dot .fa-icon {
+  width: 10px;
+  height: 10px;
+}
+
+.mood-modes {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.mood-modes .nav-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--cui-border);
+}
+
+.token-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: var(--bg-3);
+  color: var(--fg-dim);
+}
+
+.token-chip .fa-icon {
+  width: 9px;
+  height: 9px;
+}
+
+.token-chip.on-hand {
+  background: rgba(52, 211, 153, 0.14);
+  color: var(--mint);
+}
+
+.token-chip.to-buy {
+  background: rgba(251, 191, 36, 0.15);
+  color: var(--tangerine);
+}
+
+.token-chip.want {
+  background: var(--cui-accent-mute);
+  color: var(--accent-soft);
+  cursor: pointer;
+}
+
+.shopping-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shopping-line {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 16px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.shopping-line-main {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.shopping-name {
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.shopping-qty {
+  font-size: 12px;
+  color: var(--accent-soft);
+  font-weight: 600;
+}
+
+.serves {
+  font-size: 12px;
+  color: var(--tangerine);
+  font-weight: 600;
+}
+
+.shopping-for {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.shopping-for .pill {
+  background: var(--bg-3);
+  color: var(--fg-dim);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+}

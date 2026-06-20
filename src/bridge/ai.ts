@@ -72,6 +72,17 @@ export async function complete(req: CompleteRequest): Promise<string> {
  */
 async function mockComplete(req: CompleteRequest): Promise<string> {
   await new Promise((r) => setTimeout(r, 600));
+  // Plan My Week mood interpreter. Returns deterministic structured
+  // constraints so the planner is iterable under `npm run dev`.
+  if (req.system.includes("meal-plan mood interpreter")) {
+    return JSON.stringify({
+      includeIngredients: ["chicken", "pasta"],
+      cuisines: ["comfort food"],
+      dietary: [],
+      avoid: [],
+      mealCount: 5,
+    });
+  }
   // Custom-recipe reviewer call (text-only, "recipe reviewer" system). Echoes
   // back a cleaned-looking single recipe so the dev tidy button does something.
   if (req.system.includes("recipe reviewer")) {

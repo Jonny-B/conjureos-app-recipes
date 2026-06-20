@@ -135,6 +135,63 @@ export interface PantryItem {
 }
 
 /**
+ * Plan My Week: the structured constraints derived from the user's "mood"
+ * (picked ingredients, a seed recipe, or free text interpreted by the AI).
+ */
+export interface MoodConstraints {
+  /** Ingredients the week should lean on (soft preference). */
+  includeIngredients: string[];
+  /** Cuisines/categories to favor (e.g. "italian", "dinner"). */
+  cuisines: string[];
+  /** Dietary rules, e.g. "vegetarian", "gluten-free". */
+  dietary: string[];
+  /** Ingredients to exclude entirely. */
+  avoid: string[];
+  /** How many meals to plan (1-7). */
+  mealCount: number;
+}
+
+/** One recipe chosen for the week, with its overlap/coverage breakdown. */
+export interface PlannedRecipe {
+  id: string;
+  title: string;
+  recipe: Recipe;
+  /** Canonical ingredient names already covered by the pantry. */
+  pantryCovered: string[];
+  /** Canonical names this pick first added to the shared shopping set. */
+  marginalNew: string[];
+  haveCount: number;
+  totalCount: number;
+}
+
+/** One consolidated, deduped shopping-list line covering 1+ recipes. */
+export interface ShoppingListItem {
+  /** Human-friendly display name. */
+  name: string;
+  /** Normalized key the merge grouped on. */
+  canonical: string;
+  /** Original amount when only one recipe needs it. */
+  quantity?: string;
+  /** "enough for N recipes" when many recipes share it. */
+  quantityNote?: string;
+  /** Which chosen recipes need this item. */
+  recipes: { id: string; title: string }[];
+  /** Coarse grocery aisle for grouping. */
+  aisle: string;
+}
+
+/** A saved week plan: the chosen recipes + the consolidated shopping list. */
+export interface WeekPlan {
+  picks: PlannedRecipe[];
+  shoppingList: ShoppingListItem[];
+  constraints: MoodConstraints;
+  /** mealCount minus picks found (0 when fully satisfied). */
+  shortfall: number;
+  warnings: string[];
+  createdAt: string;
+}
+
+/**
  * A recipe as shown in the browse/favorites feed: either a bundled catalog
  * recipe or one the user saved. `favorite` is resolved at render time (catalog
  * favorites from the index, saved favorites from frontmatter).
