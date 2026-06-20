@@ -84,6 +84,16 @@ export async function deleteRecipe(recipe: SavedRecipe): Promise<void> {
   await vfs.rm(recipe.path);
 }
 
+/** Set/clear the favorite flag on a saved recipe (rewrites its frontmatter). */
+export async function setSavedFavorite(
+  recipe: SavedRecipe,
+  fav: boolean,
+): Promise<SavedRecipe> {
+  const updated: SavedRecipe = { ...recipe, favorite: fav };
+  await vfs.write(recipe.path, toMarkdown(updated));
+  return updated;
+}
+
 // ── helpers ────────────────────────────────────────────────────────
 
 async function ensureDir(path: string): Promise<void> {
@@ -135,6 +145,7 @@ function toMarkdown(r: SavedRecipe): string {
     `savedAt: ${r.savedAt}`,
     `madeCount: ${r.madeCount}`,
     `lastMadeAt: ${r.lastMadeAt ?? "null"}`,
+    ...(r.favorite ? ["favorite: true"] : []),
     ...nutritionLines,
     `source: conjureos-app-recipes`,
     "---",
@@ -269,6 +280,7 @@ function parseMarkdown(text: string, path: string, slug: string): SavedRecipe | 
     savedAt,
     madeCount: Number.isFinite(madeCount) ? madeCount : 0,
     lastMadeAt,
+    favorite: front.favorite === "true",
   };
 }
 

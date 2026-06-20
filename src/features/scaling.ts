@@ -120,7 +120,7 @@ function parseNumericToken(token: string): number | null {
  * over decimals for the common cookbook values (halves, thirds, quarters,
  * eighths) so "1.5 cups" reads as "1 1/2 cups" not "1.5 cups".
  */
-function formatScaledNumber(n: number): string {
+export function formatScaledNumber(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return "0";
   // Round to the nearest 1/8 to surface clean fractions, but only when
   // the result is within 1% of the rounded value (otherwise show decimal).
@@ -277,35 +277,128 @@ const NAME_STOPWORDS = new Set([
 ]);
 
 /**
+ * Canonicalize an ingredient name for loose matching: lowercase, drop common
+ * modifier stopwords, crude singularize. Exported so the coverage matcher,
+ * the cross-recipe overlap optimizer, and the shopping-list merge all share
+ * one definition of "same ingredient" (no drift).
+ */
+export function normalizeIngredientName(s: string): string {
+  return s
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((t) => !NAME_STOPWORDS.has(t))
+    .join(" ")
+    .replace(/s$/, "");
+}
+
+/**
  * Match a recipe ingredient name to a user-supplied one. Tolerates
  * modifiers + crude singularization, prefers exact match, falls back to
  * directional substring (either contains the other).
  */
-function findUserMatch(
+export function findUserMatch(
   recipeName: string,
   user: Array<{ name: string; grams: number }>,
 ): { name: string; grams: number } | null {
-  const normalize = (s: string): string =>
-    s
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((t) => !NAME_STOPWORDS.has(t))
-      .join(" ")
-      .replace(/s$/, "");
-
-  const target = normalize(recipeName);
+  const target = normalizeIngredientName(recipeName);
   if (!target) return null;
 
   // Exact normalized match wins.
   for (const u of user) {
-    if (normalize(u.name) === target) return u;
+    if (normalizeIngredientName(u.name) === target) return u;
   }
   // Otherwise: either contains the other. "feta" matches "feta cheese", etc.
   for (const u of user) {
-    const un = normalize(u.name);
+    const un = normalizeIngredientName(u.name);
     if (un.includes(target) || target.includes(un)) return u;
   }
   return null;
+}
+
+// ── Pantry coverage (match ranking) ───────────────────────────────────
+
+export interface CoverageResult {
+  /** Recipe lines that name a real (non-trace) ingredient. */
+  total: number;
+  /** Lines the pantry covers in full (or by name when unquantified). */
+  have: number;
+  /** Lines matched by name but short on quantity. */
+  short: number;
+  /** Lines with no pantry match. */
+  missing: number;
+  haveNames: string[];
+  shortNames: string[];
+  missingNames: string[];
+  /** Higher = more complete. (have - 0.5*short - missing) / total. */
+  score: number;
+}
+
+/**
+ * Score how well a pantry covers a recipe, for the "what can I make" ranking.
+ *
+ * This is the piece `computeAvailability` alone can't do: that function only
+ * matches a line when BOTH the recipe line and a pantry item parse to grams,
+ * so an un-quantified pantry ("sour cream", no amount) scores zero coverage.
+ * Here we layer a name-only presence path on top: quantified-both -> ratio
+ * decides have/short; matched-by-name-only -> have; no match -> missing.
+ */
+export function computeCoverage(
+  recipe: Recipe,
+  userIngredients: Ingredient[],
+): CoverageResult {
+  const userNorms = userIngredients
+    .map((i) => normalizeIngredientName(parseIngredient(i.name)?.name ?? i.name))
+    .filter((n) => n.length > 0);
+
+  const avail = computeAvailability(recipe, userIngredients);
+  const ratioByLine = new Map<string, number>();
+  for (const m of avail.matches) ratioByLine.set(m.recipeLine, m.ratio);
+
+  let have = 0;
+  let short = 0;
+  let missing = 0;
+  const haveNames: string[] = [];
+  const shortNames: string[] = [];
+  const missingNames: string[] = [];
+
+  for (const line of recipe.ingredients) {
+    const parsed = parseIngredient(line);
+    if (!parsed) continue; // trace / unparseable -> not counted against the recipe
+    const name = parsed.name;
+    const ratio = ratioByLine.get(line);
+    if (ratio !== undefined) {
+      if (ratio >= 0.999) {
+        have++;
+        haveNames.push(name);
+      } else {
+        short++;
+        shortNames.push(name);
+      }
+    } else if (nameInPantry(normalizeIngredientName(name), userNorms)) {
+      have++;
+      haveNames.push(name);
+    } else {
+      missing++;
+      missingNames.push(name);
+    }
+  }
+
+  const total = have + short + missing;
+  const score = (have - 0.5 * short - missing) / Math.max(1, total);
+  return { total, have, short, missing, haveNames, shortNames, missingNames, score };
+}
+
+/** Loose name presence: exact-normalized, else either-contains-other. */
+function nameInPantry(targetNorm: string, userNorms: string[]): boolean {
+  if (!targetNorm) return false;
+  for (const u of userNorms) {
+    if (u === targetNorm) return true;
+  }
+  for (const u of userNorms) {
+    if (u.length < 2) continue;
+    if (u.includes(targetNorm) || targetNorm.includes(u)) return true;
+  }
+  return false;
 }
 
 // ── Nutrition per-serving (unchanged across factor) ───────────────────

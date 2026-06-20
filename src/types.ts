@@ -118,6 +118,22 @@ export interface CatalogRecipe extends Recipe {
   tokens: string[];
 }
 
+/**
+ * One persistent pantry/fridge item the user keeps on hand. Stored as JSON at
+ * /home/Documents/Recipes/.pantry.json (see features/pantry.ts). Feeds the
+ * match-ranking + Plan My Week features via ingredientsFromPantry().
+ */
+export interface PantryItem {
+  /** Sanitized lowercase name, e.g. "sour cream". */
+  name: string;
+  /** Optional free-form amount on hand ("1 pint", "200g", "half a carton"). */
+  quantity?: string;
+  /** Optional free-form note ("opened", "use soon"). */
+  notes?: string;
+  /** ISO timestamp first added. */
+  addedAt: string;
+}
+
 export type Screen =
   | { kind: "capture" }
   | { kind: "identifying"; photos: CapturedPhoto[] }
