@@ -1,24 +1,42 @@
-# Recipes — an app for ConjureOS
+# Recipes for ConjureOS
 
-Point your phone camera at the inside of your fridge. Get three recipes you can actually make tonight.
+A recipe app with four jobs: cook from what's in your fridge, browse a catalog of ~1,200 recipes, keep a pantry so suggestions rank by what you already have, and plan a week of meals that share one shopping list.
 
-The first Phase 12a anchor app for [ConjureOS](https://github.com/Jonny-B/ConjureOS). A pure React + TypeScript source project — **no Vite**. Developed locally with `conj-pack dev` and **published to the ConjureOS App Store from CI**, where it's built by ConjureOS `@bundle` — the exact same pipeline a user-published app goes through.
+The first Phase 12a anchor app for [ConjureOS](https://github.com/Jonny-B/ConjureOS). A pure React + TypeScript source project (no Vite). Developed locally with `conj-pack dev` and **published to the ConjureOS App Store from CI**, where it's built by ConjureOS `@bundle`: the exact same pipeline a user-published app goes through.
 
-## How it works
+## The app
 
-1. **Capture** — phone camera or photo upload of your fridge interior.
-2. **Identify** — Claude (Sonnet on BYK, Haiku on hosted free tier) returns a JSON list of visible ingredients with confidence scores. Low-confidence items render as "is this here?" prompts.
-3. **Confirm** — you edit the list: add what the model missed, remove false positives, dismiss low-confidence guesses.
-4. **Generate** — second AI call returns three recipes with varied difficulty (easy / medium / hard), constrained to your confirmed ingredients plus 1-2 common pantry additions.
-5. **Save** — selected recipes land in `/home/Documents/Recipes/<slug>.md` as markdown with YAML frontmatter (title, difficulty, cookTime, date, ingredients, source). Browseable in ConjureOS's Files app or with any markdown editor.
+Five tabs:
+
+- **Cook**: the original flow. Snap or upload photos of your fridge, Claude identifies the ingredients, you confirm them, and a second call returns three recipes (easy / medium / hard) built around what you have. "Write your own" lives here too: paste or describe a recipe and the AI structures it.
+- **Recipes**: scroll a bundled catalog of ~1,200 recipes. A "What can I make" toggle ranks them against your pantry, favorites first, then by how many ingredients you already have. Missing and running-low ingredients show as compact chips, so the further you scroll the more you'd need to buy.
+- **Favorites**: the recipes you've hearted (saved recipes and catalog recipes alike).
+- **Pantry**: a persistent list of what's on hand. Add items by hand or scan your fridge to fill it fast. The suggestions and Plan My Week rank against it.
+- **Plan**: Plan My Week. Say what you're in the mood for (pick ingredients, start from a recipe, or describe it), scan your pantry, and the app picks a week of meals chosen to use what you have AND overlap with each other, then hands you one consolidated shopping list where shared ingredients are bought once.
+
+Saved recipes land in `/home/Documents/Recipes/<slug>.md` as markdown with YAML frontmatter. Week plans land in `/home/Documents/Recipes/Plans/` as JSON plus a checkbox shopping list you can open while you shop. Everything is browseable in ConjureOS's Files app.
+
+## Recipe catalog
+
+The catalog is built from a scraped [AllRecipes](https://www.allrecipes.com) dataset, normalized into the app's recipe shape (ingredients, steps, inferred difficulty, per-serving nutrition, canonical match tokens) and curated to a category-balanced subset that ships inside the app bundle. Each recipe keeps its original AllRecipes URL for attribution, shown as a "Source" link on the recipe.
+
+Rebuild the bundled catalog with:
+
+```bash
+npx -y tsx scripts/build-catalog.ts --limit 1500
+```
+
+It downloads the source dump (cached under `scripts/.cache/`), then parses, normalizes, dedupes, and curates it into `src/data/catalog.json`. The committed JSON is the source of truth; the script only reruns to refresh the corpus.
+
+> Note: the catalog is scraped third-party content. It's fine for personal and development use, but get a licensing review before publishing this app publicly. The catalog is regenerable and swappable, and every recipe keeps its source URL.
 
 ## Permissions
 
 Declared in `package.json` under `conjureos.permissions`:
 
-- `ai.complete` — multimodal vision call + recipe generation
-- `vfs.read` — list previously saved recipes
-- `vfs.write` — save new recipes to `/home/Documents/Recipes/` + cache nutrition lookups
+- `ai.complete`: multimodal vision, recipe generation, and mood interpretation
+- `vfs.read`: list saved recipes, pantry, favorites, and week plans
+- `vfs.write`: save recipes, pantry, favorites, plans, and cache nutrition lookups
 
 ## Nutrition data (USDA FoodData Central)
 

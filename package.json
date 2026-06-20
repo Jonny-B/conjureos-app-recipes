@@ -1,7 +1,7 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.3.9",
-  "description": "Recipe-from-fridge — an app for ConjureOS. Point your camera at the fridge, get recipes you can make tonight.",
+  "version": "0.4.0",
+  "description": "Recipes for ConjureOS: browse a catalog, keep a pantry, get suggestions ranked by what you have, and plan a week of meals that shares a shopping list.",
   "type": "module",
   "license": "MIT",
   "author": "Jonny-B",
