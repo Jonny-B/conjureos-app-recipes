@@ -6,8 +6,9 @@ The first Phase 12a anchor app for [ConjureOS](https://github.com/Jonny-B/Conjur
 
 ## The app
 
-Five tabs:
+Six tabs, opening on Home:
 
+- **Home**: the landing screen. A time-of-day greeting, a "Tonight's pick" recommendation scored against your pantry (favorites weighted, with a plain-language "why" and a reshuffle), at-a-glance stats (favorites / ready to cook / pantry size), your favorites, more ideas, and quick actions into the rest of the app.
 - **Cook**: the original flow. Snap or upload photos of your fridge, Claude identifies the ingredients, you confirm them, and a second call returns three recipes (easy / medium / hard) built around what you have. "Write your own" lives here too: paste or describe a recipe and the AI structures it.
 - **Recipes**: scroll a bundled catalog of ~1,200 recipes. A "What can I make" toggle ranks them against your pantry, favorites first, then by how many ingredients you already have. Missing and running-low ingredients show as compact chips, so the further you scroll the more you'd need to buy.
 - **Favorites**: the recipes you've hearted (saved recipes and catalog recipes alike).

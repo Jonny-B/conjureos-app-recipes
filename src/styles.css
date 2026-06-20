@@ -1762,3 +1762,255 @@ select {
   letter-spacing: 0;
   font-weight: 600;
 }
+
+/* ── Home ──────────────────────────────────────────────────────────────── */
+
+.home-screen {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.home-greeting h2 {
+  margin: 0;
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.home-greeting .muted {
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+/* Tonight's pick: the one hero surface. Accent wash + glow so it reads as
+   the recommendation, not just another card. */
+.hero-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(124, 106, 247, 0.2), rgba(74, 158, 255, 0.05) 70%),
+    var(--bg-1);
+  border: 1px solid var(--cui-accent-tint);
+  box-shadow: var(--cui-shadow-accent);
+  overflow: hidden;
+}
+
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--bubblegum);
+}
+
+.hero-eyebrow .fa-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.hero-title {
+  margin: 0;
+  font-size: 25px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+}
+
+.hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hero-why {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--fg-dim);
+}
+
+.hero-why .fa-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--accent-soft);
+  flex: 0 0 auto;
+}
+
+.hero-why.have {
+  color: var(--mint);
+}
+
+.hero-why.have .fa-icon {
+  color: var(--mint);
+}
+
+.hero-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+/* At-a-glance stats */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-soft);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.18s var(--bounce), border-color 0.18s, box-shadow 0.18s;
+}
+
+.stat-tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--grape);
+  box-shadow: var(--shadow-glow);
+}
+
+.stat-tile.accent {
+  background: linear-gradient(135deg, rgba(124, 106, 247, 0.14), transparent);
+  border-color: var(--cui-accent-tint);
+}
+
+.stat-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--accent-soft);
+}
+
+.stat-value {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.home-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.home-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.home-section-head h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent-soft);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.link-btn:hover {
+  color: var(--fg);
+}
+
+.home-nudge {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  background: var(--bg-1);
+  border: 1px dashed var(--border);
+  font-size: 14px;
+  flex-wrap: wrap;
+}
+
+.home-nudge > .fa-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--grape);
+  flex: 0 0 auto;
+}
+
+.home-nudge > div {
+  flex: 1;
+  min-width: 180px;
+  color: var(--fg-dim);
+}
+
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.quick-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 18px;
+  border-radius: 18px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-soft);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.18s var(--bounce), border-color 0.18s, box-shadow 0.18s;
+}
+
+.quick-action:hover {
+  transform: translateY(-2px);
+  border-color: var(--grape);
+  box-shadow: var(--shadow-glow);
+}
+
+.quick-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--bubblegum);
+  margin-bottom: 4px;
+}
+
+.quick-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.quick-sub {
+  font-size: 12px;
+  color: var(--fg-dim);
+}

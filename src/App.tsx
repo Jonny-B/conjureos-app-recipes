@@ -4,6 +4,7 @@ import { CaptureScreen } from "./screens/CaptureScreen";
 import { IngredientsScreen } from "./screens/IngredientsScreen";
 import { RecipesScreen } from "./screens/RecipesScreen";
 import { CreateScreen } from "./screens/CreateScreen";
+import { HomeScreen } from "./screens/HomeScreen";
 import { RecipesBrowseScreen } from "./screens/RecipesBrowseScreen";
 import { PantryScreen } from "./screens/PantryScreen";
 import { PlanWeekScreen } from "./screens/PlanWeekScreen";
@@ -15,9 +16,10 @@ import { getUSDAUsage, type USDAUsageSnapshot } from "./features/nutrition";
 import { Icon } from "./icons";
 import { APP_VERSION } from "./version";
 
-type Tab = "cook" | "recipes" | "favorites" | "pantry" | "plan";
+type Tab = "home" | "cook" | "recipes" | "favorites" | "pantry" | "plan";
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: "home", label: "Home" },
   { id: "cook", label: "Cook" },
   { id: "recipes", label: "Recipes" },
   { id: "favorites", label: "Favorites" },
@@ -26,7 +28,7 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export function App() {
-  const [tab, setTab] = useState<Tab>("cook");
+  const [tab, setTab] = useState<Tab>("home");
   const [pantry, setPantry] = useState<PantryItem[] | null>(null);
 
   // Register cross-app action handlers once on boot, and load the persistent
@@ -65,6 +67,7 @@ export function App() {
         </nav>
       </header>
       <main className="app-body">
+        {tab === "home" && <HomeScreen pantry={pantry} onNavigate={setTab} />}
         {tab === "cook" && <CookTab />}
         {tab === "recipes" && (
           <RecipesBrowseScreen mode="browse" pantry={pantry} onOpenPantry={() => setTab("pantry")} />
