@@ -11,6 +11,7 @@ import { PlanWeekScreen } from "./screens/PlanWeekScreen";
 import { identifyIngredients } from "./features/vision";
 import { generateRecipes } from "./features/recipes";
 import { registerActions } from "./bridge/actions";
+import { ensureCatalogLoaded } from "./features/catalog";
 import { loadPantry } from "./features/pantry";
 import { getUSDAUsage, type USDAUsageSnapshot } from "./features/nutrition";
 import { Icon } from "./icons";
@@ -30,11 +31,16 @@ const TABS: { id: Tab; label: string }[] = [
 export function App() {
   const [tab, setTab] = useState<Tab>("home");
   const [pantry, setPantry] = useState<PantryItem[] | null>(null);
+  // Bumped once the catalog is (re)loaded from the DB so the catalog-reading
+  // screens re-run their memoized decode. Starts on the bundled copy, which
+  // renders instantly and stays the offline fallback.
+  const [catalogVersion, setCatalogVersion] = useState(0);
 
-  // Register cross-app action handlers once on boot, and load the persistent
+  // Register cross-app action handlers once on boot, load the persistent
   // pantry so the Recipes feed can rank against it the moment the user opens
-  // that tab. Registration failure is non-fatal: the app stays usable, only
-  // the cross-app integrations break.
+  // that tab, and refresh the catalog from the DB (the bundled copy is the
+  // instant baseline). Each failure is non-fatal: the app stays usable, only
+  // that one integration is degraded.
   useEffect(() => {
     registerActions().catch((err) => {
       // eslint-disable-next-line no-console
@@ -43,6 +49,11 @@ export function App() {
     loadPantry()
       .then(setPantry)
       .catch(() => setPantry([]));
+    ensureCatalogLoaded()
+      .then((changed) => {
+        if (changed) setCatalogVersion((v) => v + 1);
+      })
+      .catch(() => {});
   }, []);
 
   return (
@@ -67,16 +78,28 @@ export function App() {
         </nav>
       </header>
       <main className="app-body">
-        {tab === "home" && <HomeScreen pantry={pantry} onNavigate={setTab} />}
+        {tab === "home" && (
+          <HomeScreen pantry={pantry} onNavigate={setTab} catalogVersion={catalogVersion} />
+        )}
         {tab === "cook" && <CookTab />}
         {tab === "recipes" && (
-          <RecipesBrowseScreen mode="browse" pantry={pantry} onOpenPantry={() => setTab("pantry")} />
+          <RecipesBrowseScreen
+            mode="browse"
+            pantry={pantry}
+            onOpenPantry={() => setTab("pantry")}
+            catalogVersion={catalogVersion}
+          />
         )}
         {tab === "favorites" && (
-          <RecipesBrowseScreen mode="favorites" pantry={pantry} onOpenPantry={() => setTab("pantry")} />
+          <RecipesBrowseScreen
+            mode="favorites"
+            pantry={pantry}
+            onOpenPantry={() => setTab("pantry")}
+            catalogVersion={catalogVersion}
+          />
         )}
         {tab === "pantry" && <PantryScreen pantry={pantry} onChange={setPantry} />}
-        {tab === "plan" && <PlanWeekScreen pantry={pantry} />}
+        {tab === "plan" && <PlanWeekScreen pantry={pantry} catalogVersion={catalogVersion} />}
       </main>
       <footer className="app-version">v{APP_VERSION}</footer>
     </div>

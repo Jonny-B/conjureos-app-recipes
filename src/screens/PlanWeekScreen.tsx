@@ -39,7 +39,14 @@ function uniq(a: string[]): string[] {
   return [...new Set(a)];
 }
 
-export function PlanWeekScreen({ pantry }: { pantry: PantryItem[] | null }) {
+export function PlanWeekScreen({
+  pantry,
+  catalogVersion = 0,
+}: {
+  pantry: PantryItem[] | null;
+  /** Bumped by App when the catalog reloads from the DB, so the memo re-runs. */
+  catalogVersion?: number;
+}) {
   const [step, setStep] = useState<Step>("mood");
   const [moodMode, setMoodMode] = useState<MoodMode>("ingredients");
   const [includeChips, setIncludeChips] = useState<string[]>([]);
@@ -89,7 +96,7 @@ export function PlanWeekScreen({ pantry }: { pantry: PantryItem[] | null }) {
         isFavorite: true,
       }));
     return [...savedFav, ...catalog];
-  }, [saved, favs]);
+  }, [saved, favs, catalogVersion]);
 
   const onHand = useMemo<Ingredient[]>(
     () => buildOnHand(pantry ? ingredientsFromPantry(pantry) : [], scanned),

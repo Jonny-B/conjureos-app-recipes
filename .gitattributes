@@ -1,0 +1,15 @@
+# Normalize line endings: store LF in the repo and check out LF on every
+# platform. This app is built by Linux CI (@bundle), so LF is the canonical
+# ending; it also stops Windows Git (core.autocrlf) from popping the
+# "LF will be replaced by CRLF" warning that interrupts staging in VS Code.
+* text=auto eol=lf
+
+# Binary assets: never touch their bytes.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary

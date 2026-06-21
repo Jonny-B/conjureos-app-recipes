@@ -70,6 +70,22 @@ jobs:
           token: ${{ secrets.CONJUREOS_REPO_TOKEN }}
           path: .conjureos
 
+      # The manifest's remoteActions.recipesDb.url (per-user DB reads/writes via
+      # the minted-token flow) must point at the SAME project we're publishing
+      # to. The committed default is dev; rewrite it from the per-env project-ref
+      # secret so a prod release talks to the prod recipes-db, not dev. (Catalog
+      # browse uses the kernel-injected env.recipesApiUrl, which is already
+      # per-env, so only this static manifest URL needs stamping.)
+      - name: Stamp recipes-db backend URL into manifest
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            REF="${{ secrets.SUPABASE_PROD_PROJECT_REF }}"
+          else
+            REF="${{ secrets.SUPABASE_DEV_PROJECT_REF }}"
+          fi
+          export RECIPES_DB_URL="https://${REF}.supabase.co/functions/v1/recipes-db"
+          node -e "const fs=require('fs');const p=require('./package.json');p.conjureos.remoteActions.recipesDb.url=process.env.RECIPES_DB_URL;fs.writeFileSync('./package.json',JSON.stringify(p,null,2)+'\n');console.log('stamped recipesDb url ->',process.env.RECIPES_DB_URL);"
+
       # workflow_dispatch -> DEV project. Test path; publishes to dev users.
       - name: Publish to App Store (dev)
         if: github.event_name == 'workflow_dispatch'
