@@ -114,6 +114,34 @@ async function mockComplete(req: CompleteRequest): Promise<string> {
     });
   }
 
+  // Snap-a-recipe transcriber (vision, "recipe transcriber" system). Returns a
+  // single structured recipe so the photo-to-recipe flow is iterable in dev.
+  // Must come before the generic image branch below (which returns ingredients).
+  if (req.system.includes("recipe transcriber")) {
+    return JSON.stringify({
+      title: "Grandma's Tomato Soup",
+      difficulty: "easy",
+      cookTime: 30,
+      servings: 4,
+      summary: "A cozy blended tomato soup finished with a swirl of cream.",
+      ingredients: [
+        "1 onion, diced",
+        "2 cloves garlic, minced",
+        "2 tbsp butter",
+        "1 (28 oz) can tomatoes",
+        "1 cup stock",
+        "splash of cream",
+        "salt + pepper",
+      ],
+      instructions: [
+        "Sweat the onion and garlic in the butter until soft.",
+        "Add the tomatoes and stock; simmer for 20 minutes.",
+        "Blend until smooth.",
+        "Finish with a splash of cream, season, and serve.",
+      ],
+    });
+  }
+
   const hasImages = req.messages.some((m) => m.images && m.images.length > 0);
   if (hasImages) {
     return JSON.stringify({

@@ -4,6 +4,7 @@ import { CaptureScreen } from "./screens/CaptureScreen";
 import { IngredientsScreen } from "./screens/IngredientsScreen";
 import { RecipesScreen } from "./screens/RecipesScreen";
 import { CreateScreen } from "./screens/CreateScreen";
+import { SnapRecipeScreen } from "./screens/SnapRecipeScreen";
 import { HomeScreen } from "./screens/HomeScreen";
 import { RecipesBrowseScreen } from "./screens/RecipesBrowseScreen";
 import { PantryScreen } from "./screens/PantryScreen";
@@ -112,7 +113,7 @@ export function App() {
  * primary destinations without dropping the feature).
  */
 function CookTab() {
-  const [mode, setMode] = useState<"scan" | "write">("scan");
+  const [mode, setMode] = useState<"scan" | "snap" | "write">("scan");
   const [screen, setScreen] = useState<Screen>({ kind: "capture" });
   const [error, setError] = useState<string | null>(null);
 
@@ -168,6 +169,12 @@ function CookTab() {
           <Icon name="camera" /> Scan fridge
         </button>
         <button
+          className={`nav-btn${mode === "snap" ? " active" : ""}`}
+          onClick={() => setMode("snap")}
+        >
+          <Icon name="images" /> Snap a recipe
+        </button>
+        <button
           className={`nav-btn${mode === "write" ? " active" : ""}`}
           onClick={() => setMode("write")}
         >
@@ -188,6 +195,8 @@ function CookTab() {
 
       {mode === "write" ? (
         <CreateScreen />
+      ) : mode === "snap" ? (
+        <SnapRecipeScreen />
       ) : (
         <BuildPane
           screen={screen}
