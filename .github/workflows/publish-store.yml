@@ -36,13 +36,23 @@ jobs:
 
       - name: Resolve changelog
         id: changelog
+        # User-controlled fields (release body/name, dispatch changelog) come in
+        # as env vars, NOT inlined via ${{ }} into the script body. Inlining lets
+        # a quote or backtick in the release notes break the shell (a release
+        # body containing "I made this" once failed the job with
+        # `made: command not found`). Reading them as $ENV is injection-safe.
+        env:
+          REL_BODY: ${{ github.event.release.body }}
+          REL_NAME: ${{ github.event.release.name }}
+          REL_TAG: ${{ github.event.release.tag_name }}
+          DISPATCH_CHANGELOG: ${{ github.event.inputs.changelog }}
         run: |
           if [ "${{ github.event_name }}" = "release" ]; then
-            text="${{ github.event.release.body }}"
-            [ -z "$text" ] && text="${{ github.event.release.name }}"
-            [ -z "$text" ] && text="${{ github.event.release.tag_name }}"
+            text="$REL_BODY"
+            [ -z "$text" ] && text="$REL_NAME"
+            [ -z "$text" ] && text="$REL_TAG"
           else
-            text="${{ github.event.inputs.changelog }}"
+            text="$DISPATCH_CHANGELOG"
           fi
           {
             echo "text<<__CHANGELOG__"
