@@ -16,6 +16,11 @@ name: Publish to ConjureOS App Store
 on:
   release:
     types: [published]
+  # A semver tag push (v1.2.3) publishes to PROD too — same effect as a release,
+  # for when a release object can't be created directly.
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
     inputs:
       environment:
@@ -59,6 +64,8 @@ jobs:
           else
             text="$DISPATCH_CHANGELOG"
           fi
+          # Tag-push (and empty dispatch) fall back to the ref name (e.g. v0.7.0).
+          [ -z "$text" ] && text="${{ github.ref_name }}"
           {
             echo "text<<__CHANGELOG__"
             echo "$text"
@@ -93,8 +100,9 @@ jobs:
       # per-env, so only this static manifest URL needs stamping.)
       - name: Stamp recipes-db backend URL into manifest
         env:
-          # Prod when a release fires OR a manual run picks the prod environment.
-          IS_PROD: ${{ github.event_name == 'release' || github.event.inputs.environment == 'prod' }}
+          # Prod when a release fires, a semver tag is pushed, OR a manual run
+          # picks the prod environment.
+          IS_PROD: ${{ github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v') || github.event.inputs.environment == 'prod' }}
         run: |
           if [ "$IS_PROD" = "true" ]; then
             REF="${{ secrets.SUPABASE_PROD_PROJECT_REF }}"
@@ -122,7 +130,7 @@ jobs:
       # release published, or a manual run with environment=prod -> PROD project.
       # Ships to real users.
       - name: Publish to App Store (prod)
-        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
         uses: ./.conjureos/.github/actions/publish-anchor-app
         with:
           supabase-url: https://${{ secrets.SUPABASE_PROD_PROJECT_REF }}.supabase.co
