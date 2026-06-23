@@ -200,6 +200,9 @@ export type FeedRecipe =
   | { kind: "catalog"; id: string; recipe: CatalogRecipe; favorite: boolean }
   | { kind: "saved"; recipe: SavedRecipe; favorite: boolean };
 
+/** Which slice the Recipes tab shows. Favorites is a filter here, not a tab. */
+export type RecipeSource = "all" | "mine" | "favorites";
+
 export type Screen =
   | { kind: "capture" }
   | { kind: "identifying"; photos: CapturedPhoto[] }

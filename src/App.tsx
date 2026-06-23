@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CapturedPhoto, Ingredient, PantryItem, Recipe, Screen } from "./types";
+import type { CapturedPhoto, Ingredient, PantryItem, Recipe, RecipeSource, Screen } from "./types";
 import { CaptureScreen } from "./screens/CaptureScreen";
 import { IngredientsScreen } from "./screens/IngredientsScreen";
 import { RecipesScreen } from "./screens/RecipesScreen";
@@ -18,19 +18,24 @@ import { getUSDAUsage, type USDAUsageSnapshot } from "./features/nutrition";
 import { Icon } from "./icons";
 import { APP_VERSION } from "./version";
 
-type Tab = "home" | "cook" | "recipes" | "favorites" | "pantry" | "plan";
+type Tab = "home" | "cook" | "recipes" | "pantry" | "plan";
+type CookMode = "scan" | "snap" | "write";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "home", label: "Home" },
   { id: "cook", label: "Cook" },
   { id: "recipes", label: "Recipes" },
-  { id: "favorites", label: "Favorites" },
   { id: "pantry", label: "Pantry" },
   { id: "plan", label: "Plan" },
 ];
 
 export function App() {
   const [tab, setTab] = useState<Tab>("home");
+  // The Recipes tab's source filter and the Cook tab's mode are lifted here so
+  // other surfaces can deep-link into them (Home's "favorites" + a "New recipe"
+  // shortcut that drops straight into Cook -> Write your own).
+  const [recipeSource, setRecipeSource] = useState<RecipeSource>("all");
+  const [cookMode, setCookMode] = useState<CookMode>("scan");
   const [pantry, setPantry] = useState<PantryItem[] | null>(null);
   // Bumped once the catalog is (re)loaded from the DB so the catalog-reading
   // screens re-run their memoized decode. Starts on the bundled copy, which
@@ -80,22 +85,27 @@ export function App() {
       </header>
       <main className="app-body">
         {tab === "home" && (
-          <HomeScreen pantry={pantry} onNavigate={setTab} catalogVersion={catalogVersion} />
-        )}
-        {tab === "cook" && <CookTab />}
-        {tab === "recipes" && (
-          <RecipesBrowseScreen
-            mode="browse"
+          <HomeScreen
             pantry={pantry}
-            onOpenPantry={() => setTab("pantry")}
+            onNavigate={setTab}
+            onViewFavorites={() => {
+              setRecipeSource("favorites");
+              setTab("recipes");
+            }}
             catalogVersion={catalogVersion}
           />
         )}
-        {tab === "favorites" && (
+        {tab === "cook" && <CookTab mode={cookMode} onModeChange={setCookMode} />}
+        {tab === "recipes" && (
           <RecipesBrowseScreen
-            mode="favorites"
+            source={recipeSource}
+            onSourceChange={setRecipeSource}
             pantry={pantry}
             onOpenPantry={() => setTab("pantry")}
+            onNewRecipe={() => {
+              setCookMode("write");
+              setTab("cook");
+            }}
             catalogVersion={catalogVersion}
           />
         )}
@@ -112,8 +122,8 @@ export function App() {
  * mode (the former Create tab, folded in here to keep the top nav to five
  * primary destinations without dropping the feature).
  */
-function CookTab() {
-  const [mode, setMode] = useState<"scan" | "snap" | "write">("scan");
+function CookTab({ mode, onModeChange }: { mode: CookMode; onModeChange: (m: CookMode) => void }) {
+  const setMode = onModeChange;
   const [screen, setScreen] = useState<Screen>({ kind: "capture" });
   const [error, setError] = useState<string | null>(null);
 

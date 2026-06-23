@@ -16,11 +16,13 @@ import { RecipeRow } from "../components/RecipeRow";
 import { RecipeDetail } from "./RecipeDetail";
 import { Icon, type IconName } from "../icons";
 
-type NavTab = "cook" | "recipes" | "favorites" | "pantry" | "plan";
+type NavTab = "cook" | "recipes" | "pantry" | "plan";
 
 interface Props {
   pantry: PantryItem[] | null;
   onNavigate: (tab: NavTab) => void;
+  /** Open the Recipes tab pre-filtered to the user's favorites. */
+  onViewFavorites: () => void;
   /** Bumped by App when the catalog reloads from the DB, so the memo re-runs. */
   catalogVersion?: number;
 }
@@ -36,7 +38,7 @@ function keyOf(fi: FeedRecipe): string {
   return fi.kind === "catalog" ? `c:${fi.id}` : `s:${fi.recipe.path}`;
 }
 
-export function HomeScreen({ pantry, onNavigate, catalogVersion = 0 }: Props) {
+export function HomeScreen({ pantry, onNavigate, onViewFavorites, catalogVersion = 0 }: Props) {
   const [saved, setSaved] = useState<SavedRecipe[]>([]);
   const [favs, setFavs] = useState<Set<string>>(new Set());
   const [loaded, setLoaded] = useState(false);
@@ -159,7 +161,7 @@ export function HomeScreen({ pantry, onNavigate, catalogVersion = 0 }: Props) {
           icon="heart"
           value={favoriteItems.length}
           label={favoriteItems.length === 1 ? "favorite" : "favorites"}
-          onClick={() => onNavigate("favorites")}
+          onClick={onViewFavorites}
         />
         <StatTile
           icon="bowl-food"
@@ -180,7 +182,7 @@ export function HomeScreen({ pantry, onNavigate, catalogVersion = 0 }: Props) {
         <div className="home-section-head">
           <h3>Your favorites</h3>
           {favoriteItems.length > 0 && (
-            <button className="link-btn" onClick={() => onNavigate("favorites")}>
+            <button className="link-btn" onClick={onViewFavorites}>
               See all
             </button>
           )}
