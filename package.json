@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.5.1",
+  "version": "0.6.2",
   "description": "Recipes for ConjureOS: browse a catalog, keep a pantry, get suggestions ranked by what you have, and plan a week of meals that shares a shopping list.",
   "type": "module",
   "license": "MIT",
@@ -33,6 +33,12 @@
       "markCooked": {
         "permission": "actions.write",
         "description": "Mark a saved recipe as cooked (increment madeCount, update lastMadeAt). Takes slug. Useful for calorie/health apps confirming that a meal was eaten."
+      }
+    },
+    "remoteActions": {
+      "recipesDb": {
+        "url": "https://mqpvjlsywrptefgwuztn.supabase.co/functions/v1/recipes-db",
+        "method": "POST"
       }
     },
     "promptSuggestions": [

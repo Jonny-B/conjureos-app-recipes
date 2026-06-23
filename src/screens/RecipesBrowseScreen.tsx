@@ -21,6 +21,8 @@ interface Props {
   mode: "browse" | "favorites";
   pantry: PantryItem[] | null;
   onOpenPantry: () => void;
+  /** Bumped by App when the catalog reloads from the DB, so the memos re-run. */
+  catalogVersion?: number;
 }
 
 const PAGE_SIZE = 60;
@@ -32,7 +34,7 @@ function recipeOf(fi: FeedRecipe): Recipe {
   return fi.recipe;
 }
 
-export function RecipesBrowseScreen({ mode, pantry, onOpenPantry }: Props) {
+export function RecipesBrowseScreen({ mode, pantry, onOpenPantry, catalogVersion = 0 }: Props) {
   const [saved, setSaved] = useState<SavedRecipe[]>([]);
   const [favs, setFavs] = useState<Set<string>>(new Set());
   const [loaded, setLoaded] = useState(false);
@@ -42,7 +44,7 @@ export function RecipesBrowseScreen({ mode, pantry, onOpenPantry }: Props) {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<FeedRecipe | null>(null);
 
-  const catalog = useMemo(() => getCatalog(), []);
+  const catalog = useMemo(() => getCatalog(), [catalogVersion]);
   const pantryIng = useMemo(() => (pantry ? ingredientsFromPantry(pantry) : []), [pantry]);
   const hasPantry = pantryIng.length > 0;
 
@@ -124,7 +126,7 @@ export function RecipesBrowseScreen({ mode, pantry, onOpenPantry }: Props) {
       { value: "all", label: "All categories" },
       ...categories().map((c) => ({ value: c.name, label: `${c.name} (${c.count})` })),
     ],
-    [],
+    [catalogVersion],
   );
 
   const resetPaging = () => setPage(1);

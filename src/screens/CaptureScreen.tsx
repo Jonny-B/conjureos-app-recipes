@@ -28,11 +28,19 @@ function usePointerCoarse(): boolean {
 
 interface Props {
   onIdentify: (photos: CapturedPhoto[]) => void;
+  /** Heading shown before any photo is added. Default: fridge-scan copy. */
+  title?: string;
+  /** Sub-line shown with zero photos. Default: fridge-scan copy. */
+  emptyHint?: string;
+  /** Sub-line shown once photos exist. Default: fridge-scan copy. */
+  moreHint?: string;
+  /** Label for the primary "go" button once photos exist. */
+  actionLabel?: (count: number) => string;
 }
 
 const MAX_PHOTOS = 6;
 
-export function CaptureScreen({ onIdentify }: Props) {
+export function CaptureScreen({ onIdentify, title, emptyHint, moreHint, actionLabel }: Props) {
   const [dragOver, setDragOver] = useState(false);
   const [photos, setPhotos] = useState<CapturedPhoto[]>([]);
   const [busy, setBusy] = useState(false);
@@ -99,21 +107,25 @@ export function CaptureScreen({ onIdentify }: Props) {
 
   return (
     <div className="capture-screen">
-      <h2>{photos.length === 0 ? "Show me your fridge" : "Add more photos?"}</h2>
+      <h2>{photos.length === 0 ? title ?? "Show me your fridge" : "Add more photos?"}</h2>
       {photos.length === 0 ? (
         <p className="muted" style={{ margin: 0 }}>
-          Snap or upload one or more photos. Open shelves help; the pantry counts too. I'll dedupe items across photos so you don't get the same sour cream twice.
+          {emptyHint ??
+            "Snap or upload one or more photos. Open shelves help; the pantry counts too. I'll dedupe items across photos so you don't get the same sour cream twice."}
         </p>
       ) : (
         <p className="muted" style={{ margin: 0 }}>
-          More angles = better recognition. Shoot the door, the back of a shelf, your spice rack — I'll merge them.
+          {moreHint ??
+            "More angles, better recognition. Shoot the door, the back of a shelf, your spice rack, and I'll merge them."}
         </p>
       )}
 
       {photos.length > 0 && (
         <div className="capture-buttons" style={{ marginTop: 4 }}>
           <button className="btn" disabled={busy} onClick={() => onIdentify(photos)}>
-            {`Identify ingredients from ${photos.length} photo${photos.length === 1 ? "" : "s"} →`}
+            {actionLabel
+              ? actionLabel(photos.length)
+              : `Identify ingredients from ${photos.length} photo${photos.length === 1 ? "" : "s"} →`}
           </button>
         </div>
       )}

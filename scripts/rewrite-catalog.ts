@@ -1,0 +1,178 @@
+/**
+ * rewrite-catalog.ts: copyright de-risk pass over the bundled catalog.
+ *
+ * AllRecipes instruction prose is copyrightable expression, so we reword every
+ * instruction in original wording and strip personal names from titles. The
+ * rewriting itself is done by AI agents (this script does NOT call any model);
+ * this script only splits the catalog into small chunk files for the agents and
+ * later merges their output back into src/data/catalog.ts.
+ *
+ *   npx -y tsx scripts/rewrite-catalog.ts split [--size 20]
+ *     writes scripts/.cache/rw/in-NNN.json (each an array of {i,t,g,n})
+ *   (agents rewrite each in-NNN.json to out-NNN.json, array of {i,t,n})
+ *   npx -y tsx scripts/rewrite-catalog.ts merge
+ *     patches title (t) + instructions (n) by id into catalog, re-emits
+ *     src/data/catalog.ts, and reports anomalies.
+ *
+ * Ingredients (g), tokens (k), nutrition, category, etc. are untouched: an
+ * ingredient list is not copyrightable and tokens derive from it.
+ */
+import {
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  existsSync,
+} from "node:fs";
+import { dirname, resolve, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { CATALOG } from "../src/data/catalog";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const REPO = resolve(HERE, "..");
+const RW_DIR = resolve(HERE, ".cache", "rw");
+const OUT_CATALOG = resolve(REPO, "src/data/catalog.ts");
+
+interface Rec {
+  i: string;
+  t: string;
+  c: number;
+  d: string;
+  m: number;
+  s: number;
+  g: string[];
+  n: string[];
+  u: string;
+  k: string[];
+  z?: number[];
+  a?: string[];
+}
+interface Catalog {
+  v: number;
+  generatedAt: string;
+  count: number;
+  categories: string[];
+  r: Rec[];
+}
+
+const cat = CATALOG as unknown as Catalog;
+
+function pad(n: number): string {
+  return String(n).padStart(3, "0");
+}
+
+function split(size: number): void {
+  if (existsSync(RW_DIR)) rmSync(RW_DIR, { recursive: true, force: true });
+  mkdirSync(RW_DIR, { recursive: true });
+  let idx = 0;
+  for (let i = 0; i < cat.r.length; i += size) {
+    const batch = cat.r.slice(i, i + size).map((r) => ({
+      i: r.i,
+      t: r.t,
+      g: r.g, // ingredients, for context only (do not rewrite)
+      n: r.n,
+    }));
+    writeFileSync(join(RW_DIR, `in-${pad(idx)}.json`), JSON.stringify(batch, null, 1));
+    idx++;
+  }
+  console.log(`split ${cat.r.length} recipes into ${idx} chunks of <=${size} -> ${RW_DIR}`);
+  console.log(`chunk indices: 0..${idx - 1}`);
+}
+
+// The two dash characters (em U+2014, en U+2013), built without literals so this
+// source file itself stays dash-free. Defense-in-depth scrub of any agent slips.
+const EM = String.fromCharCode(0x2014);
+const EN = String.fromCharCode(0x2013);
+const DASHES = new RegExp("[" + EM + EN + "]");
+
+function merge(): void {
+  const files = readdirSync(RW_DIR).filter((f) => /^out-\d+\.json$/.test(f));
+  if (files.length === 0) throw new Error(`no out-*.json in ${RW_DIR}`);
+  const patch = new Map<string, { t: string; n: string[] }>();
+  for (const f of files) {
+    const arr = JSON.parse(readFileSync(join(RW_DIR, f), "utf8")) as Array<{
+      i: string;
+      t: string;
+      n: string[];
+    }>;
+    for (const x of arr) patch.set(x.i, { t: x.t, n: x.n });
+  }
+
+  let patched = 0;
+  let dashFixed = 0;
+  const anomalies: string[] = [];
+  const scrub = (s: string): string => {
+    if (DASHES.test(s)) {
+      dashFixed++;
+      return s.split(EM).join(", ").split(EN).join("-");
+    }
+    return s;
+  };
+
+  for (const r of cat.r) {
+    const p = patch.get(r.i);
+    if (!p) {
+      anomalies.push(`MISSING rewrite for ${r.i} (${r.t})`);
+      continue;
+    }
+    const newTitle = scrub(p.t).trim();
+    const newSteps = p.n.map((s) => scrub(s).trim()).filter((s) => s.length > 0);
+    if (!newTitle) {
+      anomalies.push(`EMPTY title for ${r.i}, keeping original`);
+    } else {
+      r.t = newTitle;
+    }
+    if (newSteps.length === 0) {
+      anomalies.push(`EMPTY instructions for ${r.i} (${r.t}), keeping original`);
+    } else {
+      if (newSteps.length < r.n.length - 1) {
+        anomalies.push(`STEP DROP ${r.i} (${r.t}): ${r.n.length} to ${newSteps.length}`);
+      }
+      r.n = newSteps;
+    }
+    patched++;
+  }
+
+  emit();
+  console.log(`merged: patched ${patched}/${cat.r.length}; dash-scrubbed ${dashFixed} strings`);
+  if (anomalies.length) {
+    console.log(`anomalies (${anomalies.length}):`);
+    for (const a of anomalies.slice(0, 40)) console.log(`  - ${a}`);
+    if (anomalies.length > 40) console.log(`  ...and ${anomalies.length - 40} more`);
+  } else {
+    console.log("no anomalies");
+  }
+}
+
+function emit(): void {
+  const payload = {
+    v: cat.v,
+    generatedAt: cat.generatedAt,
+    rewrittenAt: new Date().toISOString(),
+    count: cat.r.length,
+    categories: cat.categories,
+    r: cat.r,
+  };
+  const json = JSON.stringify(payload);
+  const module =
+    "// AUTO-GENERATED by scripts/build-catalog.ts, instructions reworded by\n" +
+    "// scripts/rewrite-catalog.ts (copyright de-risk). Do not edit by hand.\n" +
+    `export const CATALOG = ${json} as {\n` +
+    "  v: number; generatedAt: string; rewrittenAt?: string; count: number; categories: string[]; r: unknown[];\n" +
+    "};\n";
+  writeFileSync(OUT_CATALOG, module, "utf8");
+  console.log(`wrote ${OUT_CATALOG} (${(module.length / 1024 / 1024).toFixed(2)} MB)`);
+}
+
+const cmd = process.argv[2];
+if (cmd === "split") {
+  const sizeArg = process.argv.indexOf("--size");
+  const size = sizeArg >= 0 ? Math.max(1, Number(process.argv[sizeArg + 1]) || 20) : 20;
+  split(size);
+} else if (cmd === "merge") {
+  merge();
+} else {
+  console.error("usage: rewrite-catalog.ts split [--size N] | merge");
+  process.exit(1);
+}

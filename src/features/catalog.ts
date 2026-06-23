@@ -10,6 +10,7 @@
  */
 
 import { CATALOG } from "../data/catalog";
+import { fetchCatalog } from "../bridge/recipesApi";
 import type { CatalogRecipe, Difficulty, NutritionStrip, Recipe } from "../types";
 
 /** Compact on-disk record. Keys are short to keep the bundled JSON small. */
@@ -39,6 +40,8 @@ interface RawCatalog {
 const raw = CATALOG as unknown as RawCatalog;
 
 let memo: CatalogRecipe[] | null = null;
+/** DB-loaded catalog (recipes-db). When set, it supersedes the bundled copy. */
+let override: CatalogRecipe[] | null = null;
 
 function decodeRecord(x: RawRecord): CatalogRecipe {
   const nutrition: NutritionStrip | null = x.z
@@ -69,10 +72,36 @@ function decodeRecord(x: RawRecord): CatalogRecipe {
   };
 }
 
-/** The full catalog, memoized after first decode. */
+/**
+ * The full catalog: the DB copy once ensureCatalogLoaded() has run, otherwise
+ * the bundled copy decoded on first use (the instant + offline baseline).
+ */
 export function getCatalog(): CatalogRecipe[] {
+  if (override) return override;
   if (!memo) memo = raw.r.map(decodeRecord);
   return memo;
+}
+
+/**
+ * Load the catalog from the recipes-db backend, replacing the bundled copy.
+ * The bundled data stays the instant + offline fallback: if the fetch fails
+ * (offline, not deployed yet, signed out) or returns nothing, getCatalog()
+ * keeps serving whatever it served before. Returns true when the in-memory
+ * catalog actually changed, so the caller can trigger a re-render. Only
+ * fetches once unless `force` is set.
+ */
+export async function ensureCatalogLoaded(force = false): Promise<boolean> {
+  if (override && !force) return false;
+  try {
+    const fromDb = await fetchCatalog();
+    if (fromDb.length > 0) {
+      override = fromDb;
+      return true;
+    }
+  } catch {
+    /* keep the bundled catalog */
+  }
+  return false;
 }
 
 export function getCatalogRecipe(id: string): CatalogRecipe | undefined {
@@ -96,13 +125,12 @@ export function byCategory(category: string): CatalogRecipe[] {
   return getCatalog().filter((r) => r.category === category);
 }
 
-/** Category names that actually appear, with counts, in catalog order. */
+/** Category names that actually appear, with counts, in first-seen order. */
 export function categories(): { name: string; count: number }[] {
   const counts = new Map<string, number>();
   for (const r of getCatalog()) counts.set(r.category, (counts.get(r.category) ?? 0) + 1);
-  return raw.categories
-    .filter((c) => counts.has(c))
-    .map((name) => ({ name, count: counts.get(name) ?? 0 }));
+  // First-seen order works for both the bundled short-key form and DB rows.
+  return [...counts.entries()].map(([name, count]) => ({ name, count }));
 }
 
 /** Strip catalog-only fields to a plain Recipe (the seam to storage.saveRecipe). */

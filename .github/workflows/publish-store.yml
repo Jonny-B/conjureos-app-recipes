@@ -36,13 +36,23 @@ jobs:
 
       - name: Resolve changelog
         id: changelog
+        # User-controlled fields (release body/name, dispatch changelog) come in
+        # as env vars, NOT inlined via ${{ }} into the script body. Inlining lets
+        # a quote or backtick in the release notes break the shell (a release
+        # body containing "I made this" once failed the job with
+        # `made: command not found`). Reading them as $ENV is injection-safe.
+        env:
+          REL_BODY: ${{ github.event.release.body }}
+          REL_NAME: ${{ github.event.release.name }}
+          REL_TAG: ${{ github.event.release.tag_name }}
+          DISPATCH_CHANGELOG: ${{ github.event.inputs.changelog }}
         run: |
           if [ "${{ github.event_name }}" = "release" ]; then
-            text="${{ github.event.release.body }}"
-            [ -z "$text" ] && text="${{ github.event.release.name }}"
-            [ -z "$text" ] && text="${{ github.event.release.tag_name }}"
+            text="$REL_BODY"
+            [ -z "$text" ] && text="$REL_NAME"
+            [ -z "$text" ] && text="$REL_TAG"
           else
-            text="${{ github.event.inputs.changelog }}"
+            text="$DISPATCH_CHANGELOG"
           fi
           {
             echo "text<<__CHANGELOG__"
@@ -69,6 +79,22 @@ jobs:
           ref: dev
           token: ${{ secrets.CONJUREOS_REPO_TOKEN }}
           path: .conjureos
+
+      # The manifest's remoteActions.recipesDb.url (per-user DB reads/writes via
+      # the minted-token flow) must point at the SAME project we're publishing
+      # to. The committed default is dev; rewrite it from the per-env project-ref
+      # secret so a prod release talks to the prod recipes-db, not dev. (Catalog
+      # browse uses the kernel-injected env.recipesApiUrl, which is already
+      # per-env, so only this static manifest URL needs stamping.)
+      - name: Stamp recipes-db backend URL into manifest
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            REF="${{ secrets.SUPABASE_PROD_PROJECT_REF }}"
+          else
+            REF="${{ secrets.SUPABASE_DEV_PROJECT_REF }}"
+          fi
+          export RECIPES_DB_URL="https://${REF}.supabase.co/functions/v1/recipes-db"
+          node -e "const fs=require('fs');const p=require('./package.json');p.conjureos.remoteActions.recipesDb.url=process.env.RECIPES_DB_URL;fs.writeFileSync('./package.json',JSON.stringify(p,null,2)+'\n');console.log('stamped recipesDb url ->',process.env.RECIPES_DB_URL);"
 
       # workflow_dispatch -> DEV project. Test path; publishes to dev users.
       - name: Publish to App Store (dev)

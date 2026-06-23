@@ -1,172 +1,135 @@
 /**
- * Recipe persistence — markdown with YAML frontmatter under
- * `/home/Documents/Recipes/`. Typed-home convention (ConjureOS 0.3.10)
- * so the user can browse + edit recipes in the Files app or any
- * markdown editor and they sync across devices.
+ * Saved-recipe persistence, now backed by the `recipes-db` Supabase table
+ * (the all-in-DB store) rather than VFS markdown. Each saved recipe is a row
+ * owned by the signed-in user; we reach it through recipesApi, which invokes
+ * the "recipesDb" remote action so the kernel attaches a minted identity token
+ * and the backend derives the owner. A saved recipe's `path` is `db:<id>`
+ * (recipesApi.recipeIdFromPath recovers the id); there is no longer a real
+ * file path.
  *
- * File shape:
- *
- *   ---
- *   title: Spinach & Feta Scramble
- *   difficulty: easy
- *   cookTime: 10
- *   savedAt: 2026-05-22T19:30:00.000Z
- *   madeCount: 0
- *   lastMadeAt: null
- *   source: conjureos-app-recipes
- *   ---
- *
- *   ## Ingredients
- *   - 3 eggs
- *   ...
- *
- *   ## Instructions
- *   1. ...
+ * The public surface (saveRecipe / listSavedRecipes / markMade / deleteRecipe
+ * / setSavedFavorite) is unchanged so the screens and the cross-app action
+ * registry keep working. The old markdown reader survives only as the source
+ * of a one-time migration that lifts any pre-existing VFS recipes into the DB.
  */
 
 import { vfs } from "../bridge/vfs";
+import * as api from "../bridge/recipesApi";
+import { isBackendAvailable, recipeIdFromPath } from "../bridge/recipesApi";
 import type { NutritionStrip, Recipe, SavedRecipe, Difficulty } from "../types";
 
 const RECIPES_DIR = "/home/Documents/Recipes";
+/** Marker so the one-time VFS to DB import runs at most once per device. */
+const MIGRATED_FLAG = `${RECIPES_DIR}/.migrated-to-db`;
 
 export async function saveRecipe(recipe: Recipe): Promise<SavedRecipe> {
-  await ensureDir(RECIPES_DIR);
-  const slug = await uniqueSlug(slugify(recipe.title));
-  const savedAt = new Date().toISOString();
-  const saved: SavedRecipe = {
-    ...recipe,
-    servings: recipe.servings || 2,
-    nutrition: recipe.nutrition ?? null,
-    path: `${RECIPES_DIR}/${slug}.md`,
-    slug,
-    savedAt,
-    madeCount: 0,
-    lastMadeAt: null,
-  };
-  await vfs.write(saved.path, toMarkdown(saved));
-  return saved;
+  return api.addRecipe({ ...recipe, visibility: "private" });
 }
 
 export async function listSavedRecipes(): Promise<SavedRecipe[]> {
-  const exists = await vfs.exists(RECIPES_DIR).catch(() => false);
-  if (!exists) return [];
-  const entries = await vfs.ls(RECIPES_DIR).catch(() => []);
-  const mdFiles = entries.filter((e) => e.endsWith(".md"));
-
-  const results: SavedRecipe[] = [];
-  for (const file of mdFiles) {
-    const path = `${RECIPES_DIR}/${file}`;
-    try {
-      const text = await vfs.read(path);
-      const parsed = parseMarkdown(text, path, file.replace(/\.md$/, ""));
-      if (parsed) results.push(parsed);
-    } catch {
-      // Skip unreadable / malformed entries silently — the user
-      // can delete them manually via the Files app if needed.
-    }
+  // Outside ConjureOS (conj-pack dev) there's no actions bridge at all.
+  // Signed in but the backend rejects (REQUIRES_AUTH when signed out, network
+  // error, etc.) is caught too: degrade to "no saved recipes" rather than
+  // throwing, so the catalog-only surfaces still render.
+  if (!isBackendAvailable()) return [];
+  try {
+    await migrateLegacyRecipes();
+    return await api.listMine();
+  } catch {
+    return [];
   }
-  // Newest first.
-  results.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
-  return results;
 }
 
 export async function markMade(recipe: SavedRecipe): Promise<SavedRecipe> {
-  const updated: SavedRecipe = {
-    ...recipe,
-    madeCount: recipe.madeCount + 1,
-    lastMadeAt: new Date().toISOString(),
-  };
-  await vfs.write(recipe.path, toMarkdown(updated));
-  return updated;
+  return api.markCooked(recipeIdFromPath(recipe.path));
 }
 
 export async function deleteRecipe(recipe: SavedRecipe): Promise<void> {
-  await vfs.rm(recipe.path);
+  await api.deleteRecipe(recipeIdFromPath(recipe.path));
 }
 
-/** Set/clear the favorite flag on a saved recipe (rewrites its frontmatter). */
+/** Set/clear the favorite flag on a saved recipe (a column on its DB row). */
 export async function setSavedFavorite(
   recipe: SavedRecipe,
   fav: boolean,
 ): Promise<SavedRecipe> {
-  const updated: SavedRecipe = { ...recipe, favorite: fav };
-  await vfs.write(recipe.path, toMarkdown(updated));
-  return updated;
+  return api.setFavorite(recipeIdFromPath(recipe.path), fav);
 }
 
-// ── helpers ────────────────────────────────────────────────────────
+// One-time legacy import (VFS markdown to DB).
 
-async function ensureDir(path: string): Promise<void> {
+/**
+ * Lifts recipes saved by older versions of the app (markdown under
+ * /home/Documents/Recipes) into the DB the first time we run against the
+ * backend, then drops a flag file so it never repeats. The old .md files are
+ * left in place as a backup; the user can delete them from the Files app.
+ * Best-effort throughout: any failure just leaves the flag unset so a later
+ * launch can retry, and it never blocks listing.
+ */
+async function migrateLegacyRecipes(): Promise<void> {
   try {
-    await vfs.mkdir(path);
+    if (await vfs.exists(MIGRATED_FLAG)) return;
   } catch {
-    /* already exists or host doesn't enforce */
+    return;
+  }
+  try {
+    if (!(await vfs.exists(RECIPES_DIR).catch(() => false))) {
+      await markMigrated();
+      return;
+    }
+    const entries = await vfs.ls(RECIPES_DIR).catch(() => [] as string[]);
+    const mdFiles = entries.filter((e) => e.endsWith(".md"));
+    for (const file of mdFiles) {
+      const path = `${RECIPES_DIR}/${file}`;
+      try {
+        const text = await vfs.read(path);
+        const parsed = parseMarkdown(text, path, file.replace(/\.md$/, ""));
+        if (!parsed) continue;
+        const added = await api.addRecipe({ ...toPlainRecipe(parsed), visibility: "private" });
+        if (parsed.favorite) {
+          await api.setFavorite(recipeIdFromPath(added.path), true).catch(() => {});
+        }
+      } catch {
+        /* skip one bad / unreadable file, keep going */
+      }
+    }
+    await markMigrated();
+  } catch {
+    /* leave the flag unset; a later launch retries */
   }
 }
 
-function slugify(title: string): string {
-  return (
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
-      .slice(0, 60) || "recipe"
-  );
-}
-
-async function uniqueSlug(base: string): Promise<string> {
-  let candidate = base;
-  let n = 2;
-  while (await vfs.exists(`${RECIPES_DIR}/${candidate}.md`)) {
-    candidate = `${base}-${n}`;
-    n += 1;
-    if (n > 999) throw new Error("Too many recipes with similar titles.");
+async function markMigrated(): Promise<void> {
+  try {
+    await vfs.mkdir(RECIPES_DIR);
+  } catch {
+    /* already exists */
   }
-  return candidate;
-}
-
-function toMarkdown(r: SavedRecipe): string {
-  const nutritionLines = r.nutrition
-    ? [
-        `nutritionCalories: ${r.nutrition.calories}`,
-        `nutritionProtein: ${r.nutrition.protein}`,
-        `nutritionFat: ${r.nutrition.fat}`,
-        `nutritionCarbs: ${r.nutrition.carbs}`,
-        `nutritionMatched: ${r.nutrition.matched}`,
-        `nutritionTotal: ${r.nutrition.total}`,
-      ]
-    : [];
-  const fm = [
-    "---",
-    `title: ${yamlString(r.title)}`,
-    `difficulty: ${r.difficulty}`,
-    `cookTime: ${r.cookTime}`,
-    `servings: ${r.servings}`,
-    `savedAt: ${r.savedAt}`,
-    `madeCount: ${r.madeCount}`,
-    `lastMadeAt: ${r.lastMadeAt ?? "null"}`,
-    ...(r.favorite ? ["favorite: true"] : []),
-    ...nutritionLines,
-    `source: conjureos-app-recipes`,
-    "---",
-    "",
-  ].join("\n");
-  const summary = r.summary ? `${r.summary}\n\n` : "";
-  const ingredients = `## Ingredients\n\n${r.ingredients.map((i) => `- ${i}`).join("\n")}\n\n`;
-  const instructions = `## Instructions\n\n${r.instructions.map((s, i) => `${i + 1}. ${s}`).join("\n")}\n`;
-  return `${fm}# ${r.title}\n\n${summary}${ingredients}${instructions}`;
-}
-
-function yamlString(s: string): string {
-  if (/[:#\n]/.test(s) || s.startsWith(" ") || s.endsWith(" ")) {
-    return JSON.stringify(s);
+  try {
+    await vfs.write(MIGRATED_FLAG, new Date().toISOString());
+  } catch {
+    /* non-fatal: worst case the import retries next launch */
   }
-  return s;
 }
+
+function toPlainRecipe(s: SavedRecipe): Recipe {
+  return {
+    title: s.title,
+    difficulty: s.difficulty,
+    cookTime: s.cookTime,
+    servings: s.servings,
+    ingredients: s.ingredients,
+    instructions: s.instructions,
+    summary: s.summary,
+    nutrition: s.nutrition ?? null,
+  };
+}
+
+// Legacy markdown reader (migration input only).
 
 // Defensive caps when parsing saved markdown. Users (or other apps via the
-// VFS) can edit these files freely, and a malformed file should fail
-// gracefully rather than blow memory or break the browse list.
+// VFS) could have edited these files freely, so a malformed file should fail
+// gracefully rather than blow memory or break the import.
 const MAX_FILE_BYTES = 64 * 1024;
 const MAX_FRONTMATTER_LINES = 40;
 const MAX_FIELD_VALUE_LENGTH = 1000;
@@ -257,9 +220,9 @@ function parseMarkdown(text: string, path: string, slug: string): SavedRecipe | 
         if (m) instructions.push(m[1]!.trim());
       }
     } else if (sec.startsWith("# ") || sec.startsWith("Summary\n")) {
-      const text = sec.replace(/^#\s+[^\n]*\n+/, "").trim();
-      if (text && !text.startsWith("##") && text.length <= MAX_FIELD_VALUE_LENGTH) {
-        summary = text;
+      const t = sec.replace(/^#\s+[^\n]*\n+/, "").trim();
+      if (t && !t.startsWith("##") && t.length <= MAX_FIELD_VALUE_LENGTH) {
+        summary = t;
       }
     }
   }

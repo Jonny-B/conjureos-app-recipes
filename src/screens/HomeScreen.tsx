@@ -21,6 +21,8 @@ type NavTab = "cook" | "recipes" | "favorites" | "pantry" | "plan";
 interface Props {
   pantry: PantryItem[] | null;
   onNavigate: (tab: NavTab) => void;
+  /** Bumped by App when the catalog reloads from the DB, so the memo re-runs. */
+  catalogVersion?: number;
 }
 
 interface Scored {
@@ -34,7 +36,7 @@ function keyOf(fi: FeedRecipe): string {
   return fi.kind === "catalog" ? `c:${fi.id}` : `s:${fi.recipe.path}`;
 }
 
-export function HomeScreen({ pantry, onNavigate }: Props) {
+export function HomeScreen({ pantry, onNavigate, catalogVersion = 0 }: Props) {
   const [saved, setSaved] = useState<SavedRecipe[]>([]);
   const [favs, setFavs] = useState<Set<string>>(new Set());
   const [loaded, setLoaded] = useState(false);
@@ -51,7 +53,7 @@ export function HomeScreen({ pantry, onNavigate }: Props) {
     refresh();
   }, [refresh]);
 
-  const catalog = useMemo(() => getCatalog(), []);
+  const catalog = useMemo(() => getCatalog(), [catalogVersion]);
   const pantryIng = useMemo(() => (pantry ? ingredientsFromPantry(pantry) : []), [pantry]);
   const hasPantry = pantryIng.length > 0;
 

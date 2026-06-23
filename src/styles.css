@@ -1372,15 +1372,40 @@ select {
     padding: 18px 14px;
   }
 
+  /* Stack the brand over a full-width tab strip so the six tabs never wrap
+     into a ragged second row. The strip scrolls horizontally when the labels
+     overflow the viewport — the standard mobile pattern, and far tidier than
+     the old two-row wrap. */
   .app-header {
     padding: 12px 14px;
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
   }
 
-  /* Five primary tabs + Info wrap onto a second row rather than clipping. */
+  /* The flex spacer only earns its keep in the desktop single-row header. */
+  .app-header .header-spacer {
+    display: none;
+  }
+
   .app-nav {
-    flex-wrap: wrap;
-    justify-content: flex-end;
+    width: 100%;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .app-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Keep each pill at its natural size and let the row scroll instead of
+     squishing the tabs. */
+  .app-nav .nav-btn {
+    flex: 0 0 auto;
   }
 
   .recipes-grid {
