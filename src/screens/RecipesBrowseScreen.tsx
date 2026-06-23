@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CoverageResult } from "../features/scaling";
-import type { FeedRecipe, PantryItem, Recipe, SavedRecipe } from "../types";
+import type { FeedRecipe, PantryItem, Recipe, RecipeSource, SavedRecipe } from "../types";
 import { getCatalog, categories, toRecipe } from "../features/catalog";
 import {
   listSavedRecipes,
@@ -18,12 +18,22 @@ import { RecipeDetail } from "./RecipeDetail";
 import { Icon } from "../icons";
 
 interface Props {
-  mode: "browse" | "favorites";
+  /** Which slice to show: all recipes, just the user's saved ones, or favorites. */
+  source: RecipeSource;
+  onSourceChange: (s: RecipeSource) => void;
   pantry: PantryItem[] | null;
   onOpenPantry: () => void;
+  /** Jump to Cook -> Write your own to author a recipe from scratch. */
+  onNewRecipe: () => void;
   /** Bumped by App when the catalog reloads from the DB, so the memos re-run. */
   catalogVersion?: number;
 }
+
+const SOURCE_TABS: { id: RecipeSource; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "mine", label: "My recipes" },
+  { id: "favorites", label: "Favorites" },
+];
 
 const PAGE_SIZE = 60;
 
@@ -34,7 +44,14 @@ function recipeOf(fi: FeedRecipe): Recipe {
   return fi.recipe;
 }
 
-export function RecipesBrowseScreen({ mode, pantry, onOpenPantry, catalogVersion = 0 }: Props) {
+export function RecipesBrowseScreen({
+  source,
+  onSourceChange,
+  pantry,
+  onOpenPantry,
+  onNewRecipe,
+  catalogVersion = 0,
+}: Props) {
   const [saved, setSaved] = useState<SavedRecipe[]>([]);
   const [favs, setFavs] = useState<Set<string>>(new Set());
   const [loaded, setLoaded] = useState(false);
@@ -64,23 +81,22 @@ export function RecipesBrowseScreen({ mode, pantry, onOpenPantry, catalogVersion
     if (!hasPantry && view === "suggest") setView("browse");
   }, [hasPantry, view]);
 
-  const showCoverage = (mode === "favorites" || view === "suggest") && hasPantry;
+  const showCoverage = (source === "favorites" || view === "suggest") && hasPantry;
 
   const feedItems = useMemo<FeedRecipe[]>(() => {
-    if (mode === "favorites") {
-      const savedFavs: FeedRecipe[] = saved
-        .filter((r) => r.favorite)
-        .map((r) => ({ kind: "saved", recipe: r, favorite: true }));
-      const catFavs: FeedRecipe[] = catalog
-        .filter((c) => favs.has(c.id))
-        .map((c) => ({ kind: "catalog", id: c.id, recipe: c, favorite: true }));
-      return [...savedFavs, ...catFavs];
-    }
     const savedItems: FeedRecipe[] = saved.map((r) => ({
       kind: "saved",
       recipe: r,
       favorite: !!r.favorite,
     }));
+    if (source === "mine") return savedItems;
+    if (source === "favorites") {
+      const savedFavs = savedItems.filter((fi) => fi.favorite);
+      const catFavs: FeedRecipe[] = catalog
+        .filter((c) => favs.has(c.id))
+        .map((c) => ({ kind: "catalog", id: c.id, recipe: c, favorite: true }));
+      return [...savedFavs, ...catFavs];
+    }
     const catItems: FeedRecipe[] = catalog.map((c) => ({
       kind: "catalog",
       id: c.id,
@@ -88,7 +104,7 @@ export function RecipesBrowseScreen({ mode, pantry, onOpenPantry, catalogVersion
       favorite: favs.has(c.id),
     }));
     return [...savedItems, ...catItems];
-  }, [mode, catalog, saved, favs]);
+  }, [source, catalog, saved, favs]);
 
   // Coverage computed once per (items, pantry) change, keyed by item identity.
   const coverageMap = useMemo(() => {
@@ -101,7 +117,11 @@ export function RecipesBrowseScreen({ mode, pantry, onOpenPantry, catalogVersion
     const q = query.trim().toLowerCase();
     const items = feedItems.filter((fi) => {
       if (q && !matchesQuery(fi, q)) return false;
-      if (category !== "all") return fi.kind === "catalog" && fi.recipe.category === category;
+      // The category dropdown only shows for the All source (catalog rows carry
+      // a category; saved recipes don't), so only filter by it there.
+      if (source === "all" && category !== "all") {
+        return fi.kind === "catalog" && fi.recipe.category === category;
+      }
       return true;
     });
     const rank = view === "suggest" && hasPantry;
@@ -187,12 +207,15 @@ export function RecipesBrowseScreen({ mode, pantry, onOpenPantry, catalogVersion
     );
   }
 
-  const title = mode === "favorites" ? "Favorites" : "Recipes";
-
   return (
     <div className="browse-screen">
       <div className="browse-header">
-        <h2>{title}</h2>
+        <div className="browse-title-row">
+          <h2>Recipes</h2>
+          <button className="btn new-recipe-btn" onClick={onNewRecipe}>
+            <Icon name="plus" /> New recipe
+          </button>
+        </div>
         <div className="browse-filter">
           <Icon name="magnifying-glass" />
           <input
@@ -205,7 +228,7 @@ export function RecipesBrowseScreen({ mode, pantry, onOpenPantry, catalogVersion
             }}
           />
         </div>
-        {mode === "browse" && (
+        {source === "all" && (
           <Dropdown
             options={categoryOptions}
             value={category}
@@ -218,34 +241,62 @@ export function RecipesBrowseScreen({ mode, pantry, onOpenPantry, catalogVersion
         )}
       </div>
 
-      {mode === "browse" && (
-        <div className="feed-toolbar">
+      {/* Primary filter: all recipes, just the user's saved ones, or favorites
+          (this replaces the old top-level Favorites tab). */}
+      <div className="source-filter" role="tablist" aria-label="Which recipes to show">
+        {SOURCE_TABS.map((t) => (
           <button
-            className={`nav-btn${view === "browse" ? " active" : ""}`}
+            key={t.id}
+            role="tab"
+            aria-selected={source === t.id}
+            className={`nav-btn${source === t.id ? " active" : ""}`}
             onClick={() => {
-              setView("browse");
+              onSourceChange(t.id);
               resetPaging();
             }}
           >
-            Browse
+            {t.label}
           </button>
-          <button
-            className={`nav-btn${view === "suggest" ? " active" : ""}`}
-            onClick={() => {
-              if (!hasPantry) return;
-              setView("suggest");
-              resetPaging();
-            }}
-            disabled={!hasPantry}
-            title={hasPantry ? "Rank by what's in your pantry" : "Add pantry items to use this"}
-          >
-            <Icon name="sliders" /> What can I make
-          </button>
-          {!hasPantry && (
-            <button className="btn ghost feed-toolbar-cta" onClick={onOpenPantry}>
-              <Icon name="carrot" /> Add pantry items
+        ))}
+      </div>
+
+      {source !== "favorites" && (
+        <div className="feed-controls">
+          <div className="feed-toolbar">
+            <button
+              className={`nav-btn${view === "browse" ? " active" : ""}`}
+              onClick={() => {
+                setView("browse");
+                resetPaging();
+              }}
+            >
+              Browse
             </button>
-          )}
+            <button
+              className={`nav-btn${view === "suggest" ? " active" : ""}`}
+              onClick={() => {
+                if (!hasPantry) return;
+                setView("suggest");
+                resetPaging();
+              }}
+              disabled={!hasPantry}
+              title={hasPantry ? "Rank recipes by what's in your pantry" : "Add pantry items first"}
+            >
+              <Icon name="sliders" /> What I can make now
+            </button>
+            {!hasPantry && (
+              <button className="btn ghost feed-toolbar-cta" onClick={onOpenPantry}>
+                <Icon name="carrot" /> Set up pantry
+              </button>
+            )}
+          </div>
+          <p className="feed-hint">
+            {view === "suggest"
+              ? "Ranked by what's in your pantry — recipes missing the fewest ingredients come first."
+              : hasPantry
+                ? 'Showing every recipe. Tap "What I can make now" to rank them by your pantry.'
+                : "Showing every recipe. Add a few pantry items and we'll show what you can cook right now."}
+          </p>
         </div>
       )}
 
@@ -254,7 +305,11 @@ export function RecipesBrowseScreen({ mode, pantry, onOpenPantry, catalogVersion
           <div className="spinner" />
         </div>
       ) : ranked.length === 0 ? (
-        <EmptyState mode={mode} hasQuery={!!query || category !== "all"} />
+        <EmptyState
+          source={source}
+          hasQuery={!!query || (source === "all" && category !== "all")}
+          onNewRecipe={onNewRecipe}
+        />
       ) : (
         <>
           <div className="browse-list">
@@ -292,8 +347,24 @@ function matchesQuery(fi: FeedRecipe, q: string): boolean {
   return false;
 }
 
-function EmptyState({ mode, hasQuery }: { mode: "browse" | "favorites"; hasQuery: boolean }) {
-  if (mode === "favorites") {
+function EmptyState({
+  source,
+  hasQuery,
+  onNewRecipe,
+}: {
+  source: RecipeSource;
+  hasQuery: boolean;
+  onNewRecipe: () => void;
+}) {
+  if (hasQuery) {
+    return (
+      <div className="empty-state">
+        <Icon name="bowl-food" className="empty-icon" />
+        <div>No recipes match that filter.</div>
+      </div>
+    );
+  }
+  if (source === "favorites") {
     return (
       <div className="empty-state">
         <Icon name="heart" className="empty-icon" />
@@ -301,10 +372,21 @@ function EmptyState({ mode, hasQuery }: { mode: "browse" | "favorites"; hasQuery
       </div>
     );
   }
+  if (source === "mine") {
+    return (
+      <div className="empty-state">
+        <Icon name="bowl-food" className="empty-icon" />
+        <div>You haven't saved any recipes yet. Save one from All, or start a new one.</div>
+        <button className="btn" onClick={onNewRecipe}>
+          <Icon name="plus" /> New recipe
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="empty-state">
       <Icon name="bowl-food" className="empty-icon" />
-      <div>{hasQuery ? "No recipes match that filter." : "No recipes to show."}</div>
+      <div>No recipes to show.</div>
     </div>
   );
 }

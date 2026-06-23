@@ -1125,6 +1125,52 @@ select {
   font-weight: 600;
 }
 
+/* Title + "New recipe" share the top row; the button hugs the right edge. */
+.browse-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.new-recipe-btn {
+  flex: 0 0 auto;
+  padding: 9px 16px;
+  font-size: 13px;
+}
+
+/* Primary source filter (All / My recipes / Favorites) — a pill segmented row
+   sharing the .nav-btn look. */
+.source-filter {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.source-filter .nav-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--cui-border);
+}
+
+/* Sort toolbar + its one-line explainer, grouped so they sit tight together. */
+.feed-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.feed-controls .feed-toolbar {
+  margin-bottom: 0;
+}
+
+.feed-hint {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--fg-dim);
+}
+
 .browse-filter {
   flex: 1;
   display: flex;
