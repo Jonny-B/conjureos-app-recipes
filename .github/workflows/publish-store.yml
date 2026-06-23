@@ -18,6 +18,11 @@ on:
     types: [published]
   workflow_dispatch:
     inputs:
+      environment:
+        description: Which App Store to publish to
+        type: choice
+        options: [dev, prod]
+        default: dev
       changelog:
         description: Changelog for this version
         required: false
@@ -87,8 +92,11 @@ jobs:
       # browse uses the kernel-injected env.recipesApiUrl, which is already
       # per-env, so only this static manifest URL needs stamping.)
       - name: Stamp recipes-db backend URL into manifest
+        env:
+          # Prod when a release fires OR a manual run picks the prod environment.
+          IS_PROD: ${{ github.event_name == 'release' || github.event.inputs.environment == 'prod' }}
         run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
+          if [ "$IS_PROD" = "true" ]; then
             REF="${{ secrets.SUPABASE_PROD_PROJECT_REF }}"
           else
             REF="${{ secrets.SUPABASE_DEV_PROJECT_REF }}"
@@ -96,9 +104,9 @@ jobs:
           export RECIPES_DB_URL="https://${REF}.supabase.co/functions/v1/recipes-db"
           node -e "const fs=require('fs');const p=require('./package.json');p.conjureos.remoteActions.recipesDb.url=process.env.RECIPES_DB_URL;fs.writeFileSync('./package.json',JSON.stringify(p,null,2)+'\n');console.log('stamped recipesDb url ->',process.env.RECIPES_DB_URL);"
 
-      # workflow_dispatch -> DEV project. Test path; publishes to dev users.
+      # workflow_dispatch (environment=dev) -> DEV project. Test path.
       - name: Publish to App Store (dev)
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment != 'prod'
         uses: ./.conjureos/.github/actions/publish-anchor-app
         with:
           supabase-url: https://${{ secrets.SUPABASE_DEV_PROJECT_REF }}.supabase.co
@@ -111,9 +119,10 @@ jobs:
           slug: recipes
           changelog: ${{ steps.changelog.outputs.text }}
 
-      # release published -> PROD project. Ships to real users.
+      # release published, or a manual run with environment=prod -> PROD project.
+      # Ships to real users.
       - name: Publish to App Store (prod)
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
         uses: ./.conjureos/.github/actions/publish-anchor-app
         with:
           supabase-url: https://${{ secrets.SUPABASE_PROD_PROJECT_REF }}.supabase.co
