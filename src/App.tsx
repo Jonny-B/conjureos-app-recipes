@@ -36,6 +36,8 @@ export function App() {
   const [recipeSource, setRecipeSource] = useState<RecipeSource>("all");
   const [cookMode, setCookMode] = useState<CookMode>("launcher");
   const [cookTarget, setCookTarget] = useState<CookTarget | null>(null);
+  // The tab the guided cook was launched from, so Back returns there.
+  const [cookOrigin, setCookOrigin] = useState<Tab>("cook");
   const [pantry, setPantry] = useState<PantryItem[] | null>(null);
   const [catalogVersion, setCatalogVersion] = useState(0);
 
@@ -53,8 +55,13 @@ export function App() {
   // Every "cook this" doorway routes here: load the recipe into the guided cook
   // and switch to the Cook tab.
   const startCook = (recipe: Recipe, saved: SavedRecipe | null = null) => {
+    setCookOrigin(tab);
     setCookTarget({ recipe, saved });
     setTab("cook");
+  };
+  const endCook = () => {
+    setCookTarget(null);
+    setTab(cookOrigin);
   };
   const openKitchen = () => {
     setCookMode("kitchen");
@@ -74,7 +81,12 @@ export function App() {
             <button
               key={t.id}
               className={`nav-btn${tab === t.id ? " active" : ""}`}
-              onClick={() => setTab(t.id)}
+              onClick={() => {
+                // Leaving a guided cook via the nav always returns to a real
+                // tab view (the launcher / last pane), never a stale recipe.
+                setCookTarget(null);
+                setTab(t.id);
+              }}
             >
               {t.label}
             </button>
@@ -105,28 +117,33 @@ export function App() {
             catalogVersion={catalogVersion}
           />
         )}
-        {tab === "cook" &&
-          (cookTarget ? (
-            <GuidedCook
-              recipe={cookTarget.recipe}
-              pantry={pantry}
-              saved={!!cookTarget.saved}
-              onBack={() => setCookTarget(null)}
-              onMade={() => {
-                if (cookTarget.saved) markMade(cookTarget.saved).catch(() => {});
-              }}
-              onSave={(r) => saveRecipe(r).catch(() => {})}
-            />
-          ) : (
-            <CookTab
-              mode={cookMode}
-              onModeChange={setCookMode}
-              pantry={pantry}
-              onPantryChange={setPantry}
-              onCook={startCook}
-              catalogVersion={catalogVersion}
-            />
-          ))}
+        {tab === "cook" && (
+          <>
+            {/* CookTab stays mounted (just hidden) under the guided cook so the
+                describe results / choose search / scan progress survive the
+                "pick → cook → back to pick another" detour. */}
+            <div hidden={!!cookTarget}>
+              <CookTab
+                mode={cookMode}
+                onModeChange={setCookMode}
+                pantry={pantry}
+                onPantryChange={setPantry}
+                onCook={startCook}
+                catalogVersion={catalogVersion}
+              />
+            </div>
+            {cookTarget && (
+              <GuidedCook
+                recipe={cookTarget.recipe}
+                pantry={pantry}
+                saved={!!cookTarget.saved}
+                onBack={endCook}
+                onMade={() => (cookTarget.saved ? markMade(cookTarget.saved).then(() => {}) : Promise.resolve())}
+                onSave={(r) => saveRecipe(r).then(() => {})}
+              />
+            )}
+          </>
+        )}
         {tab === "plan" && <PlanWeekScreen pantry={pantry} catalogVersion={catalogVersion} />}
       </main>
       <footer className="app-version">v{APP_VERSION}</footer>
@@ -232,7 +249,8 @@ function DescribePane({
   >({ kind: "input" });
   const [error, setError] = useState<string | null>(null);
 
-  const seed = () => (useHave ? ingredientsFromPantry(pantry ?? []) : undefined);
+  const hasPantry = !!(pantry && pantry.length);
+  const seed = () => (useHave && hasPantry ? ingredientsFromPantry(pantry ?? []) : undefined);
 
   const go = async () => {
     if (!text.trim()) return;
@@ -279,9 +297,15 @@ function DescribePane({
         maxLength={400}
         rows={3}
       />
-      <label className="describe-toggle">
-        <input type="checkbox" checked={useHave} onChange={(e) => setUseHave(e.target.checked)} />
+      <label className={`describe-toggle${hasPantry ? "" : " disabled"}`}>
+        <input
+          type="checkbox"
+          checked={useHave && hasPantry}
+          disabled={!hasPantry}
+          onChange={(e) => setUseHave(e.target.checked)}
+        />
         Use what's in my kitchen
+        {!hasPantry && <span className="faint"> — scan or add items first</span>}
       </label>
       {error && (
         <div className="status-banner error">

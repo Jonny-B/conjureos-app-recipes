@@ -12,10 +12,10 @@ interface Props {
   /** True when this recipe is already in the user's library (offer "mark as made"). */
   saved?: boolean;
   onBack: () => void;
-  /** Saved recipes: increment made-count. */
-  onMade?: () => void;
-  /** Unsaved (AI-described / catalog) recipes: save the (scaled) recipe to the library. */
-  onSave?: (recipe: Recipe) => void;
+  /** Saved recipes: increment made-count. Rejects if persistence fails. */
+  onMade?: () => Promise<void>;
+  /** Unsaved (AI-described / catalog) recipes: save the (scaled) recipe. Rejects on failure. */
+  onSave?: (recipe: Recipe) => Promise<void>;
 }
 
 /**
@@ -29,9 +29,15 @@ export function GuidedCook({ recipe, pantry, saved, onBack, onMade, onSave }: Pr
   const [checkedStep, setCheckedStep] = useState<Set<number>>(new Set());
   const [factor, setFactor] = useState(1);
   const [adjustOpen, setAdjustOpen] = useState(false);
+  const [chefOpen, setChefOpen] = useState(false);
   const [ingredientsCollapsed, setIngredientsCollapsed] = useState(false);
   const [madeDone, setMadeDone] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Catalog/DB recipes can carry a bad servings value; fall back to 1 so the
+  // stepper + scaling never divide by zero into NaN.
+  const baseServings = recipe.servings > 0 ? recipe.servings : 1;
   const scaled = useMemo(() => (factor === 1 ? recipe : scaleRecipe(recipe, factor)), [recipe, factor]);
 
   const pantryIng = useMemo(() => (pantry ? ingredientsFromPantry(pantry) : []), [pantry]);
@@ -47,7 +53,7 @@ export function GuidedCook({ recipe, pantry, saved, onBack, onMade, onSave }: Pr
   const doneSteps = checkedStep.size;
   const allDone = totalSteps > 0 && doneSteps === totalSteps;
   const currentStep = scaled.instructions.findIndex((_, i) => !checkedStep.has(i));
-  const servings = Math.max(1, Math.round(recipe.servings * factor));
+  const servings = Math.max(1, Math.round(baseServings * factor));
 
   const toggle = (set: Set<number>, i: number, apply: (s: Set<number>) => void) => {
     const next = new Set(set);
@@ -57,7 +63,21 @@ export function GuidedCook({ recipe, pantry, saved, onBack, onMade, onSave }: Pr
 
   const setServings = (n: number) => {
     const clamped = Math.max(1, Math.min(24, n));
-    setFactor(clamped / recipe.servings);
+    setFactor(clamped / baseServings);
+  };
+
+  // Persist on completion; only flip to the "done" confirmation if it succeeds.
+  const finish = async (fn: () => Promise<void>) => {
+    setSaveError(null);
+    setSaving(true);
+    try {
+      await fn();
+      setMadeDone(true);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
   };
   const scaleToPantry = () => {
     const a = computeAvailability(recipe, pantryIng);
@@ -74,6 +94,14 @@ export function GuidedCook({ recipe, pantry, saved, onBack, onMade, onSave }: Pr
         <div className="guided-progress" aria-label={`${doneSteps} of ${totalSteps} steps done`}>
           <div className="guided-progress-bar" style={{ width: `${totalSteps ? (doneSteps / totalSteps) * 100 : 0}%` }} />
         </div>
+        <button
+          className={`icon-btn${chefOpen ? " active" : ""}`}
+          onClick={() => setChefOpen(true)}
+          aria-label="Ask the chef"
+          title="Ask the chef"
+        >
+          <Icon name="comment-dots" />
+        </button>
         <div className="adjust-wrap">
           <button
             className={`icon-btn${adjustOpen ? " active" : ""}`}
@@ -164,19 +192,29 @@ export function GuidedCook({ recipe, pantry, saved, onBack, onMade, onSave }: Pr
         <div className="guided-done">
           <Icon name="check" /> Nicely done.
           {saved ? (
-            <button className="btn" onClick={() => { onMade?.(); setMadeDone(true); }}>
-              <Icon name="check" /> Mark as made
+            <button className="btn" disabled={saving} onClick={() => finish(() => onMade?.() ?? Promise.resolve())}>
+              <Icon name="check" /> {saving ? "Saving…" : "Mark as made"}
             </button>
           ) : onSave ? (
-            <button className="btn" onClick={() => { onSave(scaled); setMadeDone(true); }}>
-              <Icon name="plus" /> Save to my recipes
+            <button className="btn" disabled={saving} onClick={() => finish(() => onSave(scaled))}>
+              <Icon name="plus" /> {saving ? "Saving…" : "Save to my recipes"}
             </button>
           ) : null}
         </div>
       )}
-      {madeDone && <div className="guided-done"><Icon name="check" /> Saved to your recipes.</div>}
+      {saveError && (
+        <div className="status-banner error">
+          <Icon name="triangle-exclamation" />
+          <span>Couldn't save: {saveError}</span>
+        </div>
+      )}
+      {madeDone && (
+        <div className="guided-done">
+          <Icon name="check" /> {saved ? "Marked as made." : "Saved to your recipes."}
+        </div>
+      )}
 
-      <ChefChat recipe={scaled} />
+      <ChefChat recipe={scaled} open={chefOpen} onClose={() => setChefOpen(false)} />
     </div>
   );
 }

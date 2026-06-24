@@ -5,13 +5,12 @@ import { Icon } from "../icons";
 
 /**
  * "Ask the chef" — an unobtrusive AI cooking assistant for the guided cook.
- * Collapsed it's a single floating button (zero layout cost); tapped it opens a
- * bottom sheet over the steps for substitutions / technique / timing questions.
- * Grounded in the current recipe via the system prompt; multi-turn through the
- * messages array the `complete()` bridge already accepts.
+ * Controlled by the host (the trigger lives in the GuidedCook header, so it adds
+ * no floating chrome over the steps). When open, a bottom sheet slides up for
+ * substitutions / technique / timing questions, grounded in the current recipe
+ * and multi-turn via the messages array `complete()` accepts.
  */
-export function ChefChat({ recipe }: { recipe: Recipe }) {
-  const [open, setOpen] = useState(false);
+export function ChefChat({ recipe, open, onClose }: { recipe: Recipe; open: boolean; onClose: () => void }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -26,10 +25,10 @@ export function ChefChat({ recipe }: { recipe: Recipe }) {
   // Close on Escape, like the other popovers in the app.
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [open, onClose]);
 
   const send = async () => {
     const text = input.trim();
@@ -54,13 +53,7 @@ export function ChefChat({ recipe }: { recipe: Recipe }) {
     }
   };
 
-  if (!open) {
-    return (
-      <button className="chef-fab" onClick={() => setOpen(true)} aria-label="Ask the chef" title="Ask the chef">
-        <Icon name="comment-dots" />
-      </button>
-    );
-  }
+  if (!open) return null;
 
   return (
     <div className="chef-sheet" role="dialog" aria-label="Ask the chef">
@@ -68,7 +61,7 @@ export function ChefChat({ recipe }: { recipe: Recipe }) {
         <span className="chef-title">
           <Icon name="comment-dots" /> Ask the chef
         </span>
-        <button className="icon-btn" onClick={() => setOpen(false)} aria-label="Close" title="Close">
+        <button className="icon-btn" onClick={onClose} aria-label="Close" title="Close">
           <Icon name="chevron-down" />
         </button>
       </div>

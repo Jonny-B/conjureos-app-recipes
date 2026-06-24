@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FeedRecipe, PantryItem, Recipe, SavedRecipe } from "../types";
 import { ingredientsFromPantry } from "../features/pantry";
 import { computeAvailability, computeCoverage } from "../features/scaling";
@@ -37,7 +37,23 @@ export function RecipeDetail({
   onDelete,
 }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const recipe: Recipe = feed.recipe;
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointer = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuOpen(false);
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
   const pantryIng = useMemo(() => (pantry ? ingredientsFromPantry(pantry) : []), [pantry]);
   const hasPantry = pantryIng.length > 0;
 
@@ -66,41 +82,62 @@ export function RecipeDetail({
         <button className="btn ghost" onClick={onBack}>
           <Icon name="chevron-down" className="back-caret" /> Back
         </button>
-        <button
-          className="btn"
-          onClick={() => onCook(recipe, feed.kind === "saved" ? feed.recipe : null)}
-        >
-          <Icon name="bowl-food" /> Cook this
-        </button>
         <div style={{ flex: 1 }} />
         <button
-          className={`btn ghost fav-btn${feed.favorite ? " on" : ""}`}
+          className={`icon-btn fav-btn${feed.favorite ? " on" : ""}`}
           onClick={onToggleFavorite}
+          aria-label={feed.favorite ? "Remove from favorites" : "Add to favorites"}
           title={feed.favorite ? "Remove from favorites" : "Add to favorites"}
         >
-          <Icon name="heart" /> {feed.favorite ? "Favorited" : "Favorite"}
+          <Icon name="heart" />
         </button>
-        {isCatalog ? (
-          <button className="btn secondary" onClick={onSaveToLibrary} disabled={inLibrary}>
-            <Icon name="check" /> {inLibrary ? "In your recipes" : "Save to my recipes"}
+        <button className="btn" onClick={() => onCook(recipe, feed.kind === "saved" ? feed.recipe : null)}>
+          <Icon name="bowl-food" /> Cook this
+        </button>
+        <div className="overflow-wrap" ref={menuRef}>
+          <button
+            className={`icon-btn${menuOpen ? " active" : ""}`}
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="More actions"
+            title="More"
+          >
+            <Icon name="ellipsis" />
           </button>
-        ) : (
-          <>
-            <button className="btn secondary" onClick={onMade}>
-              <Icon name="check" /> I made this
-            </button>
-            {confirmDelete ? (
-              <>
-                <span className="muted" style={{ fontSize: 13 }}>Sure?</span>
-                <button className="btn danger" onClick={onDelete}>Delete</button>
-                <button className="btn ghost" onClick={() => setConfirmDelete(false)}>Cancel</button>
-              </>
-            ) : (
-              <button className="btn ghost" onClick={() => setConfirmDelete(true)}>Delete</button>
-            )}
-          </>
-        )}
+          {menuOpen && (
+            <div className="overflow-menu" role="menu">
+              {isCatalog ? (
+                <button
+                  className="overflow-item"
+                  disabled={inLibrary}
+                  onClick={() => { onSaveToLibrary?.(); setMenuOpen(false); }}
+                >
+                  <Icon name="check" /> {inLibrary ? "In your recipes" : "Save to my recipes"}
+                </button>
+              ) : (
+                <>
+                  <button className="overflow-item" onClick={() => { onMade?.(); setMenuOpen(false); }}>
+                    <Icon name="check" /> I made this
+                  </button>
+                  <button
+                    className="overflow-item danger"
+                    onClick={() => { setMenuOpen(false); setConfirmDelete(true); }}
+                  >
+                    <Icon name="trash-can" /> Delete
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
+
+      {confirmDelete && (
+        <div className="confirm-row">
+          <span>Delete this recipe?</span>
+          <button className="btn danger" onClick={onDelete}>Delete</button>
+          <button className="btn ghost" onClick={() => setConfirmDelete(false)}>Cancel</button>
+        </div>
+      )}
 
       <article className="recipe-card recipe-card--static" style={{ maxWidth: "100%" }}>
         <h3 style={{ fontSize: 22 }}>{recipe.title}</h3>
