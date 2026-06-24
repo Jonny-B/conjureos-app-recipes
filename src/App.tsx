@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CapturedPhoto, Ingredient, PantryItem, Recipe, RecipeSource, Screen } from "./types";
-import { CaptureScreen } from "./screens/CaptureScreen";
-import { IngredientsScreen } from "./screens/IngredientsScreen";
+import type { Ingredient, PantryItem, Recipe, RecipeSource } from "./types";
 import { RecipesScreen } from "./screens/RecipesScreen";
 import { CreateScreen } from "./screens/CreateScreen";
 import { SnapRecipeScreen } from "./screens/SnapRecipeScreen";
@@ -9,23 +7,23 @@ import { HomeScreen } from "./screens/HomeScreen";
 import { RecipesBrowseScreen } from "./screens/RecipesBrowseScreen";
 import { PantryScreen } from "./screens/PantryScreen";
 import { PlanWeekScreen } from "./screens/PlanWeekScreen";
-import { identifyIngredients } from "./features/vision";
 import { generateRecipes } from "./features/recipes";
 import { registerActions } from "./bridge/actions";
 import { ensureCatalogLoaded } from "./features/catalog";
-import { loadPantry } from "./features/pantry";
+import { loadPantry, ingredientsFromPantry } from "./features/pantry";
 import { getUSDAUsage, type USDAUsageSnapshot } from "./features/nutrition";
 import { Icon } from "./icons";
 import { APP_VERSION } from "./version";
 
-type Tab = "home" | "cook" | "recipes" | "pantry" | "plan";
-type CookMode = "scan" | "snap" | "write";
+type Tab = "home" | "cook" | "recipes" | "plan";
+// Cook is the kitchen hub: "kitchen" merges the old Pantry tab + fridge-scan
+// (what you have -> cook from it); snap/write add a recipe to your library.
+type CookMode = "kitchen" | "snap" | "write";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "home", label: "Home" },
   { id: "cook", label: "Cook" },
   { id: "recipes", label: "Recipes" },
-  { id: "pantry", label: "Pantry" },
   { id: "plan", label: "Plan" },
 ];
 
@@ -35,7 +33,7 @@ export function App() {
   // other surfaces can deep-link into them (Home's "favorites" + a "New recipe"
   // shortcut that drops straight into Cook -> Write your own).
   const [recipeSource, setRecipeSource] = useState<RecipeSource>("all");
-  const [cookMode, setCookMode] = useState<CookMode>("scan");
+  const [cookMode, setCookMode] = useState<CookMode>("kitchen");
   const [pantry, setPantry] = useState<PantryItem[] | null>(null);
   // Bumped once the catalog is (re)loaded from the DB so the catalog-reading
   // screens re-run their memoized decode. Starts on the bundled copy, which
@@ -95,13 +93,24 @@ export function App() {
             catalogVersion={catalogVersion}
           />
         )}
-        {tab === "cook" && <CookTab mode={cookMode} onModeChange={setCookMode} />}
+        {tab === "cook" && (
+          <CookTab
+            mode={cookMode}
+            onModeChange={setCookMode}
+            pantry={pantry}
+            onPantryChange={setPantry}
+            onBrowse={() => setTab("recipes")}
+          />
+        )}
         {tab === "recipes" && (
           <RecipesBrowseScreen
             source={recipeSource}
             onSourceChange={setRecipeSource}
             pantry={pantry}
-            onOpenPantry={() => setTab("pantry")}
+            onOpenPantry={() => {
+              setCookMode("kitchen");
+              setTab("cook");
+            }}
             onNewRecipe={() => {
               setCookMode("write");
               setTab("cook");
@@ -109,7 +118,6 @@ export function App() {
             catalogVersion={catalogVersion}
           />
         )}
-        {tab === "pantry" && <PantryScreen pantry={pantry} onChange={setPantry} />}
         {tab === "plan" && <PlanWeekScreen pantry={pantry} catalogVersion={catalogVersion} />}
       </main>
       <footer className="app-version">v{APP_VERSION}</footer>
@@ -118,81 +126,72 @@ export function App() {
 }
 
 /**
- * The Cook tab hosts the original scan-to-recipe flow plus a "Write your own"
- * mode (the former Create tab, folded in here to keep the top nav to five
- * primary destinations without dropping the feature).
+ * The Cook tab is the "kitchen" hub. Its default mode merges what used to be
+ * two separate destinations — the Pantry tab and the fridge-scan flow — into
+ * one place: keep what you have on hand, scan to add to it, then cook from it
+ * (AI-generate three recipes) or browse what you can make. "Snap a recipe" and
+ * "Write your own" add a recipe to your library.
  */
-function CookTab({ mode, onModeChange }: { mode: CookMode; onModeChange: (m: CookMode) => void }) {
-  const setMode = onModeChange;
-  const [screen, setScreen] = useState<Screen>({ kind: "capture" });
+function CookTab({
+  mode,
+  onModeChange,
+  pantry,
+  onPantryChange,
+  onBrowse,
+}: {
+  mode: CookMode;
+  onModeChange: (m: CookMode) => void;
+  pantry: PantryItem[] | null;
+  onPantryChange: (items: PantryItem[]) => void;
+  onBrowse: () => void;
+}) {
+  // "Cook from my pantry" sub-flow, seeded from the pantry rather than a fresh
+  // scan (the pantry IS the list of what you have now).
+  const [cook, setCook] = useState<
+    | { kind: "idle" }
+    | { kind: "generating"; ingredients: Ingredient[] }
+    | { kind: "recipes"; ingredients: Ingredient[]; recipes: Recipe[] }
+  >({ kind: "idle" });
   const [error, setError] = useState<string | null>(null);
 
-  const reset = useCallback(() => {
-    setScreen({ kind: "capture" });
+  const cookFromPantry = useCallback(async () => {
+    const ingredients = ingredientsFromPantry(pantry ?? []);
+    if (ingredients.length === 0) return;
     setError(null);
-  }, []);
-
-  // Back one step: recipes -> ingredients, preserving photos + confirmed
-  // ingredients so the user can tweak without re-shooting or regenerating.
-  const editIngredients = useCallback(
-    (photos: CapturedPhoto[], ingredients: Ingredient[]) => {
-      setError(null);
-      setScreen({ kind: "ingredients", photos, ingredients });
-    },
-    [],
-  );
-
-  const onIdentify = useCallback(async (photos: CapturedPhoto[]) => {
-    setError(null);
-    setScreen({ kind: "identifying", photos });
+    setCook({ kind: "generating", ingredients });
     try {
-      const ingredients = await identifyIngredients(photos);
-      setScreen({ kind: "ingredients", photos, ingredients });
+      const recipes = await generateRecipes(ingredients);
+      setCook({ kind: "recipes", ingredients, recipes });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-      setScreen({ kind: "capture" });
+      setCook({ kind: "idle" });
     }
-  }, []);
-
-  const onIngredientsConfirmed = useCallback(
-    async (photos: CapturedPhoto[], ingredients: Ingredient[]) => {
-      setError(null);
-      setScreen({ kind: "generating", photos, ingredients });
-      try {
-        const recipes = await generateRecipes(ingredients);
-        setScreen({ kind: "recipes", photos, ingredients, recipes });
-      } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
-        setScreen({ kind: "ingredients", photos, ingredients });
-      }
-    },
-    [],
-  );
+  }, [pantry]);
 
   return (
     <>
       <div className="feed-toolbar">
         <button
-          className={`nav-btn${mode === "scan" ? " active" : ""}`}
-          onClick={() => setMode("scan")}
+          className={`nav-btn${mode === "kitchen" ? " active" : ""}`}
+          onClick={() => onModeChange("kitchen")}
         >
-          <Icon name="camera" /> Scan fridge
+          <Icon name="carrot" /> My kitchen
         </button>
         <button
           className={`nav-btn${mode === "snap" ? " active" : ""}`}
-          onClick={() => setMode("snap")}
+          onClick={() => onModeChange("snap")}
         >
           <Icon name="images" /> Snap a recipe
         </button>
         <button
           className={`nav-btn${mode === "write" ? " active" : ""}`}
-          onClick={() => setMode("write")}
+          onClick={() => onModeChange("write")}
         >
           <Icon name="pen" /> Write your own
         </button>
       </div>
 
-      {error && mode === "scan" && (
+      {error && mode === "kitchen" && (
         <div className="status-banner error" style={{ marginBottom: 16 }}>
           <Icon name="wand" />
           <span>{error}</span>
@@ -207,60 +206,25 @@ function CookTab({ mode, onModeChange }: { mode: CookMode; onModeChange: (m: Coo
         <CreateScreen />
       ) : mode === "snap" ? (
         <SnapRecipeScreen />
+      ) : cook.kind === "generating" ? (
+        <FullscreenSpinner label="Cooking up recipes…" sub="Three options from what you have. ~10 seconds." />
+      ) : cook.kind === "recipes" ? (
+        <RecipesScreen
+          recipes={cook.recipes}
+          ingredients={cook.ingredients}
+          onEditIngredients={() => setCook({ kind: "idle" })}
+          onRestart={() => setCook({ kind: "idle" })}
+        />
       ) : (
-        <BuildPane
-          screen={screen}
-          onIdentify={onIdentify}
-          onIngredientsConfirmed={onIngredientsConfirmed}
-          onEditIngredients={editIngredients}
-          onReset={reset}
+        <PantryScreen
+          pantry={pantry}
+          onChange={onPantryChange}
+          onCook={cookFromPantry}
+          onBrowse={onBrowse}
         />
       )}
     </>
   );
-}
-
-
-interface BuildPaneProps {
-  screen: Screen;
-  onIdentify: (photos: CapturedPhoto[]) => void;
-  onIngredientsConfirmed: (photos: CapturedPhoto[], ingredients: Ingredient[]) => void;
-  onEditIngredients: (photos: CapturedPhoto[], ingredients: Ingredient[]) => void;
-  onReset: () => void;
-}
-
-function BuildPane({ screen, onIdentify, onIngredientsConfirmed, onEditIngredients, onReset }: BuildPaneProps) {
-  switch (screen.kind) {
-    case "capture":
-      return <CaptureScreen onIdentify={onIdentify} />;
-    case "identifying":
-      return (
-        <FullscreenSpinner
-          label={`Looking at ${screen.photos.length} photo${screen.photos.length === 1 ? "" : "s"}…`}
-          sub="Identifying + deduping ingredients with Claude. ~5-10 seconds."
-        />
-      );
-    case "ingredients":
-      return (
-        <IngredientsScreen
-          photos={screen.photos}
-          initialIngredients={screen.ingredients}
-          onConfirm={(items) => onIngredientsConfirmed(screen.photos, items)}
-          onRetake={onReset}
-        />
-      );
-    case "generating":
-      return <FullscreenSpinner label="Cooking up recipes…" sub="Generating three options. ~10 seconds." />;
-    case "recipes":
-      return (
-        <RecipesScreen
-          recipes={screen.recipes as Recipe[]}
-          ingredients={screen.ingredients}
-          onEditIngredients={() => onEditIngredients(screen.photos, screen.ingredients)}
-          onRestart={onReset}
-        />
-      );
-  }
 }
 
 function FullscreenSpinner({ label, sub }: { label: string; sub?: string }) {
