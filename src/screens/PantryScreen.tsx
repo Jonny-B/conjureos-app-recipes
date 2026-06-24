@@ -232,34 +232,6 @@ function KitchenList({
         </button>
       </div>
 
-      {hasItems && (
-        <button className="btn kitchen-make" onClick={() => setShowMatches((v) => !v)}>
-          <Icon name="bowl-food" /> What can I make?
-        </button>
-      )}
-
-      {showMatches && hasItems && (
-        <div className="kitchen-matches">
-          <button className="btn secondary kitchen-invent" onClick={onInvent}>
-            <Icon name="wand" /> Invent 3 with AI from what I have
-          </button>
-          {matches.length > 0 ? (
-            <div className="browse-list">
-              {matches.map(({ c, cov }) => (
-                <RecipeRow
-                  key={c.id}
-                  fi={{ kind: "catalog", id: c.id, recipe: c, favorite: false }}
-                  cov={cov}
-                  onOpen={() => onCook?.(toRecipe(c), null)}
-                />
-              ))}
-            </div>
-          ) : (
-            <p className="muted" style={{ fontSize: 13 }}>Add a few more items and matches will show here.</p>
-          )}
-        </div>
-      )}
-
       {err && (
         <div className="status-banner error">
           <Icon name="triangle-exclamation" />
@@ -319,6 +291,36 @@ function KitchenList({
           <input type="text" placeholder="Amount (optional)" value={qty} onChange={(e) => setQty(e.target.value)} maxLength={40} />
           <button className="btn" type="submit" disabled={!name.trim()}><Icon name="plus" /> Add</button>
         </form>
+      )}
+
+      {hasItems && (
+        <div className="kitchen-make-section">
+          <button className="btn kitchen-make" onClick={() => setShowMatches((v) => !v)}>
+            <Icon name="bowl-food" /> What can I make?
+            <Icon name="chevron-down" className={showMatches ? "rot-flip" : ""} />
+          </button>
+          {showMatches && (
+            <div className="kitchen-matches">
+              <button className="btn secondary kitchen-invent" onClick={onInvent}>
+                <Icon name="wand" /> Invent with AI from what I have
+              </button>
+              {matches.length > 0 ? (
+                <div className="browse-list">
+                  {matches.map(({ c, cov }) => (
+                    <RecipeRow
+                      key={c.id}
+                      fi={{ kind: "catalog", id: c.id, recipe: c, favorite: false }}
+                      cov={cov}
+                      onOpen={() => onCook?.(toRecipe(c), null)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="muted" style={{ fontSize: 13 }}>Add a few more items and matches will show here.</p>
+              )}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
