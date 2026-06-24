@@ -10,6 +10,8 @@ interface Props {
   ingredients: Ingredient[];
   onEditIngredients: () => void;
   onRestart: () => void;
+  /** When set, each card offers "Cook this" → guided cook (with the scaled recipe). */
+  onCook?: (recipe: Recipe) => void;
 }
 
 /** Per-card nutrition state. See nutrition.ts for the kind union semantics. */
@@ -20,7 +22,7 @@ type CardNutrition =
   | { kind: "rate-limited"; missedDueToRateLimit: number }
   | { kind: "empty" };
 
-export function RecipesScreen({ recipes, ingredients, onEditIngredients, onRestart }: Props) {
+export function RecipesScreen({ recipes, ingredients, onEditIngredients, onRestart, onCook }: Props) {
   const [savedIdx, setSavedIdx] = useState<Set<number>>(new Set());
   const [savingIdx, setSavingIdx] = useState<number | null>(null);
   const [saveErr, setSaveErr] = useState<string | null>(null);
@@ -167,6 +169,7 @@ export function RecipesScreen({ recipes, ingredients, onEditIngredients, onResta
               onScaleToAvailable={() => scaleToAvailable(i)}
               onResetScale={() => resetScale(i)}
               onSave={() => onSave(i)}
+              onCook={onCook ? () => onCook(scaled) : undefined}
             />
           );
         })}
@@ -190,6 +193,7 @@ interface RecipeCardProps {
   onScaleToAvailable: () => void;
   onResetScale: () => void;
   onSave: () => void;
+  onCook?: () => void;
 }
 
 function RecipeCard({
@@ -205,6 +209,7 @@ function RecipeCard({
   onScaleToAvailable,
   onResetScale,
   onSave,
+  onCook,
 }: RecipeCardProps) {
   // Constraining ingredient and a precomputed shortage map so we can show
   // a "not enough X" annotation next to the offending recipe line.
@@ -322,14 +327,14 @@ function RecipeCard({
       </section>
 
       <div className="row" style={{ marginTop: "auto" }}>
-        {saved ? (
-          <span className="muted" style={{ fontSize: 13, display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="check" /> Saved to Recipes</span>
-        ) : (
-          <span />
-        )}
-        <button className="btn" disabled={saved || anySaving} onClick={onSave}>
-          {saving ? "Saving…" : saved ? "Saved" : "Save"}
+        <button className={`btn${onCook ? " secondary" : ""}`} disabled={saved || anySaving} onClick={onSave}>
+          {saving ? "Saving…" : saved ? "Saved ✓" : "Save"}
         </button>
+        {onCook && (
+          <button className="btn" onClick={onCook}>
+            <Icon name="bowl-food" /> Cook this
+          </button>
+        )}
       </div>
     </article>
   );

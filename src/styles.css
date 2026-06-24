@@ -2097,3 +2097,240 @@ select {
   font-size: 12px;
   color: var(--fg-dim);
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   v0.9 redesign: Cook launcher, guided cook, chef chat, library + kitchen
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Cook launcher (3 entry cards) ──────────────────────────────────── */
+.cook-launcher {
+  max-width: 560px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 6px;
+}
+.launch-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  padding: 18px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  cursor: pointer;
+  box-shadow: var(--shadow-soft);
+  transition: transform var(--cui-duration-fast) var(--cui-ease), border-color var(--cui-duration) var(--cui-ease), box-shadow var(--cui-duration) var(--cui-ease);
+}
+.launch-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--cui-accent-tint);
+  box-shadow: var(--cui-shadow-accent);
+}
+.launch-icon {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--grad-primary);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--cui-shadow-accent);
+}
+.launch-icon .fa-icon { width: 20px; height: 20px; }
+.launch-text { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.launch-title { font-size: 16px; font-weight: 600; }
+.launch-sub { font-size: 12.5px; color: var(--fg-dim); line-height: 1.4; }
+.launch-caret { width: 14px; height: 14px; color: var(--fg-faint); transform: rotate(-90deg); flex: 0 0 auto; }
+
+/* ── Describe a dish ────────────────────────────────────────────────── */
+.describe-pane { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.describe-pane h2 { margin: 0; font-size: 24px; font-weight: 600; }
+.describe-input {
+  width: 100%;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  color: var(--fg);
+  font: inherit;
+  resize: vertical;
+  outline: none;
+}
+.describe-input:focus { border-color: var(--grape); box-shadow: 0 0 0 3px rgba(179, 136, 255, 0.18); }
+.describe-toggle { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--fg); cursor: pointer; }
+.describe-toggle input { width: 16px; height: 16px; }
+
+/* ── Library header (search + filter + add) ─────────────────────────── */
+.lib-header { display: flex; align-items: center; gap: 8px; }
+.lib-header .browse-filter { flex: 1; }
+.lib-icon {
+  position: relative;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+}
+.lib-icon.active { border-color: var(--cui-accent-tint); color: var(--fg); background: var(--cui-accent-mute); }
+.lib-badge {
+  position: absolute;
+  top: -5px; right: -5px;
+  min-width: 17px; height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--grad-primary);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.lib-panel {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lib-panel-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-dim); }
+.add-panel { flex-direction: row; }
+.add-panel .btn { flex: 1; justify-content: center; }
+
+/* ── Kitchen (pantry) ───────────────────────────────────────────────── */
+.kitchen-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.kitchen-top h2 { margin: 0; font-size: 24px; font-weight: 600; }
+.kitchen-make { width: 100%; justify-content: center; }
+.kitchen-matches { display: flex; flex-direction: column; gap: 10px; }
+.kitchen-invent { width: 100%; justify-content: center; }
+.kitchen-list-head { display: flex; align-items: center; justify-content: space-between; }
+
+/* ── Guided cook ────────────────────────────────────────────────────── */
+.guided { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; padding-bottom: 80px; }
+.guided-head { display: flex; align-items: center; gap: 12px; }
+.guided-progress { flex: 1; height: 6px; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden; }
+.guided-progress-bar { height: 100%; background: var(--grad-primary); border-radius: 999px; transition: width var(--cui-duration) var(--cui-ease); }
+.guided-title { margin: 0; font-size: 24px; font-weight: 600; }
+.guided-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.guided-section { display: flex; flex-direction: column; gap: 8px; }
+.guided-section-head {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; background: transparent; border: none; color: var(--fg);
+  font-size: 15px; font-weight: 600; padding: 4px 0; cursor: pointer;
+}
+.guided-section-head.static { cursor: default; }
+.guided-section-head .fa-icon { width: 13px; height: 13px; color: var(--fg-faint); transition: transform var(--cui-duration-fast) var(--cui-ease); }
+.rot-flip { transform: rotate(180deg); }
+
+.check-list, .step-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.check-row, .step-row {
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 12px 14px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: opacity var(--cui-duration) var(--cui-ease), border-color var(--cui-duration) var(--cui-ease);
+}
+.check-row.checked, .step-row.checked { opacity: 0.55; }
+.check-row.checked .check-text, .step-row.checked .step-text { text-decoration: line-through; }
+.check-mark { flex: 0 0 auto; width: 18px; height: 18px; margin-top: 1px; color: var(--fg-faint); }
+.check-row.checked .check-mark { color: var(--mint); }
+.check-text, .step-text { flex: 1; line-height: 1.45; }
+.step-num { flex: 0 0 auto; width: 20px; height: 20px; color: var(--fg-faint); margin-top: 1px; }
+.step-num .fa-icon { width: 18px; height: 18px; }
+.step-row.checked .step-num { color: var(--mint); }
+.step-row.current { border-color: var(--cui-accent-tint); box-shadow: 0 0 0 1px var(--cui-accent-tint), 0 4px 14px rgba(124, 106, 247, 0.18); }
+.ing-tag { flex: 0 0 auto; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; display: inline-flex; align-items: center; gap: 4px; }
+.ing-tag.miss { background: rgba(255, 122, 122, 0.16); color: #ff9b9b; }
+.ing-tag.miss .fa-icon { width: 10px; height: 10px; }
+.ing-tag.low { background: rgba(255, 184, 108, 0.16); color: var(--tangerine); }
+
+.guided-done {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 14px 16px;
+  background: var(--cui-accent-mute);
+  border: 1px solid var(--cui-accent-tint);
+  border-radius: 16px;
+  font-size: 15px; font-weight: 600;
+}
+.guided-done .btn { margin-left: auto; }
+
+/* Adjust (servings/scale) popover */
+.adjust-wrap { position: relative; flex: 0 0 auto; }
+.adjust-pop {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  min-width: 210px; padding: 12px 14px;
+  background: var(--bg-1); border: 1px solid var(--border);
+  border-radius: 14px; box-shadow: var(--shadow-soft); z-index: 50;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.adjust-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; }
+.stepper { display: inline-flex; align-items: center; gap: 8px; }
+.stepper-val { min-width: 28px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* ── Ask-the-chef chat ──────────────────────────────────────────────── */
+.chef-fab {
+  position: fixed; right: 16px; bottom: 16px;
+  width: 52px; height: 52px; border-radius: 999px;
+  background: var(--grad-primary); color: #fff; border: none;
+  box-shadow: var(--cui-shadow-accent); cursor: pointer; z-index: 60;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: transform var(--cui-duration-fast) var(--cui-ease);
+}
+.chef-fab:hover { transform: translateY(-2px); }
+.chef-fab .fa-icon { width: 22px; height: 22px; }
+.chef-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  max-width: 640px; margin: 0 auto;
+  height: 58vh; max-height: 560px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.4);
+  z-index: 60;
+  display: flex; flex-direction: column;
+}
+.chef-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.chef-title { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; }
+.chef-title .fa-icon { width: 16px; height: 16px; color: var(--bubblegum); }
+.chef-thread { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.chef-hint { margin: 0; font-size: 13px; color: var(--fg-dim); line-height: 1.5; }
+.chef-msg { max-width: 85%; padding: 9px 12px; border-radius: 14px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
+.chef-msg.user { align-self: flex-end; background: var(--grad-primary); color: #fff; border-bottom-right-radius: 4px; }
+.chef-msg.assistant { align-self: flex-start; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+.chef-typing { opacity: 0.7; font-style: italic; }
+.chef-input { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--border); }
+.chef-input input { flex: 1; background: var(--bg-0, var(--bg-1)); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; color: var(--fg); outline: none; }
+.chef-input input:focus { border-color: var(--grape); }
+.chef-input .btn { flex: 0 0 auto; padding: 10px 14px; }
+
+/* Base icon button (header Adjust, chef close, stepper, etc.). The
+   .ing-row button.icon-btn rule above is more specific and still wins there. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition: background var(--cui-duration-fast) var(--cui-ease), color var(--cui-duration-fast) var(--cui-ease);
+}
+.icon-btn:hover,
+.icon-btn.active { background: var(--cui-accent-mute); color: var(--fg); }
+.icon-btn .fa-icon { width: 16px; height: 16px; }

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { CoverageResult } from "../features/scaling";
 import type { FeedRecipe, PantryItem, Recipe, RecipeSource, SavedRecipe } from "../types";
 import { getCatalog, categories, toRecipe } from "../features/catalog";
 import {
@@ -10,11 +9,11 @@ import {
   setSavedFavorite,
 } from "../features/storage";
 import { loadFavorites, toggleCatalogFavorite } from "../features/favorites";
-import { ingredientsFromPantry } from "../features/pantry";
-import { computeCoverage } from "../features/scaling";
 import { Dropdown, type DropdownOption } from "../components/Dropdown";
 import { RecipeRow } from "../components/RecipeRow";
 import { RecipeDetail } from "./RecipeDetail";
+import { CreateScreen } from "./CreateScreen";
+import { SnapRecipeScreen } from "./SnapRecipeScreen";
 import { Icon } from "../icons";
 
 interface Props {
@@ -22,9 +21,8 @@ interface Props {
   source: RecipeSource;
   onSourceChange: (s: RecipeSource) => void;
   pantry: PantryItem[] | null;
-  onOpenPantry: () => void;
-  /** Jump to Cook -> Write your own to author a recipe from scratch. */
-  onNewRecipe: () => void;
+  /** Enter the guided cook for a recipe (savedRecipe set when it's in the library). */
+  onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
   /** Bumped by App when the catalog reloads from the DB, so the memos re-run. */
   catalogVersion?: number;
 }
@@ -36,34 +34,25 @@ const SOURCE_TABS: { id: RecipeSource; label: string }[] = [
 ];
 
 const PAGE_SIZE = 60;
+type Mode = "list" | "write" | "snap";
 
 function keyOf(fi: FeedRecipe): string {
   return fi.kind === "catalog" ? `c:${fi.id}` : `s:${fi.recipe.path}`;
 }
-function recipeOf(fi: FeedRecipe): Recipe {
-  return fi.recipe;
-}
 
-export function RecipesBrowseScreen({
-  source,
-  onSourceChange,
-  pantry,
-  onOpenPantry,
-  onNewRecipe,
-  catalogVersion = 0,
-}: Props) {
+export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, catalogVersion = 0 }: Props) {
   const [saved, setSaved] = useState<SavedRecipe[]>([]);
   const [favs, setFavs] = useState<Set<string>>(new Set());
   const [loaded, setLoaded] = useState(false);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>("all");
-  const [view, setView] = useState<"browse" | "suggest">("browse");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<FeedRecipe | null>(null);
+  const [mode, setMode] = useState<Mode>("list");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   const catalog = useMemo(() => getCatalog(), [catalogVersion]);
-  const pantryIng = useMemo(() => (pantry ? ingredientsFromPantry(pantry) : []), [pantry]);
-  const hasPantry = pantryIng.length > 0;
 
   const refresh = useCallback(async () => {
     const [s, f] = await Promise.all([listSavedRecipes(), loadFavorites()]);
@@ -75,20 +64,8 @@ export function RecipesBrowseScreen({
     refresh();
   }, [refresh]);
 
-  // Favorites view is inherently a "suggestions" surface; in browse, default
-  // to plain browse and let the user opt into ranking once they have a pantry.
-  useEffect(() => {
-    if (!hasPantry && view === "suggest") setView("browse");
-  }, [hasPantry, view]);
-
-  const showCoverage = (source === "favorites" || view === "suggest") && hasPantry;
-
   const feedItems = useMemo<FeedRecipe[]>(() => {
-    const savedItems: FeedRecipe[] = saved.map((r) => ({
-      kind: "saved",
-      recipe: r,
-      favorite: !!r.favorite,
-    }));
+    const savedItems: FeedRecipe[] = saved.map((r) => ({ kind: "saved", recipe: r, favorite: !!r.favorite }));
     if (source === "mine") return savedItems;
     if (source === "favorites") {
       const savedFavs = savedItems.filter((fi) => fi.favorite);
@@ -97,47 +74,26 @@ export function RecipesBrowseScreen({
         .map((c) => ({ kind: "catalog", id: c.id, recipe: c, favorite: true }));
       return [...savedFavs, ...catFavs];
     }
-    const catItems: FeedRecipe[] = catalog.map((c) => ({
-      kind: "catalog",
-      id: c.id,
-      recipe: c,
-      favorite: favs.has(c.id),
-    }));
+    const catItems: FeedRecipe[] = catalog.map((c) => ({ kind: "catalog", id: c.id, recipe: c, favorite: favs.has(c.id) }));
     return [...savedItems, ...catItems];
   }, [source, catalog, saved, favs]);
-
-  // Coverage computed once per (items, pantry) change, keyed by item identity.
-  const coverageMap = useMemo(() => {
-    const m = new Map<string, CoverageResult>();
-    if (hasPantry) for (const fi of feedItems) m.set(keyOf(fi), computeCoverage(recipeOf(fi), pantryIng));
-    return m;
-  }, [feedItems, pantryIng, hasPantry]);
 
   const ranked = useMemo(() => {
     const q = query.trim().toLowerCase();
     const items = feedItems.filter((fi) => {
       if (q && !matchesQuery(fi, q)) return false;
-      // The category dropdown only shows for the All source (catalog rows carry
-      // a category; saved recipes don't), so only filter by it there.
       if (source === "all" && category !== "all") {
         return fi.kind === "catalog" && fi.recipe.category === category;
       }
       return true;
     });
-    const rank = view === "suggest" && hasPantry;
     return items.slice().sort((a, b) => {
       if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
-      if (rank) {
-        const sa = coverageMap.get(keyOf(a))?.score ?? -Infinity;
-        const sb = coverageMap.get(keyOf(b))?.score ?? -Infinity;
-        if (sb !== sa) return sb - sa;
-        return recipeOf(a).cookTime - recipeOf(b).cookTime;
-      }
       const ak = a.kind === "saved" ? 0 : 1;
       const bk = b.kind === "saved" ? 0 : 1;
       return ak - bk;
     });
-  }, [feedItems, query, category, view, hasPantry, coverageMap]);
+  }, [feedItems, query, category, source]);
 
   const visible = ranked.slice(0, page * PAGE_SIZE);
 
@@ -150,12 +106,12 @@ export function RecipesBrowseScreen({
   );
 
   const resetPaging = () => setPage(1);
+  const activeFilters = (source !== "all" ? 1 : 0) + (source === "all" && category !== "all" ? 1 : 0);
 
   // ── mutations ──────────────────────────────────────────────────────
   const onToggleFavorite = async (fi: FeedRecipe) => {
-    if (fi.kind === "catalog") {
-      setFavs(await toggleCatalogFavorite(fi.id));
-    } else {
+    if (fi.kind === "catalog") setFavs(await toggleCatalogFavorite(fi.id));
+    else {
       const updated = await setSavedFavorite(fi.recipe, !fi.recipe.favorite);
       setSaved((prev) => prev.map((r) => (r.path === updated.path ? updated : r)));
     }
@@ -177,17 +133,32 @@ export function RecipesBrowseScreen({
     setSelected(null);
   };
 
-  // Re-resolve the selected item against fresh state so the detail reflects
-  // favorite/made changes live (and bails if a saved recipe was deleted).
   const resolvedSelected = useMemo<FeedRecipe | null>(() => {
     if (!selected) return null;
-    if (selected.kind === "catalog") {
+    if (selected.kind === "catalog")
       return { kind: "catalog", id: selected.id, recipe: selected.recipe, favorite: favs.has(selected.id) };
-    }
     const s = saved.find((x) => x.path === selected.recipe.path);
     if (!s) return null;
     return { kind: "saved", recipe: s, favorite: !!s.favorite };
   }, [selected, favs, saved]);
+
+  // ── Add-a-recipe sub-views (by hand / by picture), hosted in Recipes ──
+  if (mode === "write" || mode === "snap") {
+    const back = () => {
+      setMode("list");
+      refresh();
+    };
+    return (
+      <div className="browse-screen">
+        <div className="detail-actions">
+          <button className="btn ghost" onClick={back}>
+            <Icon name="chevron-down" className="back-caret" /> Back to recipes
+          </button>
+        </div>
+        {mode === "write" ? <CreateScreen /> : <SnapRecipeScreen />}
+      </div>
+    );
+  }
 
   if (resolvedSelected) {
     const inLibrary =
@@ -198,6 +169,7 @@ export function RecipesBrowseScreen({
         feed={resolvedSelected}
         pantry={pantry}
         inLibrary={inLibrary}
+        onCook={onCook}
         onBack={() => setSelected(null)}
         onToggleFavorite={() => onToggleFavorite(resolvedSelected)}
         onSaveToLibrary={() => onSaveToLibrary(resolvedSelected)}
@@ -209,13 +181,8 @@ export function RecipesBrowseScreen({
 
   return (
     <div className="browse-screen">
-      <div className="browse-header">
-        <div className="browse-title-row">
-          <h2>Recipes</h2>
-          <button className="btn new-recipe-btn" onClick={onNewRecipe}>
-            <Icon name="plus" /> New recipe
-          </button>
-        </div>
+      {/* One slim control bar: search + filter + add. Everything else is the list. */}
+      <div className="lib-header">
         <div className="browse-filter">
           <Icon name="magnifying-glass" />
           <input
@@ -228,98 +195,85 @@ export function RecipesBrowseScreen({
             }}
           />
         </div>
-        {source === "all" && (
-          <Dropdown
-            options={categoryOptions}
-            value={category}
-            onChange={(v) => {
-              setCategory(v);
-              resetPaging();
-            }}
-            ariaLabel="Filter by category"
-          />
-        )}
+        <button
+          className={`icon-btn lib-icon${filterOpen || activeFilters ? " active" : ""}`}
+          onClick={() => {
+            setFilterOpen((v) => !v);
+            setAddOpen(false);
+          }}
+          aria-label="Filter"
+          title="Filter"
+        >
+          <Icon name="sliders" />
+          {activeFilters > 0 && <span className="lib-badge">{activeFilters}</span>}
+        </button>
+        <button
+          className={`icon-btn lib-icon${addOpen ? " active" : ""}`}
+          onClick={() => {
+            setAddOpen((v) => !v);
+            setFilterOpen(false);
+          }}
+          aria-label="Add a recipe"
+          title="Add a recipe"
+        >
+          <Icon name="plus" />
+        </button>
       </div>
 
-      {/* Primary filter: all recipes, just the user's saved ones, or favorites
-          (this replaces the old top-level Favorites tab). */}
-      <div className="source-filter" role="tablist" aria-label="Which recipes to show">
-        {SOURCE_TABS.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={source === t.id}
-            className={`nav-btn${source === t.id ? " active" : ""}`}
-            onClick={() => {
-              onSourceChange(t.id);
-              resetPaging();
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {source !== "favorites" && (
-        <div className="feed-controls">
-          <div className="feed-toolbar">
-            <button
-              className={`nav-btn${view === "browse" ? " active" : ""}`}
-              onClick={() => {
-                setView("browse");
-                resetPaging();
-              }}
-            >
-              Browse
-            </button>
-            <button
-              className={`nav-btn${view === "suggest" ? " active" : ""}`}
-              onClick={() => {
-                if (!hasPantry) return;
-                setView("suggest");
-                resetPaging();
-              }}
-              disabled={!hasPantry}
-              title={hasPantry ? "Rank recipes by what's in your pantry" : "Add pantry items first"}
-            >
-              <Icon name="sliders" /> What I can make now
-            </button>
-            {!hasPantry && (
-              <button className="btn ghost feed-toolbar-cta" onClick={onOpenPantry}>
-                <Icon name="carrot" /> Set up pantry
+      {filterOpen && (
+        <div className="lib-panel">
+          <div className="lib-panel-label">Show</div>
+          <div className="source-filter">
+            {SOURCE_TABS.map((t) => (
+              <button
+                key={t.id}
+                className={`nav-btn${source === t.id ? " active" : ""}`}
+                onClick={() => {
+                  onSourceChange(t.id);
+                  resetPaging();
+                }}
+              >
+                {t.label}
               </button>
-            )}
+            ))}
           </div>
-          <p className="feed-hint">
-            {view === "suggest"
-              ? "Ranked by what's in your pantry — recipes missing the fewest ingredients come first."
-              : hasPantry
-                ? 'Showing every recipe. Tap "What I can make now" to rank them by your pantry.'
-                : "Showing every recipe. Add a few pantry items and we'll show what you can cook right now."}
-          </p>
+          {source === "all" && (
+            <>
+              <div className="lib-panel-label">Category</div>
+              <Dropdown
+                options={categoryOptions}
+                value={category}
+                onChange={(v) => {
+                  setCategory(v);
+                  resetPaging();
+                }}
+                ariaLabel="Filter by category"
+              />
+            </>
+          )}
+        </div>
+      )}
+
+      {addOpen && (
+        <div className="lib-panel add-panel">
+          <button className="btn secondary" onClick={() => { setAddOpen(false); setMode("write"); }}>
+            <Icon name="pen" /> Write it
+          </button>
+          <button className="btn secondary" onClick={() => { setAddOpen(false); setMode("snap"); }}>
+            <Icon name="camera" /> Snap a photo
+          </button>
         </div>
       )}
 
       {!loaded ? (
-        <div className="center-spinner">
-          <div className="spinner" />
-        </div>
+        <div className="center-spinner"><div className="spinner" /></div>
       ) : ranked.length === 0 ? (
-        <EmptyState
-          source={source}
-          hasQuery={!!query || (source === "all" && category !== "all")}
-          onNewRecipe={onNewRecipe}
-        />
+        <EmptyState source={source} hasQuery={!!query || (source === "all" && category !== "all")} onAdd={() => setMode("write")} />
       ) : (
         <>
           <div className="browse-list">
             {visible.map((fi) => (
-              <RecipeRow
-                key={keyOf(fi)}
-                fi={fi}
-                cov={showCoverage ? coverageMap.get(keyOf(fi)) : undefined}
-                onOpen={() => setSelected(fi)}
-              />
+              <RecipeRow key={keyOf(fi)} fi={fi} onOpen={() => setSelected(fi)} />
             ))}
           </div>
           {visible.length < ranked.length && (
@@ -347,42 +301,31 @@ function matchesQuery(fi: FeedRecipe, q: string): boolean {
   return false;
 }
 
-function EmptyState({
-  source,
-  hasQuery,
-  onNewRecipe,
-}: {
-  source: RecipeSource;
-  hasQuery: boolean;
-  onNewRecipe: () => void;
-}) {
-  if (hasQuery) {
+function EmptyState({ source, hasQuery, onAdd }: { source: RecipeSource; hasQuery: boolean; onAdd: () => void }) {
+  if (hasQuery)
     return (
       <div className="empty-state">
         <Icon name="bowl-food" className="empty-icon" />
         <div>No recipes match that filter.</div>
       </div>
     );
-  }
-  if (source === "favorites") {
+  if (source === "favorites")
     return (
       <div className="empty-state">
         <Icon name="heart" className="empty-icon" />
         <div>No favorites yet. Tap the heart on any recipe to save it here.</div>
       </div>
     );
-  }
-  if (source === "mine") {
+  if (source === "mine")
     return (
       <div className="empty-state">
         <Icon name="bowl-food" className="empty-icon" />
-        <div>You haven't saved any recipes yet. Save one from All, or start a new one.</div>
-        <button className="btn" onClick={onNewRecipe}>
-          <Icon name="plus" /> New recipe
+        <div>You haven't saved any recipes yet. Save one from All, or add your own.</div>
+        <button className="btn" onClick={onAdd}>
+          <Icon name="plus" /> Add a recipe
         </button>
       </div>
     );
-  }
   return (
     <div className="empty-state">
       <Icon name="bowl-food" className="empty-icon" />
