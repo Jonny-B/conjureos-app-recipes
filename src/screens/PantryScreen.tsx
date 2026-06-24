@@ -13,11 +13,15 @@ import { Icon } from "../icons";
 interface Props {
   pantry: PantryItem[] | null;
   onChange: (items: PantryItem[]) => void;
+  /** Generate recipes from everything in the pantry (the "cook now" action). */
+  onCook?: () => void;
+  /** Browse the catalog ranked by what's in the pantry. */
+  onBrowse?: () => void;
 }
 
 type Mode = "list" | "capture" | "identifying" | "confirm";
 
-export function PantryScreen({ pantry, onChange }: Props) {
+export function PantryScreen({ pantry, onChange, onCook, onBrowse }: Props) {
   const [mode, setMode] = useState<Mode>("list");
   const [scanned, setScanned] = useState<Ingredient[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +63,12 @@ export function PantryScreen({ pantry, onChange }: Props) {
             <span>{error}</span>
           </div>
         )}
-        <CaptureScreen onIdentify={onScanned} />
+        <CaptureScreen
+          onIdentify={onScanned}
+          title="Add to your kitchen"
+          emptyHint="Snap your fridge or shelves — I'll list what I see so you can add it in a tap."
+          actionLabel={(n) => `Find items in ${n} photo${n === 1 ? "" : "s"} →`}
+        />
       </div>
     );
   }
@@ -95,6 +104,8 @@ export function PantryScreen({ pantry, onChange }: Props) {
         setError(null);
         setMode("capture");
       }}
+      onCook={onCook}
+      onBrowse={onBrowse}
     />
   );
 }
@@ -105,10 +116,14 @@ function PantryList({
   pantry,
   onChange,
   onScan,
+  onCook,
+  onBrowse,
 }: {
   pantry: PantryItem[] | null;
   onChange: (items: PantryItem[]) => void;
   onScan: () => void;
+  onCook?: () => void;
+  onBrowse?: () => void;
 }) {
   const [name, setName] = useState("");
   const [qty, setQty] = useState("");
@@ -159,24 +174,40 @@ function PantryList({
   return (
     <div className="browse-screen">
       <div className="browse-header">
-        <h2>My Pantry</h2>
+        <div className="browse-title-row">
+          <h2>My kitchen</h2>
+          <button className="btn secondary new-recipe-btn" onClick={onScan}>
+            <Icon name="camera" /> Scan to add
+          </button>
+        </div>
         <div className="browse-filter">
           <Icon name="magnifying-glass" />
           <input
             type="text"
-            placeholder="Filter pantry…"
+            placeholder="Filter…"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
         </div>
-        <button className="btn secondary" onClick={onScan}>
-          <Icon name="camera" /> Scan to add
-        </button>
       </div>
 
+      {(onCook || onBrowse) && (
+        <div className="kitchen-actions">
+          {onCook && (
+            <button className="btn" disabled={items.length === 0} onClick={onCook}>
+              <Icon name="wand" /> Cook from my kitchen
+            </button>
+          )}
+          {onBrowse && (
+            <button className="btn secondary" onClick={onBrowse}>
+              <Icon name="magnifying-glass" /> Browse what I can make
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="muted" style={{ fontSize: 13 }}>
-        Keep what's on hand here. Recipes rank by how much of each you already have. Add an amount to
-        catch when you're running low.
+        What you have on hand — recipes rank by how much of it you already have.
       </div>
 
       <form className="add-ing-form" onSubmit={add}>
@@ -209,7 +240,7 @@ function PantryList({
       {items.length === 0 ? (
         <div className="empty-state">
           <Icon name="carrot" className="empty-icon" />
-          <div>Your pantry is empty. Add items above, or scan your fridge to fill it fast.</div>
+          <div>Your kitchen is empty. Add items above, or scan your fridge to fill it fast.</div>
         </div>
       ) : (
         <div className="ing-group">

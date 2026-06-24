@@ -563,7 +563,7 @@ select {
 .capture-area {
   border: 2.5px dashed var(--border);
   border-radius: 24px;
-  padding: 44px 20px;
+  padding: 26px 18px;
   text-align: center;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent);
   transition: border-color 0.25s, background 0.25s, transform 0.25s var(--bounce);
@@ -576,15 +576,15 @@ select {
 }
 
 .capture-area .icon {
-  font-size: 54px;
-  margin-bottom: 12px;
+  font-size: 40px;
+  margin-bottom: 8px;
   filter: drop-shadow(0 6px 14px rgba(124, 106, 247, 0.4));
   line-height: 0;
 }
 
 .capture-area .icon svg {
-  width: 58px;
-  height: 58px;
+  width: 44px;
+  height: 44px;
   display: block;
   margin: 0 auto;
 }
@@ -1138,6 +1138,18 @@ select {
   flex: 0 0 auto;
   padding: 9px 16px;
   font-size: 13px;
+}
+
+/* "Cook from my kitchen" + "Browse what I can make" action row. */
+.kitchen-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.kitchen-actions .btn {
+  flex: 1 1 auto;
+  justify-content: center;
 }
 
 /* Primary source filter (All / My recipes / Favorites) — a pill segmented row
