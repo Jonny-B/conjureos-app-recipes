@@ -110,8 +110,7 @@ export function CaptureScreen({ onIdentify, title, emptyHint, moreHint, actionLa
       <h2>{photos.length === 0 ? title ?? "Show me your fridge" : "Add more photos?"}</h2>
       {photos.length === 0 ? (
         <p className="muted" style={{ margin: 0 }}>
-          {emptyHint ??
-            "Snap or upload one or more photos. Open shelves help; the pantry counts too. I'll dedupe items across photos so you don't get the same sour cream twice."}
+          {emptyHint ?? "Snap or upload a photo or two — I'll list what I see."}
         </p>
       ) : (
         <p className="muted" style={{ margin: 0 }}>

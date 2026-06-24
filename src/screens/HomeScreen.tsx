@@ -16,7 +16,7 @@ import { RecipeRow } from "../components/RecipeRow";
 import { RecipeDetail } from "./RecipeDetail";
 import { Icon, type IconName } from "../icons";
 
-type NavTab = "cook" | "recipes" | "pantry" | "plan";
+type NavTab = "cook" | "recipes" | "plan";
 
 interface Props {
   pantry: PantryItem[] | null;
@@ -167,14 +167,14 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, catalogVersion
           icon="bowl-food"
           value={hasPantry ? readyToCook : "+"}
           label={hasPantry ? "ready to cook" : "add a pantry"}
-          onClick={() => onNavigate(hasPantry ? "recipes" : "pantry")}
+          onClick={() => onNavigate(hasPantry ? "recipes" : "cook")}
           accent
         />
         <StatTile
           icon="carrot"
           value={pantry?.length ?? 0}
           label={(pantry?.length ?? 0) === 1 ? "pantry item" : "pantry items"}
-          onClick={() => onNavigate("pantry")}
+          onClick={() => onNavigate("cook")}
         />
       </div>
 
