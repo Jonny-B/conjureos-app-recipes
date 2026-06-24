@@ -1385,10 +1385,9 @@ select {
     padding: 18px 14px;
   }
 
-  /* Stack the brand over a full-width tab strip so the six tabs never wrap
-     into a ragged second row. The strip scrolls horizontally when the labels
-     overflow the viewport — the standard mobile pattern, and far tidier than
-     the old two-row wrap. */
+  /* Stack the brand over the tab strip. The strip is only as wide as its tabs
+     (so a short 4-tab row doesn't leave a blank gutter where the old info
+     button sat) but scrolls horizontally if the labels ever overflow. */
   .app-header {
     padding: 12px 14px;
     flex-direction: column;
@@ -1402,7 +1401,8 @@ select {
   }
 
   .app-nav {
-    width: 100%;
+    width: fit-content;
+    max-width: 100%;
     flex-wrap: nowrap;
     justify-content: flex-start;
     overflow-x: auto;
