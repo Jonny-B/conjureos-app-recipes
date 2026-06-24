@@ -50,6 +50,7 @@ interface DbRecipe {
   sourceUrl: string | null;
   visibility: string;
   shareToken: string;
+  rating: number | null;
   madeCount: number;
   lastMadeAt: string | null;
   createdAt: string;
@@ -82,6 +83,7 @@ export function toCatalogRecipe(r: DbRecipe): CatalogRecipe {
     instructions: r.instructions,
     summary: r.summary ?? undefined,
     nutrition: toStrip(r.nutrition, r.ingredients.length),
+    rating: r.rating ?? null,
     tags: r.tags,
     sourceUrl: r.sourceUrl ?? "",
     tokens: r.tokens,
@@ -98,6 +100,7 @@ export function toSavedRecipe(r: DbRecipe): SavedRecipe {
     instructions: r.instructions,
     summary: r.summary ?? undefined,
     nutrition: toStrip(r.nutrition, r.ingredients.length),
+    rating: r.rating ?? null,
     path: `db:${r.id}`,
     slug: r.id,
     savedAt: r.createdAt,
@@ -214,6 +217,13 @@ export async function markCooked(id: string): Promise<SavedRecipe> {
 export async function setFavorite(id: string, favorite: boolean): Promise<SavedRecipe> {
   const r = await invoke("setFavorite", { id, favorite });
   if (!r.recipe) throw new Error("setFavorite failed");
+  return toSavedRecipe(r.recipe);
+}
+
+/** Set (1-5) or clear (null) the star rating on a saved recipe's DB row. */
+export async function setRating(id: string, rating: number | null): Promise<SavedRecipe> {
+  const r = await invoke("setRating", { id, rating });
+  if (!r.recipe) throw new Error("setRating failed");
   return toSavedRecipe(r.recipe);
 }
 

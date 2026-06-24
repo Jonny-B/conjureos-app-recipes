@@ -11,7 +11,7 @@ import { generateFromDescription } from "./features/recipes";
 import { registerActions } from "./bridge/actions";
 import { ensureCatalogLoaded } from "./features/catalog";
 import { loadPantry, ingredientsFromPantry } from "./features/pantry";
-import { listSavedRecipes, markMade, saveRecipe } from "./features/storage";
+import { listSavedRecipes, markMade, saveRecipe, setSavedRating } from "./features/storage";
 import { Icon } from "./icons";
 import { APP_VERSION } from "./version";
 
@@ -134,10 +134,11 @@ export function App() {
               <GuidedCook
                 recipe={cookTarget.recipe}
                 pantry={pantry}
-                saved={!!cookTarget.saved}
+                savedRecipe={cookTarget.saved}
                 onBack={endCook}
                 onMade={() => (cookTarget.saved ? markMade(cookTarget.saved).then(() => {}) : Promise.resolve())}
-                onSave={(r) => saveRecipe(r).then(() => {})}
+                onSave={(r) => saveRecipe(r)}
+                onRate={(saved, rating) => setSavedRating(saved, rating).then(() => {})}
               />
             )}
           </>
@@ -198,9 +199,9 @@ function CookTab({
         onClick={() => onModeChange("describe")}
       />
       <LauncherCard
-        icon="bowl-food"
-        title="Cook one of mine"
-        sub="Pick a saved recipe and cook it step by step"
+        icon="heart"
+        title="Favorite recipes"
+        sub="Pick one of your saved recipes and cook it step by step"
         onClick={() => onModeChange("choose")}
       />
     </div>
@@ -339,12 +340,15 @@ function ChoosePane({
       .catch(() => setLoaded(true));
   }, []);
 
-  const filtered = saved.filter((r) => !q || r.title.toLowerCase().includes(q.toLowerCase()));
+  const filtered = saved
+    .filter((r) => !q || r.title.toLowerCase().includes(q.toLowerCase()))
+    // Favorites first, then most-recently saved.
+    .sort((a, b) => Number(!!b.favorite) - Number(!!a.favorite));
 
   return (
     <div className="browse-screen">
       <BackBar label="Cook" onBack={onBack} />
-      <h2>Cook one of mine</h2>
+      <h2>Favorite recipes</h2>
       <div className="browse-filter">
         <Icon name="magnifying-glass" />
         <input type="text" placeholder="Search your recipes…" value={q} onChange={(e) => setQ(e.target.value)} />

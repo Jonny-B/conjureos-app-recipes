@@ -56,6 +56,14 @@ export async function setSavedFavorite(
   return api.setFavorite(recipeIdFromPath(recipe.path), fav);
 }
 
+/** Set (1-5) or clear (null) the star rating on a saved recipe. */
+export async function setSavedRating(
+  recipe: SavedRecipe,
+  rating: number | null,
+): Promise<SavedRecipe> {
+  return api.setRating(recipeIdFromPath(recipe.path), rating);
+}
+
 // One-time legacy import (VFS markdown to DB).
 
 /**

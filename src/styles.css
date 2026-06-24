@@ -1385,10 +1385,9 @@ select {
     padding: 18px 14px;
   }
 
-  /* Stack the brand over a full-width tab strip so the six tabs never wrap
-     into a ragged second row. The strip scrolls horizontally when the labels
-     overflow the viewport — the standard mobile pattern, and far tidier than
-     the old two-row wrap. */
+  /* Stack the brand over the tab strip. The strip is only as wide as its tabs
+     (so a short 4-tab row doesn't leave a blank gutter where the old info
+     button sat) but scrolls horizontally if the labels ever overflow. */
   .app-header {
     padding: 12px 14px;
     flex-direction: column;
@@ -1402,7 +1401,8 @@ select {
   }
 
   .app-nav {
-    width: 100%;
+    width: fit-content;
+    max-width: 100%;
     flex-wrap: nowrap;
     justify-content: flex-start;
     overflow-x: auto;
@@ -2325,3 +2325,162 @@ select {
 .card-fav .fa-icon { width: 18px; height: 18px; }
 
 .detail-cook-bottom { align-self: flex-start; margin-top: 4px; }
+
+/* ── 0.9.3: star ratings, mood picker, plans library, grocery edit, modal ── */
+
+/* Star rating — read-only display (half-star via clipped overlay) + picker */
+.stars { display: inline-flex; line-height: 1; }
+.stars--show {
+  position: relative;
+  display: inline-flex;
+  vertical-align: -2px;
+  margin-left: 8px;
+}
+.stars--show .stars-empty,
+.stars--show .stars-fill { display: inline-flex; gap: 1px; }
+.stars--show .stars-empty { color: var(--cui-border); }
+.stars--show .stars-fill {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--butter);
+}
+.stars--show .fa-icon { width: 1em; height: 1em; flex: 0 0 auto; }
+
+.stars--pick { gap: 6px; }
+.star-btn {
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--cui-border);
+  display: inline-flex;
+  transition: color var(--cui-duration-fast) var(--cui-ease), transform var(--cui-duration-fast) var(--cui-ease);
+}
+.star-btn .fa-icon { width: 1em; height: 1em; }
+.star-btn:hover { transform: scale(1.12); }
+.star-btn.on { color: var(--butter); }
+
+/* Post-cook rate prompt inside the guided-done banner */
+.guided-rated { flex-direction: column; align-items: flex-start; gap: 12px; }
+.rate-prompt { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.rate-label { font-size: 13px; font-weight: 600; color: var(--fg-dim); }
+
+/* Mood: option cards that visibly own the input panel below them */
+.mood-picker { display: flex; gap: 8px; flex-wrap: wrap; }
+.mood-opt {
+  flex: 1 1 0;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: 11px 13px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 14px 14px 0 0;
+  border-bottom: none;
+  cursor: pointer;
+  color: var(--fg-dim);
+  transition: background var(--cui-duration-fast) var(--cui-ease), color var(--cui-duration-fast) var(--cui-ease);
+}
+.mood-opt-title { font-size: 14px; font-weight: 700; }
+.mood-opt-sub { font-size: 11.5px; color: var(--fg-faint); }
+.mood-opt.active {
+  background: var(--cui-accent-mute);
+  color: var(--fg);
+  border-color: var(--cui-accent-tint);
+}
+.mood-opt.active .mood-opt-sub { color: var(--accent-soft); }
+.mood-panel {
+  margin-top: -1px;
+  padding: 14px;
+  background: var(--bg-1);
+  border: 1px solid var(--cui-accent-tint);
+  border-radius: 0 0 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mood-panel-label { font-size: 12px; font-weight: 700; color: var(--fg-dim); letter-spacing: 0.02em; }
+.mood-panel .create-input {
+  width: 100%;
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 11px 13px;
+  color: var(--fg);
+  font: inherit;
+  resize: vertical;
+  outline: none;
+}
+.mood-panel .create-input:focus { border-color: var(--grape); }
+
+/* Saved-plans library */
+.plan-cards { display: flex; flex-direction: column; gap: 10px; }
+.plan-saved-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 15px 18px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  cursor: pointer;
+  transition: border-color var(--cui-duration) var(--cui-ease), transform var(--cui-duration-fast) var(--cui-ease);
+}
+.plan-saved-card:hover { border-color: var(--grape); transform: translateY(-1px); }
+.plan-saved-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.plan-saved-date { font-size: 13px; font-weight: 700; color: var(--fg); }
+.plan-saved-meals { font-size: 13px; color: var(--fg-dim); line-height: 1.45; }
+.plan-saved-foot {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--fg-faint);
+}
+.plan-saved-foot .fa-icon { width: 11px; height: 11px; }
+
+/* Editable grocery line */
+.shopping-line-end { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.shopping-remove { width: 30px; height: 30px; flex: 0 0 auto; }
+.shopping-remove .fa-icon { width: 12px; height: 12px; }
+
+/* In-flow recipe preview modal */
+.recipe-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+.recipe-modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 560px;
+  max-height: 88vh;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+.recipe-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.recipe-modal-head h3 { margin: 0; font-size: 18px; font-weight: 700; }
+.recipe-modal-body { padding: 16px 18px; overflow-y: auto; }
+.recipe-modal-body section h4 { margin: 16px 0 8px; font-size: 14px; }
+.recipe-modal-body ul, .recipe-modal-body ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.recipe-modal-body .summary { color: var(--fg-dim); font-size: 13px; margin: 10px 0 0; }
+.recipe-modal-foot { padding: 14px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
