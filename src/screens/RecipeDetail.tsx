@@ -83,14 +83,6 @@ export function RecipeDetail({
           <Icon name="chevron-down" className="back-caret" /> Back
         </button>
         <div style={{ flex: 1 }} />
-        <button
-          className={`icon-btn fav-btn${feed.favorite ? " on" : ""}`}
-          onClick={onToggleFavorite}
-          aria-label={feed.favorite ? "Remove from favorites" : "Add to favorites"}
-          title={feed.favorite ? "Remove from favorites" : "Add to favorites"}
-        >
-          <Icon name="heart" />
-        </button>
         <button className="btn" onClick={() => onCook(recipe, feed.kind === "saved" ? feed.recipe : null)}>
           <Icon name="bowl-food" /> Cook this
         </button>
@@ -140,7 +132,15 @@ export function RecipeDetail({
       )}
 
       <article className="recipe-card recipe-card--static" style={{ maxWidth: "100%" }}>
-        <h3 style={{ fontSize: 22 }}>{recipe.title}</h3>
+        <button
+          className={`card-fav${feed.favorite ? " on" : ""}`}
+          onClick={onToggleFavorite}
+          aria-label={feed.favorite ? "Remove from favorites" : "Add to favorites"}
+          title={feed.favorite ? "Remove from favorites" : "Add to favorites"}
+        >
+          <Icon name="heart" />
+        </button>
+        <h3 style={{ fontSize: 22, paddingRight: 40 }}>{recipe.title}</h3>
         <div>
           {isCatalog && <span className="pill">{feed.recipe.category}</span>}
           <span className={`pill ${recipe.difficulty}`}>{recipe.difficulty}</span>
@@ -203,6 +203,13 @@ export function RecipeDetail({
             ))}
           </ol>
         </section>
+
+        <button
+          className="btn detail-cook-bottom"
+          onClick={() => onCook(recipe, feed.kind === "saved" ? feed.recipe : null)}
+        >
+          <Icon name="bowl-food" /> Cook this
+        </button>
 
         {isCatalog && feed.recipe.sourceUrl && (
           <div className="faint" style={{ fontSize: 11, marginTop: 8 }}>

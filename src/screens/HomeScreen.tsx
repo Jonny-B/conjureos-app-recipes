@@ -267,6 +267,11 @@ function HeroPick({
   const cov = scored.cov;
   return (
     <article className="hero-card">
+      {canShuffle && (
+        <button className="hero-refresh" onClick={onShuffle} aria-label="Another idea" title="Another idea">
+          <Icon name="rotate" />
+        </button>
+      )}
       <div className="hero-eyebrow">
         <Icon name="wand" /> Tonight's pick
       </div>
@@ -294,11 +299,6 @@ function HeroPick({
         <button className="btn" onClick={onView}>
           View recipe
         </button>
-        {canShuffle && (
-          <button className="btn ghost" onClick={onShuffle}>
-            <Icon name="sliders" /> Another idea
-          </button>
-        )}
       </div>
     </article>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { PantryItem, Recipe, RecipeSource, SavedRecipe } from "./types";
 import { HomeScreen } from "./screens/HomeScreen";
 import { RecipesBrowseScreen } from "./screens/RecipesBrowseScreen";
@@ -12,7 +12,6 @@ import { registerActions } from "./bridge/actions";
 import { ensureCatalogLoaded } from "./features/catalog";
 import { loadPantry, ingredientsFromPantry } from "./features/pantry";
 import { listSavedRecipes, markMade, saveRecipe } from "./features/storage";
-import { getUSDAUsage, type USDAUsageSnapshot } from "./features/nutrition";
 import { Icon } from "./icons";
 import { APP_VERSION } from "./version";
 
@@ -91,7 +90,6 @@ export function App() {
               {t.label}
             </button>
           ))}
-          <InfoButton />
         </nav>
       </header>
       <main className="app-body">
@@ -397,85 +395,3 @@ function BackBar({ label, onBack }: { label: string; onBack: () => void }) {
   );
 }
 
-/**
- * Small "i" button in the header: version, USDA quota, and a one-line note on
- * what the quota is. Opens on click, closes on outside-click or Escape.
- */
-function InfoButton() {
-  const [open, setOpen] = useState(false);
-  const [usage, setUsage] = useState<USDAUsageSnapshot>(() => getUSDAUsage());
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    setUsage(getUSDAUsage());
-    const t = setInterval(() => setUsage(getUSDAUsage()), 5000);
-    return () => clearInterval(t);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  const rateLimitClearsIn = usage.rateLimited
-    ? Math.max(0, Math.ceil((usage.rateLimitedUntil - Date.now()) / 60_000))
-    : null;
-
-  return (
-    <div className="info-wrap" ref={wrapRef}>
-      <button
-        type="button"
-        className={`info-btn${open ? " active" : ""}`}
-        onClick={() => setOpen((v) => !v)}
-        aria-label="App info"
-        title="App info"
-        aria-expanded={open}
-      >
-        <Icon name="circle-info" />
-      </button>
-      {open && (
-        <div className="info-popover" role="dialog" aria-label="App info">
-          <div className="info-row">
-            <span className="info-label">Version</span>
-            <span className="info-value mono">{APP_VERSION}</span>
-          </div>
-          <div className="info-divider" />
-          <div className="info-row">
-            <span className="info-label">Nutrition</span>
-            <span className="info-value">USDA food database</span>
-          </div>
-          {usage.tierKnown && (
-            <div className="info-row">
-              <span className="info-label">Lookups this hour</span>
-              <span className="info-value mono">
-                ~{usage.recentInLastHour} / {usage.approxLimit}
-              </span>
-            </div>
-          )}
-          {usage.rateLimited ? (
-            <p className="info-help warn">
-              The hourly nutrition limit was reached. Recipes still work; some calorie and macro
-              numbers fill in again in ~{rateLimitClearsIn} min.
-            </p>
-          ) : (
-            <p className="info-help">
-              {usage.tierKnown
-                ? "Calorie and macro estimates come from the free USDA food database, which limits how many lookups happen per hour. You're well within it."
-                : "Calorie and macro estimates come from the free USDA food database. Your hourly usage shows here once you generate your first recipe."}
-            </p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
