@@ -1,64 +1,65 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { Ingredient, PantryItem, Recipe, RecipeSource } from "./types";
-import { RecipesScreen } from "./screens/RecipesScreen";
-import { CreateScreen } from "./screens/CreateScreen";
-import { SnapRecipeScreen } from "./screens/SnapRecipeScreen";
+import { useEffect, useRef, useState } from "react";
+import type { PantryItem, Recipe, RecipeSource, SavedRecipe } from "./types";
 import { HomeScreen } from "./screens/HomeScreen";
 import { RecipesBrowseScreen } from "./screens/RecipesBrowseScreen";
 import { PantryScreen } from "./screens/PantryScreen";
 import { PlanWeekScreen } from "./screens/PlanWeekScreen";
-import { generateRecipes } from "./features/recipes";
+import { GuidedCook } from "./screens/GuidedCook";
+import { RecipesScreen } from "./screens/RecipesScreen";
+import { RecipeRow } from "./components/RecipeRow";
+import { generateFromDescription } from "./features/recipes";
 import { registerActions } from "./bridge/actions";
 import { ensureCatalogLoaded } from "./features/catalog";
 import { loadPantry, ingredientsFromPantry } from "./features/pantry";
+import { listSavedRecipes, markMade, saveRecipe } from "./features/storage";
 import { getUSDAUsage, type USDAUsageSnapshot } from "./features/nutrition";
 import { Icon } from "./icons";
 import { APP_VERSION } from "./version";
 
-type Tab = "home" | "cook" | "recipes" | "plan";
-// Cook is the kitchen hub: "kitchen" merges the old Pantry tab + fridge-scan
-// (what you have -> cook from it); snap/write add a recipe to your library.
-type CookMode = "kitchen" | "snap" | "write";
+type Tab = "home" | "recipes" | "cook" | "plan";
+type CookMode = "launcher" | "kitchen" | "describe" | "choose";
+/** What's loaded into the guided cook. `saved` set when it's a library recipe. */
+interface CookTarget {
+  recipe: Recipe;
+  saved: SavedRecipe | null;
+}
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "home", label: "Home" },
-  { id: "cook", label: "Cook" },
   { id: "recipes", label: "Recipes" },
+  { id: "cook", label: "Cook" },
   { id: "plan", label: "Plan" },
 ];
 
 export function App() {
   const [tab, setTab] = useState<Tab>("home");
-  // The Recipes tab's source filter and the Cook tab's mode are lifted here so
-  // other surfaces can deep-link into them (Home's "favorites" + a "New recipe"
-  // shortcut that drops straight into Cook -> Write your own).
   const [recipeSource, setRecipeSource] = useState<RecipeSource>("all");
-  const [cookMode, setCookMode] = useState<CookMode>("kitchen");
+  const [cookMode, setCookMode] = useState<CookMode>("launcher");
+  const [cookTarget, setCookTarget] = useState<CookTarget | null>(null);
   const [pantry, setPantry] = useState<PantryItem[] | null>(null);
-  // Bumped once the catalog is (re)loaded from the DB so the catalog-reading
-  // screens re-run their memoized decode. Starts on the bundled copy, which
-  // renders instantly and stays the offline fallback.
   const [catalogVersion, setCatalogVersion] = useState(0);
 
-  // Register cross-app action handlers once on boot, load the persistent
-  // pantry so the Recipes feed can rank against it the moment the user opens
-  // that tab, and refresh the catalog from the DB (the bundled copy is the
-  // instant baseline). Each failure is non-fatal: the app stays usable, only
-  // that one integration is degraded.
   useEffect(() => {
     registerActions().catch((err) => {
       // eslint-disable-next-line no-console
       console.warn("[recipes] action registration failed:", err);
     });
-    loadPantry()
-      .then(setPantry)
-      .catch(() => setPantry([]));
+    loadPantry().then(setPantry).catch(() => setPantry([]));
     ensureCatalogLoaded()
-      .then((changed) => {
-        if (changed) setCatalogVersion((v) => v + 1);
-      })
+      .then((changed) => changed && setCatalogVersion((v) => v + 1))
       .catch(() => {});
   }, []);
+
+  // Every "cook this" doorway routes here: load the recipe into the guided cook
+  // and switch to the Cook tab.
+  const startCook = (recipe: Recipe, saved: SavedRecipe | null = null) => {
+    setCookTarget({ recipe, saved });
+    setTab("cook");
+  };
+  const openKitchen = () => {
+    setCookMode("kitchen");
+    setTab("cook");
+  };
 
   return (
     <div className="app">
@@ -90,16 +91,9 @@ export function App() {
               setRecipeSource("favorites");
               setTab("recipes");
             }}
+            onOpenKitchen={openKitchen}
+            onCook={startCook}
             catalogVersion={catalogVersion}
-          />
-        )}
-        {tab === "cook" && (
-          <CookTab
-            mode={cookMode}
-            onModeChange={setCookMode}
-            pantry={pantry}
-            onPantryChange={setPantry}
-            onBrowse={() => setTab("recipes")}
           />
         )}
         {tab === "recipes" && (
@@ -107,17 +101,32 @@ export function App() {
             source={recipeSource}
             onSourceChange={setRecipeSource}
             pantry={pantry}
-            onOpenPantry={() => {
-              setCookMode("kitchen");
-              setTab("cook");
-            }}
-            onNewRecipe={() => {
-              setCookMode("write");
-              setTab("cook");
-            }}
+            onCook={startCook}
             catalogVersion={catalogVersion}
           />
         )}
+        {tab === "cook" &&
+          (cookTarget ? (
+            <GuidedCook
+              recipe={cookTarget.recipe}
+              pantry={pantry}
+              saved={!!cookTarget.saved}
+              onBack={() => setCookTarget(null)}
+              onMade={() => {
+                if (cookTarget.saved) markMade(cookTarget.saved).catch(() => {});
+              }}
+              onSave={(r) => saveRecipe(r).catch(() => {})}
+            />
+          ) : (
+            <CookTab
+              mode={cookMode}
+              onModeChange={setCookMode}
+              pantry={pantry}
+              onPantryChange={setPantry}
+              onCook={startCook}
+              catalogVersion={catalogVersion}
+            />
+          ))}
         {tab === "plan" && <PlanWeekScreen pantry={pantry} catalogVersion={catalogVersion} />}
       </main>
       <footer className="app-version">v{APP_VERSION}</footer>
@@ -126,104 +135,221 @@ export function App() {
 }
 
 /**
- * The Cook tab is the "kitchen" hub. Its default mode merges what used to be
- * two separate destinations — the Pantry tab and the fridge-scan flow — into
- * one place: keep what you have on hand, scan to add to it, then cook from it
- * (AI-generate three recipes) or browse what you can make. "Snap a recipe" and
- * "Write your own" add a recipe to your library.
+ * Cook is the doing. Its launcher offers three ways in — cook from your kitchen
+ * (the hero scan/pantry loop), describe a dish for the AI, or pick a saved
+ * recipe — each leading to the guided, step-by-step cook.
  */
 function CookTab({
   mode,
   onModeChange,
   pantry,
   onPantryChange,
-  onBrowse,
+  onCook,
+  catalogVersion,
 }: {
   mode: CookMode;
   onModeChange: (m: CookMode) => void;
   pantry: PantryItem[] | null;
   onPantryChange: (items: PantryItem[]) => void;
-  onBrowse: () => void;
+  onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
+  catalogVersion: number;
 }) {
-  // "Cook from my pantry" sub-flow, seeded from the pantry rather than a fresh
-  // scan (the pantry IS the list of what you have now).
-  const [cook, setCook] = useState<
-    | { kind: "idle" }
-    | { kind: "generating"; ingredients: Ingredient[] }
-    | { kind: "recipes"; ingredients: Ingredient[]; recipes: Recipe[] }
-  >({ kind: "idle" });
-  const [error, setError] = useState<string | null>(null);
-
-  const cookFromPantry = useCallback(async () => {
-    const ingredients = ingredientsFromPantry(pantry ?? []);
-    if (ingredients.length === 0) return;
-    setError(null);
-    setCook({ kind: "generating", ingredients });
-    try {
-      const recipes = await generateRecipes(ingredients);
-      setCook({ kind: "recipes", ingredients, recipes });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setCook({ kind: "idle" });
-    }
-  }, [pantry]);
+  const back = () => onModeChange("launcher");
+  if (mode === "kitchen")
+    return (
+      <PantryScreen
+        pantry={pantry}
+        onChange={onPantryChange}
+        onBack={back}
+        onCook={onCook}
+        catalogVersion={catalogVersion}
+      />
+    );
+  if (mode === "describe") return <DescribePane pantry={pantry} onBack={back} onCook={onCook} />;
+  if (mode === "choose") return <ChoosePane onBack={back} onCook={onCook} />;
 
   return (
-    <>
-      <div className="feed-toolbar">
-        <button
-          className={`nav-btn${mode === "kitchen" ? " active" : ""}`}
-          onClick={() => onModeChange("kitchen")}
-        >
-          <Icon name="carrot" /> My kitchen
-        </button>
-        <button
-          className={`nav-btn${mode === "snap" ? " active" : ""}`}
-          onClick={() => onModeChange("snap")}
-        >
-          <Icon name="images" /> Snap a recipe
-        </button>
-        <button
-          className={`nav-btn${mode === "write" ? " active" : ""}`}
-          onClick={() => onModeChange("write")}
-        >
-          <Icon name="pen" /> Write your own
-        </button>
-      </div>
+    <div className="cook-launcher">
+      <LauncherCard
+        icon="carrot"
+        title="From my kitchen"
+        sub="Scan your fridge or use your pantry, then cook what you can make"
+        onClick={() => onModeChange("kitchen")}
+      />
+      <LauncherCard
+        icon="wand"
+        title="Describe a dish"
+        sub="Tell the AI what you fancy and it writes you a recipe"
+        onClick={() => onModeChange("describe")}
+      />
+      <LauncherCard
+        icon="bowl-food"
+        title="Cook one of mine"
+        sub="Pick a saved recipe and cook it step by step"
+        onClick={() => onModeChange("choose")}
+      />
+    </div>
+  );
+}
 
-      {error && mode === "kitchen" && (
-        <div className="status-banner error" style={{ marginBottom: 16 }}>
-          <Icon name="wand" />
+function LauncherCard({
+  icon,
+  title,
+  sub,
+  onClick,
+}: {
+  icon: Parameters<typeof Icon>[0]["name"];
+  title: string;
+  sub: string;
+  onClick: () => void;
+}) {
+  return (
+    <button className="launch-card" onClick={onClick}>
+      <span className="launch-icon"><Icon name={icon} /></span>
+      <span className="launch-text">
+        <span className="launch-title">{title}</span>
+        <span className="launch-sub">{sub}</span>
+      </span>
+      <Icon name="chevron-down" className="launch-caret" />
+    </button>
+  );
+}
+
+/** Describe a dish → AI writes recipes → pick one → guided cook. */
+function DescribePane({
+  pantry,
+  onBack,
+  onCook,
+}: {
+  pantry: PantryItem[] | null;
+  onBack: () => void;
+  onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
+}) {
+  const [text, setText] = useState("");
+  const [useHave, setUseHave] = useState(false);
+  const [state, setState] = useState<
+    { kind: "input" } | { kind: "generating" } | { kind: "recipes"; recipes: Recipe[] }
+  >({ kind: "input" });
+  const [error, setError] = useState<string | null>(null);
+
+  const seed = () => (useHave ? ingredientsFromPantry(pantry ?? []) : undefined);
+
+  const go = async () => {
+    if (!text.trim()) return;
+    setError(null);
+    setState({ kind: "generating" });
+    try {
+      const recipes = await generateFromDescription(text, seed());
+      setState({ kind: "recipes", recipes });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setState({ kind: "input" });
+    }
+  };
+
+  if (state.kind === "generating")
+    return <FullscreenSpinner label="Writing your recipe…" sub="Three takes on your idea. ~10 seconds." />;
+
+  if (state.kind === "recipes")
+    return (
+      <div className="browse-screen">
+        <BackBar label="Describe again" onBack={() => setState({ kind: "input" })} />
+        <RecipesScreen
+          recipes={state.recipes}
+          ingredients={seed() ?? []}
+          onEditIngredients={() => setState({ kind: "input" })}
+          onRestart={() => setState({ kind: "input" })}
+          onCook={(r) => onCook(r, null)}
+        />
+      </div>
+    );
+
+  return (
+    <div className="describe-pane">
+      <BackBar label="Cook" onBack={onBack} />
+      <h2>Describe a dish</h2>
+      <p className="muted" style={{ marginTop: 0 }}>
+        What are you in the mood for? An ingredient, a cuisine, a craving — I'll write a recipe for it.
+      </p>
+      <textarea
+        className="describe-input"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="e.g. something cozy with chicken and rice, ready in 30 minutes"
+        maxLength={400}
+        rows={3}
+      />
+      <label className="describe-toggle">
+        <input type="checkbox" checked={useHave} onChange={(e) => setUseHave(e.target.checked)} />
+        Use what's in my kitchen
+      </label>
+      {error && (
+        <div className="status-banner error">
+          <Icon name="triangle-exclamation" />
           <span>{error}</span>
-          <div style={{ flex: 1 }} />
-          <button className="btn ghost" onClick={() => setError(null)}>
-            Dismiss
-          </button>
         </div>
       )}
+      <button className="btn" disabled={!text.trim()} onClick={go}>
+        <Icon name="wand" /> Create recipe
+      </button>
+    </div>
+  );
+}
 
-      {mode === "write" ? (
-        <CreateScreen />
-      ) : mode === "snap" ? (
-        <SnapRecipeScreen />
-      ) : cook.kind === "generating" ? (
-        <FullscreenSpinner label="Cooking up recipes…" sub="Three options from what you have. ~10 seconds." />
-      ) : cook.kind === "recipes" ? (
-        <RecipesScreen
-          recipes={cook.recipes}
-          ingredients={cook.ingredients}
-          onEditIngredients={() => setCook({ kind: "idle" })}
-          onRestart={() => setCook({ kind: "idle" })}
-        />
+/** Pick a saved recipe to cook. */
+function ChoosePane({
+  onBack,
+  onCook,
+}: {
+  onBack: () => void;
+  onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
+}) {
+  const [saved, setSaved] = useState<SavedRecipe[]>([]);
+  const [q, setQ] = useState("");
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    listSavedRecipes()
+      .then((s) => {
+        setSaved(s);
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+  }, []);
+
+  const filtered = saved.filter((r) => !q || r.title.toLowerCase().includes(q.toLowerCase()));
+
+  return (
+    <div className="browse-screen">
+      <BackBar label="Cook" onBack={onBack} />
+      <h2>Cook one of mine</h2>
+      <div className="browse-filter">
+        <Icon name="magnifying-glass" />
+        <input type="text" placeholder="Search your recipes…" value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+      {!loaded ? (
+        <div className="center-spinner"><div className="spinner" /></div>
+      ) : filtered.length === 0 ? (
+        <div className="empty-state">
+          <Icon name="bowl-food" className="empty-icon" />
+          <div>
+            {saved.length === 0
+              ? "No saved recipes yet. Add some in the Recipes tab, then cook them here."
+              : "No saved recipes match that search."}
+          </div>
+        </div>
       ) : (
-        <PantryScreen
-          pantry={pantry}
-          onChange={onPantryChange}
-          onCook={cookFromPantry}
-          onBrowse={onBrowse}
-        />
+        <div className="browse-list">
+          {filtered.map((r) => (
+            <RecipeRow
+              key={r.path}
+              fi={{ kind: "saved", recipe: r, favorite: !!r.favorite }}
+              onOpen={() => onCook(r, r)}
+            />
+          ))}
+        </div>
       )}
-    </>
+    </div>
   );
 }
 
@@ -237,22 +363,25 @@ function FullscreenSpinner({ label, sub }: { label: string; sub?: string }) {
   );
 }
 
+function BackBar({ label, onBack }: { label: string; onBack: () => void }) {
+  return (
+    <div className="detail-actions">
+      <button className="btn ghost" onClick={onBack}>
+        <Icon name="chevron-down" className="back-caret" /> {label}
+      </button>
+    </div>
+  );
+}
+
 /**
- * Small "i" button in the header that opens a popover with: app version,
- * USDA quota remaining, and a one-line explanation of what the quota is.
- * Designed to stay out of the way — collapsed by default, opens on
- * click, closes on outside-click or Escape. Doesn't block any other
- * interaction in the app.
+ * Small "i" button in the header: version, USDA quota, and a one-line note on
+ * what the quota is. Opens on click, closes on outside-click or Escape.
  */
 function InfoButton() {
   const [open, setOpen] = useState(false);
   const [usage, setUsage] = useState<USDAUsageSnapshot>(() => getUSDAUsage());
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
-  // Refresh the USDA snapshot every 5s while the popover is open. The
-  // sliding-window count changes over time as old timestamps age out of
-  // the rolling hour — polling beats trying to subscribe to a counter
-  // we don't event-source.
   useEffect(() => {
     if (!open) return;
     setUsage(getUSDAUsage());
@@ -260,15 +389,12 @@ function InfoButton() {
     return () => clearInterval(t);
   }, [open]);
 
-  // Close on outside-click + Escape so the popover doesn't trap focus.
   useEffect(() => {
     if (!open) return;
     const onPointer = (e: MouseEvent) => {
       if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     document.addEventListener("mousedown", onPointer);
     document.addEventListener("keydown", onKey);
     return () => {
@@ -277,8 +403,6 @@ function InfoButton() {
     };
   }, [open]);
 
-  // Time remaining until the rate-limit short-circuit clears, if active.
-  // Updated alongside the snapshot poll.
   const rateLimitClearsIn = usage.rateLimited
     ? Math.max(0, Math.ceil((usage.rateLimitedUntil - Date.now()) / 60_000))
     : null;
@@ -316,8 +440,8 @@ function InfoButton() {
           )}
           {usage.rateLimited ? (
             <p className="info-help warn">
-              The hourly nutrition limit was reached. Recipes still work; some
-              calorie and macro numbers fill in again in ~{rateLimitClearsIn} min.
+              The hourly nutrition limit was reached. Recipes still work; some calorie and macro
+              numbers fill in again in ~{rateLimitClearsIn} min.
             </p>
           ) : (
             <p className="info-help">

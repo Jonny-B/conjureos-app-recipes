@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { FeedRecipe, PantryItem, Recipe } from "../types";
+import type { FeedRecipe, PantryItem, Recipe, SavedRecipe } from "../types";
 import { ingredientsFromPantry } from "../features/pantry";
 import { computeAvailability, computeCoverage } from "../features/scaling";
 import { parseIngredient, formatStrip } from "../features/nutrition";
@@ -10,6 +10,8 @@ interface Props {
   pantry: PantryItem[] | null;
   /** True when this catalog recipe is already in the user's saved library. */
   inLibrary?: boolean;
+  /** Enter the guided cook for this recipe (savedRecipe set when it's in the library). */
+  onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
   onBack: () => void;
   onToggleFavorite: () => void;
   onSaveToLibrary?: () => void; // catalog only
@@ -27,6 +29,7 @@ export function RecipeDetail({
   feed,
   pantry,
   inLibrary,
+  onCook,
   onBack,
   onToggleFavorite,
   onSaveToLibrary,
@@ -62,6 +65,12 @@ export function RecipeDetail({
       <div className="detail-actions">
         <button className="btn ghost" onClick={onBack}>
           <Icon name="chevron-down" className="back-caret" /> Back
+        </button>
+        <button
+          className="btn"
+          onClick={() => onCook(recipe, feed.kind === "saved" ? feed.recipe : null)}
+        >
+          <Icon name="bowl-food" /> Cook this
         </button>
         <div style={{ flex: 1 }} />
         <button

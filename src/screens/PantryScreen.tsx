@@ -1,30 +1,39 @@
 import { useMemo, useState, type FormEvent } from "react";
-import type { CapturedPhoto, Ingredient, PantryItem } from "../types";
+import type { CapturedPhoto, Ingredient, PantryItem, Recipe, SavedRecipe } from "../types";
 import {
   addPantryItem,
   addPantryItems,
   updatePantryItem,
   removePantryItem,
+  ingredientsFromPantry,
 } from "../features/pantry";
 import { identifyIngredients } from "../features/vision";
+import { generateRecipes } from "../features/recipes";
+import { getCatalog, toRecipe } from "../features/catalog";
+import { computeCoverage } from "../features/scaling";
 import { CaptureScreen } from "./CaptureScreen";
+import { RecipesScreen } from "./RecipesScreen";
+import { RecipeRow } from "../components/RecipeRow";
 import { Icon } from "../icons";
 
 interface Props {
   pantry: PantryItem[] | null;
   onChange: (items: PantryItem[]) => void;
-  /** Generate recipes from everything in the pantry (the "cook now" action). */
-  onCook?: () => void;
-  /** Browse the catalog ranked by what's in the pantry. */
-  onBrowse?: () => void;
+  /** Return to the Cook launcher. */
+  onBack?: () => void;
+  /** Start the guided cook for a recipe (savedRecipe null — kitchen cooks catalog/AI recipes). */
+  onCook?: (recipe: Recipe, saved: SavedRecipe | null) => void;
+  catalogVersion?: number;
 }
 
 type Mode = "list" | "capture" | "identifying" | "confirm";
+type Gen = { kind: "idle" } | { kind: "generating" } | { kind: "recipes"; recipes: Recipe[] };
 
-export function PantryScreen({ pantry, onChange, onCook, onBrowse }: Props) {
+export function PantryScreen({ pantry, onChange, onBack, onCook, catalogVersion = 0 }: Props) {
   const [mode, setMode] = useState<Mode>("list");
   const [scanned, setScanned] = useState<Ingredient[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [gen, setGen] = useState<Gen>({ kind: "idle" });
 
   const onScanned = async (photos: CapturedPhoto[]) => {
     setError(null);
@@ -45,18 +54,54 @@ export function PantryScreen({ pantry, onChange, onCook, onBrowse }: Props) {
       setMode("list");
       return;
     }
-    const next = await addPantryItems(
-      include.map((i) => ({ name: i.name, quantity: i.quantity, notes: i.notes })),
-    );
+    const next = await addPantryItems(include.map((i) => ({ name: i.name, quantity: i.quantity, notes: i.notes })));
     onChange(next);
     setScanned([]);
     setMode("list");
   };
 
+  const inventWithAI = async () => {
+    const ings = ingredientsFromPantry(pantry ?? []);
+    if (ings.length === 0) return;
+    setError(null);
+    setGen({ kind: "generating" });
+    try {
+      const recipes = await generateRecipes(ings);
+      setGen({ kind: "recipes", recipes });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setGen({ kind: "idle" });
+    }
+  };
+
+  if (gen.kind === "generating") {
+    return (
+      <div className="center-spinner">
+        <div className="spinner" />
+        <div style={{ fontWeight: 500 }}>Cooking up ideas…</div>
+        <div className="muted" style={{ fontSize: 13 }}>Three recipes from what you have. ~10 seconds.</div>
+      </div>
+    );
+  }
+  if (gen.kind === "recipes") {
+    return (
+      <div className="browse-screen">
+        <BackBar label="Back to kitchen" onBack={() => setGen({ kind: "idle" })} />
+        <RecipesScreen
+          recipes={gen.recipes}
+          ingredients={ingredientsFromPantry(pantry ?? [])}
+          onEditIngredients={() => setGen({ kind: "idle" })}
+          onRestart={() => setGen({ kind: "idle" })}
+          onCook={onCook ? (r) => onCook(r, null) : undefined}
+        />
+      </div>
+    );
+  }
+
   if (mode === "capture") {
     return (
       <div className="browse-screen">
-        <BackBar label="Back to pantry" onBack={() => setMode("list")} />
+        <BackBar label="Back to kitchen" onBack={() => setMode("list")} />
         {error && (
           <div className="status-banner error">
             <Icon name="wand" />
@@ -86,9 +131,7 @@ export function PantryScreen({ pantry, onChange, onCook, onBrowse }: Props) {
     return (
       <ScanConfirm
         scanned={scanned}
-        onToggle={(name) =>
-          setScanned((prev) => prev.map((i) => (i.name === name ? { ...i, confirmed: !i.confirmed } : i)))
-        }
+        onToggle={(name) => setScanned((prev) => prev.map((i) => (i.name === name ? { ...i, confirmed: !i.confirmed } : i)))}
         onRemove={(name) => setScanned((prev) => prev.filter((i) => i.name !== name))}
         onBack={() => setMode("list")}
         onCommit={commitScanned}
@@ -97,46 +140,61 @@ export function PantryScreen({ pantry, onChange, onCook, onBrowse }: Props) {
   }
 
   return (
-    <PantryList
+    <KitchenList
       pantry={pantry}
       onChange={onChange}
+      onBack={onBack}
+      onCook={onCook}
       onScan={() => {
         setError(null);
         setMode("capture");
       }}
-      onCook={onCook}
-      onBrowse={onBrowse}
+      onInvent={inventWithAI}
+      catalogVersion={catalogVersion}
     />
   );
 }
 
-// ── List + manual editing ──────────────────────────────────────────────
+// ── Kitchen list: what you have + scan + "what can I make" ──────────────
 
-function PantryList({
+function KitchenList({
   pantry,
   onChange,
-  onScan,
+  onBack,
   onCook,
-  onBrowse,
+  onScan,
+  onInvent,
+  catalogVersion,
 }: {
   pantry: PantryItem[] | null;
   onChange: (items: PantryItem[]) => void;
+  onBack?: () => void;
+  onCook?: (recipe: Recipe, saved: SavedRecipe | null) => void;
   onScan: () => void;
-  onCook?: () => void;
-  onBrowse?: () => void;
+  onInvent: () => void;
+  catalogVersion: number;
 }) {
   const [name, setName] = useState("");
   const [qty, setQty] = useState("");
-  const [filter, setFilter] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [showMatches, setShowMatches] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [err, setErr] = useState<string | null>(null);
 
   const items = pantry ?? [];
-  const filtered = useMemo(() => {
-    const q = filter.trim().toLowerCase();
-    return q ? items.filter((i) => i.name.toLowerCase().includes(q)) : items;
-  }, [items, filter]);
+  const hasItems = items.length > 0;
+
+  const catalog = useMemo(() => getCatalog(), [catalogVersion]);
+  const pantryIng = useMemo(() => ingredientsFromPantry(items), [items]);
+  const matches = useMemo(() => {
+    if (!pantryIng.length) return [];
+    return catalog
+      .map((c) => ({ c, cov: computeCoverage(c, pantryIng) }))
+      .filter((x) => x.cov.have > 0)
+      .sort((a, b) => b.cov.score - a.cov.score)
+      .slice(0, 30);
+  }, [catalog, pantryIng]);
 
   const add = async (e: FormEvent) => {
     e.preventDefault();
@@ -157,78 +215,50 @@ function PantryList({
     setEditing(null);
     setEditValue("");
   };
-
-  const remove = async (itemName: string) => {
-    const next = await removePantryItem(itemName);
-    onChange(next);
-  };
+  const remove = async (itemName: string) => onChange(await removePantryItem(itemName));
 
   if (pantry === null) {
-    return (
-      <div className="center-spinner">
-        <div className="spinner" />
-      </div>
-    );
+    return <div className="center-spinner"><div className="spinner" /></div>;
   }
 
   return (
     <div className="browse-screen">
-      <div className="browse-header">
-        <div className="browse-title-row">
-          <h2>My kitchen</h2>
-          <button className="btn secondary new-recipe-btn" onClick={onScan}>
-            <Icon name="camera" /> Scan to add
-          </button>
-        </div>
-        <div className="browse-filter">
-          <Icon name="magnifying-glass" />
-          <input
-            type="text"
-            placeholder="Filter…"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          />
-        </div>
+      {onBack && <BackBar label="Cook" onBack={onBack} />}
+
+      <div className="kitchen-top">
+        <h2>My kitchen</h2>
+        <button className="btn" onClick={onScan}>
+          <Icon name="camera" /> Scan
+        </button>
       </div>
 
-      {(onCook || onBrowse) && (
-        <div className="kitchen-actions">
-          {onCook && (
-            <button className="btn" disabled={items.length === 0} onClick={onCook}>
-              <Icon name="wand" /> Cook from my kitchen
-            </button>
-          )}
-          {onBrowse && (
-            <button className="btn secondary" onClick={onBrowse}>
-              <Icon name="magnifying-glass" /> Browse what I can make
-            </button>
+      {hasItems && (
+        <button className="btn kitchen-make" onClick={() => setShowMatches((v) => !v)}>
+          <Icon name="bowl-food" /> What can I make?
+        </button>
+      )}
+
+      {showMatches && hasItems && (
+        <div className="kitchen-matches">
+          <button className="btn secondary kitchen-invent" onClick={onInvent}>
+            <Icon name="wand" /> Invent 3 with AI from what I have
+          </button>
+          {matches.length > 0 ? (
+            <div className="browse-list">
+              {matches.map(({ c, cov }) => (
+                <RecipeRow
+                  key={c.id}
+                  fi={{ kind: "catalog", id: c.id, recipe: c, favorite: false }}
+                  cov={cov}
+                  onOpen={() => onCook?.(toRecipe(c), null)}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="muted" style={{ fontSize: 13 }}>Add a few more items and matches will show here.</p>
           )}
         </div>
       )}
-
-      <div className="muted" style={{ fontSize: 13 }}>
-        What you have on hand — recipes rank by how much of it you already have.
-      </div>
-
-      <form className="add-ing-form" onSubmit={add}>
-        <input
-          type="text"
-          placeholder="Add an ingredient (e.g. sour cream)"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          maxLength={50}
-        />
-        <input
-          type="text"
-          placeholder="Amount (optional)"
-          value={qty}
-          onChange={(e) => setQty(e.target.value)}
-          maxLength={40}
-        />
-        <button className="btn" type="submit" disabled={!name.trim()}>
-          <Icon name="plus" /> Add
-        </button>
-      </form>
 
       {err && (
         <div className="status-banner error">
@@ -237,70 +267,58 @@ function PantryList({
         </div>
       )}
 
-      {items.length === 0 ? (
+      {!hasItems ? (
         <div className="empty-state">
           <Icon name="carrot" className="empty-icon" />
-          <div>Your kitchen is empty. Add items above, or scan your fridge to fill it fast.</div>
+          <div>Your kitchen is empty. Scan your fridge to fill it fast, or add items by hand.</div>
+          <button className="btn secondary" onClick={() => setShowAdd(true)}>
+            <Icon name="plus" /> Add by hand
+          </button>
         </div>
       ) : (
-        <div className="ing-group">
-          <div className="ing-group-label">
-            {filtered.length} item{filtered.length === 1 ? "" : "s"}
+        <>
+          <div className="kitchen-list-head">
+            <span className="ing-group-label">{items.length} item{items.length === 1 ? "" : "s"}</span>
+            <button className="link-btn" onClick={() => setShowAdd((v) => !v)}>
+              <Icon name="plus" /> Add by hand
+            </button>
           </div>
-          {filtered.map((it) => (
-            <div className="ing-row confirmed" key={it.name}>
-              <span className="name">{it.name}</span>
-              {editing === it.name ? (
-                <form
-                  className="qty-edit-form"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    commitQty(it.name);
-                  }}
-                >
-                  <input
-                    type="text"
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    maxLength={40}
-                    autoFocus
-                    placeholder="e.g. 1 pint, 200g"
-                  />
-                  <button type="submit" className="icon-btn" title="Save">
-                    <Icon name="check" />
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    title="Cancel"
-                    onClick={() => {
-                      setEditing(null);
-                      setEditValue("");
+          <div className="ing-group">
+            {items.map((it) => (
+              <div className="ing-row confirmed" key={it.name}>
+                <span className="name">{it.name}</span>
+                {editing === it.name ? (
+                  <form
+                    className="qty-edit-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      commitQty(it.name);
                     }}
                   >
-                    <Icon name="xmark" />
+                    <input type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)} maxLength={40} autoFocus placeholder="e.g. 1 pint" />
+                    <button type="submit" className="icon-btn" title="Save"><Icon name="check" /></button>
+                    <button type="button" className="icon-btn" title="Cancel" onClick={() => { setEditing(null); setEditValue(""); }}><Icon name="xmark" /></button>
+                  </form>
+                ) : (
+                  <button className="qty-pill" onClick={() => { setEditing(it.name); setEditValue(it.quantity ?? ""); }} title="Edit amount">
+                    {it.quantity ?? "+ amount"}
                   </button>
-                </form>
-              ) : (
-                <button
-                  className="qty-pill"
-                  onClick={() => {
-                    setEditing(it.name);
-                    setEditValue(it.quantity ?? "");
-                  }}
-                  title="Edit amount"
-                >
-                  {it.quantity ?? "+ amount"}
-                </button>
-              )}
-              <div className="actions">
-                <button className="icon-btn" onClick={() => remove(it.name)} title="Remove">
-                  <Icon name="xmark" />
-                </button>
+                )}
+                <div className="actions">
+                  <button className="icon-btn" onClick={() => remove(it.name)} title="Remove"><Icon name="xmark" /></button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {showAdd && (
+        <form className="add-ing-form" onSubmit={add}>
+          <input type="text" placeholder="Add an ingredient (e.g. sour cream)" value={name} onChange={(e) => setName(e.target.value)} maxLength={50} autoFocus />
+          <input type="text" placeholder="Amount (optional)" value={qty} onChange={(e) => setQty(e.target.value)} maxLength={40} />
+          <button className="btn" type="submit" disabled={!name.trim()}><Icon name="plus" /> Add</button>
+        </form>
       )}
     </div>
   );
@@ -327,34 +345,26 @@ function ScanConfirm({
       <BackBar label="Cancel" onBack={onBack} />
       <div>
         <div style={{ fontSize: 18, fontWeight: 600 }}>Found {scanned.length} items</div>
-        <div className="muted" style={{ fontSize: 13 }}>
-          Uncheck anything that isn't yours, then add the rest to your pantry.
-        </div>
+        <div className="muted" style={{ fontSize: 13 }}>Uncheck anything that isn't yours, then add the rest to your kitchen.</div>
       </div>
       <div className="ing-group">
         {scanned.map((ing) => (
           <div className={`ing-row ${ing.confirmed ? "confirmed" : "unconfirmed"}`} key={ing.name}>
-            <button
-              className="icon-btn"
-              onClick={() => onToggle(ing.name)}
-              title={ing.confirmed ? "Exclude" : "Include"}
-            >
+            <button className="icon-btn" onClick={() => onToggle(ing.name)} title={ing.confirmed ? "Exclude" : "Include"}>
               <Icon name={ing.confirmed ? "check" : "circle"} />
             </button>
             <span className="name">{ing.name}</span>
             {ing.quantity && <span className="qty-pill">{ing.quantity}</span>}
             {ing.notes && <span className="notes">{ing.notes}</span>}
             <div className="actions">
-              <button className="icon-btn" onClick={() => onRemove(ing.name)} title="Remove">
-                <Icon name="xmark" />
-              </button>
+              <button className="icon-btn" onClick={() => onRemove(ing.name)} title="Remove"><Icon name="xmark" /></button>
             </div>
           </div>
         ))}
       </div>
       <div className="capture-buttons" style={{ marginTop: 8 }}>
         <button className="btn" disabled={included.length === 0} onClick={onCommit}>
-          <Icon name="plus" /> Add {included.length} to pantry
+          <Icon name="plus" /> Add {included.length} to kitchen
         </button>
       </div>
     </div>
