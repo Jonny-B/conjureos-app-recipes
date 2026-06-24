@@ -17,14 +17,16 @@ on:
   release:
     types: [published]
   # A semver tag push (v1.2.3) publishes to PROD — same effect as a release.
-  # A push to a publish/** branch also publishes to PROD: a "publish button"
-  # for environments where releases/tags/dispatch aren't available to
-  # automation but branch pushes are. Normal dev/main merges are unaffected.
+  # A push to a publish/** branch also publishes to PROD; a push to publish-dev/**
+  # publishes to DEV. These are "publish buttons" for environments where
+  # releases/tags/dispatch aren't available to automation but branch pushes are.
+  # Normal dev/main merges are unaffected.
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
     branches:
       - "publish/**"
+      - "publish-dev/**"
   workflow_dispatch:
     inputs:
       environment:
@@ -116,9 +118,9 @@ jobs:
           export RECIPES_DB_URL="https://${REF}.supabase.co/functions/v1/recipes-db"
           node -e "const fs=require('fs');const p=require('./package.json');p.conjureos.remoteActions.recipesDb.url=process.env.RECIPES_DB_URL;fs.writeFileSync('./package.json',JSON.stringify(p,null,2)+'\n');console.log('stamped recipesDb url ->',process.env.RECIPES_DB_URL);"
 
-      # workflow_dispatch (environment=dev) -> DEV project. Test path.
+      # workflow_dispatch (environment=dev) or a publish-dev/** push -> DEV project.
       - name: Publish to App Store (dev)
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment != 'prod'
+        if: (github.event_name == 'workflow_dispatch' && github.event.inputs.environment != 'prod') || startsWith(github.ref, 'refs/heads/publish-dev/')
         uses: ./.conjureos/.github/actions/publish-anchor-app
         with:
           supabase-url: https://${{ secrets.SUPABASE_DEV_PROJECT_REF }}.supabase.co
