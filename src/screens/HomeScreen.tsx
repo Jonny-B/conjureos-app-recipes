@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CoverageResult } from "../features/scaling";
-import type { CatalogRecipe, FeedRecipe, PantryItem, SavedRecipe } from "../types";
+import type { CatalogRecipe, FeedRecipe, PantryItem, Recipe, SavedRecipe } from "../types";
 import { getCatalog, toRecipe } from "../features/catalog";
 import {
   listSavedRecipes,
@@ -23,6 +23,10 @@ interface Props {
   onNavigate: (tab: NavTab) => void;
   /** Open the Recipes tab pre-filtered to the user's favorites. */
   onViewFavorites: () => void;
+  /** Open the Cook tab's kitchen (scan/pantry) surface directly. */
+  onOpenKitchen: () => void;
+  /** Start the guided cook for a recipe (from a Home recommendation's detail). */
+  onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
   /** Bumped by App when the catalog reloads from the DB, so the memo re-runs. */
   catalogVersion?: number;
 }
@@ -38,7 +42,7 @@ function keyOf(fi: FeedRecipe): string {
   return fi.kind === "catalog" ? `c:${fi.id}` : `s:${fi.recipe.path}`;
 }
 
-export function HomeScreen({ pantry, onNavigate, onViewFavorites, catalogVersion = 0 }: Props) {
+export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen, onCook, catalogVersion = 0 }: Props) {
   const [saved, setSaved] = useState<SavedRecipe[]>([]);
   const [favs, setFavs] = useState<Set<string>>(new Set());
   const [loaded, setLoaded] = useState(false);
@@ -123,6 +127,7 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, catalogVersion
         feed={resolved}
         pantry={pantry}
         inLibrary={inLibrary}
+        onCook={onCook}
         onBack={() => setSelected(null)}
         onToggleFavorite={() => onToggleFavorite(resolved)}
         onSaveToLibrary={() => onSaveToLibrary(resolved)}
@@ -167,14 +172,14 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, catalogVersion
           icon="bowl-food"
           value={hasPantry ? readyToCook : "+"}
           label={hasPantry ? "ready to cook" : "add a pantry"}
-          onClick={() => onNavigate(hasPantry ? "recipes" : "cook")}
+          onClick={() => (hasPantry ? onNavigate("recipes") : onOpenKitchen())}
           accent
         />
         <StatTile
           icon="carrot"
           value={pantry?.length ?? 0}
           label={(pantry?.length ?? 0) === 1 ? "pantry item" : "pantry items"}
-          onClick={() => onNavigate("cook")}
+          onClick={onOpenKitchen}
         />
       </div>
 
@@ -236,7 +241,7 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, catalogVersion
           <h3>Jump in</h3>
         </div>
         <div className="quick-actions">
-          <QuickAction icon="camera" title="Scan your fridge" sub="Cook from what you have" onClick={() => onNavigate("cook")} />
+          <QuickAction icon="camera" title="Scan your fridge" sub="Cook from what you have" onClick={onOpenKitchen} />
           <QuickAction icon="calendar-days" title="Plan my week" sub="One shopping list" onClick={() => onNavigate("plan")} />
           <QuickAction icon="magnifying-glass" title="Browse recipes" sub="~1,200 to explore" onClick={() => onNavigate("recipes")} />
         </div>
