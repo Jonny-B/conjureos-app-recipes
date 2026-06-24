@@ -2280,3 +2280,48 @@ select {
 .kitchen-make .fa-icon:last-child { width: 12px; height: 12px; opacity: 0.8; }
 
 .describe-toggle.disabled { opacity: 0.65; cursor: default; }
+
+/* ── 0.9.2: hero refresh, in-card favorite heart, bottom cook button ──── */
+.hero-refresh {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--cui-border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--cui-fg);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--cui-duration) var(--cui-ease), background var(--cui-duration-fast) var(--cui-ease);
+}
+.hero-refresh:hover { background: var(--cui-accent-mute); }
+.hero-refresh:active { transform: rotate(-90deg); }
+.hero-refresh .fa-icon { width: 15px; height: 15px; }
+
+/* Favorite heart pinned to the recipe card's top-right corner. */
+.card-fav {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fg-faint);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--cui-duration-fast) var(--cui-ease), color var(--cui-duration-fast) var(--cui-ease), transform var(--cui-duration) var(--cui-ease);
+}
+.card-fav:hover { background: var(--cui-accent-mute); color: var(--fg); }
+.card-fav.on { color: var(--bubblegum); }
+.card-fav.on:hover { color: var(--bubblegum); }
+.card-fav .fa-icon { width: 18px; height: 18px; }
+
+.detail-cook-bottom { align-self: flex-start; margin-top: 4px; }
