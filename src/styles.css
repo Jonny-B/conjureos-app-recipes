@@ -132,6 +132,18 @@ select {
   color: inherit;
 }
 
+/* iOS Safari zooms the viewport on focus when a form control is under 16px.
+   Force 16px on touch so it never zooms; pinch-zoom stays available (no
+   user-scalable=no). !important to beat per-component sizes (e.g. the 12px
+   quantity inputs). Touch only, so desktop is untouched. */
+@media (pointer: coarse) {
+  input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 /* ── Layout shell ──────────────────────────────────────────────────── */
 
 .app {
