@@ -4,7 +4,9 @@ import type {
   Ingredient,
   MoodConstraints,
   PantryItem,
+  Recipe,
   SavedRecipe,
+  ShoppingListItem,
   WeekPlan,
 } from "../types";
 import { getCatalog } from "../features/catalog";
@@ -18,7 +20,7 @@ import {
   buildOnHand,
   type PlanCandidate,
 } from "../features/planWeek";
-import { saveWeekPlan } from "../features/planStorage";
+import { saveWeekPlan, listWeekPlans } from "../features/planStorage";
 import { identifyIngredients } from "../features/vision";
 import { sanitizeName } from "../features/vision";
 import { prettyIngredient } from "../features/scaling";
@@ -27,6 +29,7 @@ import { Icon } from "../icons";
 
 type Step = "mood" | "scan" | "review" | "shopping";
 type MoodMode = "ingredients" | "seed" | "text";
+type View = "list" | "build";
 
 const STEPS: { id: Step; label: string }[] = [
   { id: "mood", label: "Mood" },
@@ -35,8 +38,23 @@ const STEPS: { id: Step; label: string }[] = [
   { id: "shopping", label: "Shopping" },
 ];
 
+const MOOD_META: Record<MoodMode, { title: string; sub: string; label: string }> = {
+  ingredients: {
+    title: "Pick ingredients",
+    sub: "Build around a few",
+    label: "Ingredients you want this week",
+  },
+  seed: { title: "From a recipe", sub: "Start from one you love", label: "Starting recipe" },
+  text: { title: "Describe it", sub: "Say it in words", label: "Describe your week" },
+};
+
 function uniq(a: string[]): string[] {
   return [...new Set(a)];
+}
+
+function fmtDate(iso: string): string {
+  // createdAt is an ISO string; show YYYY-MM-DD without pulling in a date lib.
+  return iso.slice(0, 10);
 }
 
 export function PlanWeekScreen({
@@ -47,6 +65,10 @@ export function PlanWeekScreen({
   /** Bumped by App when the catalog reloads from the DB, so the memo re-runs. */
   catalogVersion?: number;
 }) {
+  const [view, setView] = useState<View>("build");
+  const [plans, setPlans] = useState<WeekPlan[]>([]);
+  const [viewingPlan, setViewingPlan] = useState<WeekPlan | null>(null);
+
   const [step, setStep] = useState<Step>("mood");
   const [moodMode, setMoodMode] = useState<MoodMode>("ingredients");
   const [includeChips, setIncludeChips] = useState<string[]>([]);
@@ -68,11 +90,24 @@ export function PlanWeekScreen({
   const [busy, setBusy] = useState<null | "mood" | "saving">(null);
   const [error, setError] = useState<string | null>(null);
   const [savedPath, setSavedPath] = useState<string | null>(null);
+  const [savedJustNow, setSavedJustNow] = useState(false);
+  const [lastSaved, setLastSaved] = useState<WeekPlan | null>(null);
+
+  // In-flow recipe preview (modal over the Review step).
+  const [preview, setPreview] = useState<Recipe | null>(null);
+
+  // Editable grocery list: lines the user removed (by canonical) + lines they added.
+  const [removed, setRemoved] = useState<Set<string>>(new Set());
+  const [extras, setExtras] = useState<ShoppingListItem[]>([]);
 
   useEffect(() => {
     Promise.all([listSavedRecipes(), loadFavorites()]).then(([s, f]) => {
       setSaved(s);
       setFavs(f);
+    });
+    listWeekPlans().then((p) => {
+      setPlans(p);
+      if (p.length) setView("list"); // land on the library when plans exist
     });
   }, []);
 
@@ -109,12 +144,41 @@ export function PlanWeekScreen({
     return candidates.filter((c) => c.title.toLowerCase().includes(q)).slice(0, 8);
   }, [seedQuery, candidates]);
 
+  // Effective grocery list = plan list minus removed, plus user-added extras.
+  const groceryList = useMemo<ShoppingListItem[]>(() => {
+    if (!plan) return [];
+    return [...plan.shoppingList.filter((i) => !removed.has(i.canonical)), ...extras];
+  }, [plan, removed, extras]);
+
   // ── transitions ─────────────────────────────────────────────────────
   const addChip = (e: FormEvent) => {
     e.preventDefault();
     const n = sanitizeName(chipInput);
     setChipInput("");
     if (n && !includeChips.includes(n)) setIncludeChips((p) => [...p, n]);
+  };
+
+  const newPlan = () => {
+    setStep("mood");
+    setMoodMode("ingredients");
+    setIncludeChips([]);
+    setChipInput("");
+    setFreeText("");
+    setMealCount(5);
+    setSeed(null);
+    setSeedQuery("");
+    setScanned([]);
+    setConstraints(null);
+    setPlan(null);
+    setExcludeIds([]);
+    setError(null);
+    setSavedPath(null);
+    setSavedJustNow(false);
+    setLastSaved(null);
+    setRemoved(new Set());
+    setExtras([]);
+    setViewingPlan(null);
+    setView("build");
   };
 
   const goToScan = async () => {
@@ -165,6 +229,11 @@ export function PlanWeekScreen({
     });
     setPlan(p);
     setExcludeIds(exclude);
+    // A fresh plan resets any prior grocery-list edits / save state.
+    setRemoved(new Set());
+    setExtras([]);
+    setSavedPath(null);
+    setSavedJustNow(false);
   };
 
   const onScanned = async (photos: CapturedPhoto[]) => {
@@ -181,17 +250,49 @@ export function PlanWeekScreen({
 
   const removePick = (id: string) => runPlan([...excludeIds, id]);
 
+  const removeGroceryItem = (canonical: string) =>
+    setRemoved((prev) => new Set(prev).add(canonical));
+
+  const addGroceryItem = (raw: string) => {
+    const name = raw.trim();
+    if (!name) return;
+    const canonical = name.toLowerCase();
+    if (groceryList.some((i) => i.canonical === canonical)) return;
+    setRemoved((prev) => {
+      // if they'd removed a same-named line, un-remove instead of duplicating
+      if (prev.has(canonical)) {
+        const next = new Set(prev);
+        next.delete(canonical);
+        return next;
+      }
+      return prev;
+    });
+    if (!plan?.shoppingList.some((i) => i.canonical === canonical)) {
+      setExtras((prev) => [...prev, { name, canonical, recipes: [], aisle: "Added by you" }]);
+    }
+  };
+
   const onSave = async () => {
     if (!plan) return;
     setBusy("saving");
     try {
-      const { path } = await saveWeekPlan(plan);
+      const edited: WeekPlan = { ...plan, shoppingList: groceryList };
+      const { path } = await saveWeekPlan(edited);
+      setLastSaved(edited);
       setSavedPath(path);
+      setSavedJustNow(true);
+      setTimeout(() => setSavedJustNow(false), 1000);
+      listWeekPlans().then(setPlans);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(null);
     }
+  };
+
+  const goToSavedPlan = () => {
+    setViewingPlan(lastSaved);
+    setView("list");
   };
 
   // ── render ───────────────────────────────────────────────────────────
@@ -214,10 +315,31 @@ export function PlanWeekScreen({
     );
   }
 
+  // A saved plan, opened read-only from the library.
+  if (viewingPlan) {
+    return <PlanReadView plan={viewingPlan} onBack={() => setViewingPlan(null)} />;
+  }
+
+  // The library of saved plans + a "New plan" entry point.
+  if (view === "list") {
+    return (
+      <PlansList
+        plans={plans}
+        onNew={newPlan}
+        onOpen={(p) => setViewingPlan(p)}
+      />
+    );
+  }
+
   return (
     <div className="browse-screen">
       <div className="browse-header">
         <h2>Plan my week</h2>
+        {plans.length > 0 && (
+          <button className="btn ghost" onClick={() => setView("list")}>
+            <Icon name="calendar-days" /> My plans
+          </button>
+        )}
       </div>
       <StepDots step={step} />
 
@@ -271,6 +393,7 @@ export function PlanWeekScreen({
         <ReviewStep
           plan={plan}
           onRemove={removePick}
+          onPreview={setPreview}
           onBack={() => setStep("scan")}
           onNext={() => setStep("shopping")}
         />
@@ -278,13 +401,20 @@ export function PlanWeekScreen({
 
       {step === "shopping" && plan && (
         <ShoppingStep
-          plan={plan}
+          items={groceryList}
+          mealCount={plan.picks.length}
           saving={busy === "saving"}
           savedPath={savedPath}
+          savedJustNow={savedJustNow}
+          onAddItem={addGroceryItem}
+          onRemoveItem={removeGroceryItem}
           onBack={() => setStep("review")}
           onSave={onSave}
+          onGoToPlan={goToSavedPlan}
         />
       )}
+
+      {preview && <RecipePreviewModal recipe={preview} onClose={() => setPreview(null)} />}
     </div>
   );
 }
@@ -301,6 +431,106 @@ function StepDots({ step }: { step: Step }) {
           {s.label}
         </div>
       ))}
+    </div>
+  );
+}
+
+// ── Saved-plans library ──────────────────────────────────────────────────
+
+function PlansList({
+  plans,
+  onNew,
+  onOpen,
+}: {
+  plans: WeekPlan[];
+  onNew: () => void;
+  onOpen: (p: WeekPlan) => void;
+}) {
+  return (
+    <div className="browse-screen">
+      <div className="browse-header">
+        <h2>My plans</h2>
+        <button className="btn" onClick={onNew}>
+          <Icon name="plus" /> New plan
+        </button>
+      </div>
+
+      {plans.length === 0 ? (
+        <div className="empty-state">
+          <Icon name="calendar-days" className="empty-icon" />
+          <div>No saved plans yet. Tap “New plan” to build your week.</div>
+        </div>
+      ) : (
+        <div className="plan-cards">
+          {plans.map((pl, i) => (
+            <button key={`${pl.createdAt}-${i}`} className="plan-saved-card" onClick={() => onOpen(pl)}>
+              <div className="plan-saved-top">
+                <span className="plan-saved-date">{fmtDate(pl.createdAt)}</span>
+                <span className="pill">{pl.picks.length} meal{pl.picks.length === 1 ? "" : "s"}</span>
+              </div>
+              <div className="plan-saved-meals">
+                {pl.picks.map((p) => p.title).join(" · ") || "Empty plan"}
+              </div>
+              <div className="plan-saved-foot">
+                <Icon name="basket-shopping" /> {pl.shoppingList.length} item
+                {pl.shoppingList.length === 1 ? "" : "s"} to buy
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlanReadView({ plan, onBack }: { plan: WeekPlan; onBack: () => void }) {
+  const byAisle = useMemo(() => groupByAisle(plan.shoppingList), [plan]);
+  return (
+    <div className="browse-screen">
+      <div className="detail-actions">
+        <button className="btn ghost" onClick={onBack}>
+          <Icon name="chevron-down" className="back-caret" /> My plans
+        </button>
+      </div>
+      <div className="browse-header">
+        <h2>Week of {fmtDate(plan.createdAt)}</h2>
+      </div>
+
+      <div className="ing-group">
+        <div className="ing-group-label">Meals</div>
+        <div className="browse-list">
+          {plan.picks.map((p) => (
+            <div key={p.id} className="browse-item" style={{ cursor: "default" }}>
+              <div className="title-block">
+                <div className="title">{p.title}</div>
+                <div className="meta">{p.haveCount}/{p.totalCount} on hand</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="ing-group">
+        <div className="ing-group-label">Grocery list · {plan.shoppingList.length}</div>
+        {plan.shoppingList.length === 0 ? (
+          <div className="muted" style={{ fontSize: 13 }}>Nothing to buy.</div>
+        ) : (
+          byAisle.map(([aisle, items]) => (
+            <div key={aisle} className="shopping-group">
+              <div className="ing-group-label">{aisle}</div>
+              {items.map((item) => (
+                <div key={item.canonical} className="shopping-line">
+                  <div className="shopping-line-main">
+                    <span className="shopping-name">{item.name}</span>
+                    {item.quantity && <span className="shopping-qty">{item.quantity}</span>}
+                    {item.quantityNote && <span className="serves">{item.quantityNote}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -338,94 +568,102 @@ function MoodStep(p: MoodProps) {
   return (
     <>
       <div className="muted" style={{ fontSize: 13 }}>
-        What are you in the mood for this week? Pick a few ingredients, start from a recipe you love,
-        or just describe it.
+        What are you in the mood for this week? Choose how you want to start.
       </div>
 
-      <div className="mood-modes">
+      <div className="mood-picker">
         {(["ingredients", "seed", "text"] as MoodMode[]).map((m) => (
           <button
             key={m}
-            className={`nav-btn${p.mode === m ? " active" : ""}`}
+            className={`mood-opt${p.mode === m ? " active" : ""}`}
             onClick={() => p.setMode(m)}
+            aria-pressed={p.mode === m}
           >
-            {m === "ingredients" ? "Pick ingredients" : m === "seed" ? "From a recipe" : "Describe it"}
+            <span className="mood-opt-title">{MOOD_META[m].title}</span>
+            <span className="mood-opt-sub">{MOOD_META[m].sub}</span>
           </button>
         ))}
       </div>
 
-      {p.mode === "ingredients" && (
-        <div className="ing-group">
-          <form className="add-ing-form" onSubmit={p.addChip}>
-            <input
-              type="text"
-              placeholder="Add an ingredient you want this week…"
-              value={p.chipInput}
-              onChange={(e) => p.setChipInput(e.target.value)}
-              maxLength={50}
-            />
-            <button className="btn secondary" type="submit" disabled={!p.chipInput.trim()}>
-              <Icon name="plus" /> Add
-            </button>
-          </form>
-          <div className="cov-strip" style={{ marginTop: 4 }}>
-            {p.includeChips.map((c) => (
-              <button key={c} className="token-chip want" onClick={() => p.removeChip(c)} title="Remove">
-                {c} <Icon name="xmark" />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="mood-panel">
+        <div className="mood-panel-label">{MOOD_META[p.mode].label}</div>
 
-      {p.mode === "seed" && (
-        <div className="ing-group">
-          {p.seed ? (
-            <div className="browse-item" style={{ cursor: "default" }}>
-              <div className="title-block">
-                <div className="title">{p.seed.title}</div>
-                <div className="meta">seed recipe</div>
-              </div>
-              <button className="btn ghost" onClick={() => p.setSeed(null)}>
-                Change
+        {p.mode === "ingredients" && (
+          <div className="ing-group">
+            <form className="add-ing-form" onSubmit={p.addChip}>
+              <input
+                type="text"
+                placeholder="Add an ingredient you want this week…"
+                value={p.chipInput}
+                onChange={(e) => p.setChipInput(e.target.value)}
+                maxLength={50}
+              />
+              <button className="btn secondary" type="submit" disabled={!p.chipInput.trim()}>
+                <Icon name="plus" /> Add
               </button>
+            </form>
+            <div className="cov-strip" style={{ marginTop: 4 }}>
+              {p.includeChips.map((c) => (
+                <button key={c} className="token-chip want" onClick={() => p.removeChip(c)} title="Remove">
+                  {c} <Icon name="xmark" />
+                </button>
+              ))}
+              {p.includeChips.length === 0 && (
+                <span className="muted" style={{ fontSize: 13 }}>No ingredients yet.</span>
+              )}
             </div>
-          ) : (
-            <>
-              <div className="browse-filter">
-                <Icon name="magnifying-glass" />
-                <input
-                  type="text"
-                  placeholder="Search a recipe to start from…"
-                  value={p.seedQuery}
-                  onChange={(e) => p.setSeedQuery(e.target.value)}
-                />
-              </div>
-              <div className="browse-list">
-                {p.seedResults.map((c) => (
-                  <div key={c.id} className="browse-item" onClick={() => p.setSeed(c)}>
-                    <div className="title-block">
-                      <div className="title">{c.title}</div>
-                      <div className="meta">{c.category}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      )}
+          </div>
+        )}
 
-      {p.mode === "text" && (
-        <textarea
-          className="create-input"
-          placeholder={"e.g. Quick weeknight dinners, lots of chicken and veg, nothing too spicy. Maybe a pasta night."}
-          value={p.freeText}
-          onChange={(e) => p.setFreeText(e.target.value)}
-          rows={4}
-          maxLength={1000}
-        />
-      )}
+        {p.mode === "seed" && (
+          <div className="ing-group">
+            {p.seed ? (
+              <div className="browse-item" style={{ cursor: "default" }}>
+                <div className="title-block">
+                  <div className="title">{p.seed.title}</div>
+                  <div className="meta">seed recipe</div>
+                </div>
+                <button className="btn ghost" onClick={() => p.setSeed(null)}>
+                  Change
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="browse-filter">
+                  <Icon name="magnifying-glass" />
+                  <input
+                    type="text"
+                    placeholder="Search a recipe to start from…"
+                    value={p.seedQuery}
+                    onChange={(e) => p.setSeedQuery(e.target.value)}
+                  />
+                </div>
+                <div className="browse-list">
+                  {p.seedResults.map((c) => (
+                    <div key={c.id} className="browse-item" onClick={() => p.setSeed(c)}>
+                      <div className="title-block">
+                        <div className="title">{c.title}</div>
+                        <div className="meta">{c.category}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {p.mode === "text" && (
+          <textarea
+            className="create-input"
+            placeholder={"e.g. Quick weeknight dinners, lots of chicken and veg, nothing too spicy. Maybe a pasta night."}
+            value={p.freeText}
+            onChange={(e) => p.setFreeText(e.target.value)}
+            rows={4}
+            maxLength={1000}
+          />
+        )}
+      </div>
 
       <div className="scale-row">
         <span className="muted" style={{ fontSize: 13 }}>How many meals?</span>
@@ -467,8 +705,8 @@ function ScanStep({
   return (
     <>
       <div className="muted" style={{ fontSize: 13 }}>
-        I'll build the week around what you already have. Your pantry has {pantryCount} item
-        {pantryCount === 1 ? "" : "s"}. Add a fresh fridge scan if you like.
+        I'll build the week around what you already have, then put everything else on one grocery list.
+        Your pantry has {pantryCount} item{pantryCount === 1 ? "" : "s"}. Add a fresh fridge scan if you like.
       </div>
 
       <div className="capture-buttons" style={{ justifyContent: "flex-start" }}>
@@ -508,16 +746,23 @@ function ScanStep({
 function ReviewStep({
   plan,
   onRemove,
+  onPreview,
   onBack,
   onNext,
 }: {
   plan: WeekPlan;
   onRemove: (id: string) => void;
+  onPreview: (r: Recipe) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
   return (
     <>
+      <div className="muted" style={{ fontSize: 13 }}>
+        Here's your week. Each meal adds what you don't already have to one shared grocery list — tap a
+        meal to see the full recipe, or swap any you don't fancy.
+      </div>
+
       {plan.warnings.map((w, i) => (
         <div key={i} className="shortage-banner">
           <Icon name="circle-info" />
@@ -557,7 +802,7 @@ function ReviewStep({
             )}
             {pick.marginalNew.length > 0 && (
               <div>
-                <h4>Adds to the list</h4>
+                <h4>Adds to grocery list</h4>
                 <div className="cov-strip">
                   {pick.marginalNew.map((t) => (
                     <span key={t} className="token-chip to-buy">{prettyIngredient(t)}</span>
@@ -566,9 +811,11 @@ function ReviewStep({
               </div>
             )}
             <div className="row" style={{ marginTop: "auto" }}>
-              <span />
+              <button className="btn ghost" onClick={() => onPreview(pick.recipe)}>
+                <Icon name="magnifying-glass" /> View recipe
+              </button>
               <button className="btn ghost" onClick={() => onRemove(pick.id)}>
-                <Icon name="xmark" /> Swap out
+                <Icon name="rotate" /> Swap out
               </button>
             </div>
           </article>
@@ -581,64 +828,157 @@ function ReviewStep({
         </button>
         <div style={{ flex: 1 }} />
         <button className="btn" disabled={plan.picks.length === 0} onClick={onNext}>
-          <Icon name="basket-shopping" /> See shopping list
+          <Icon name="basket-shopping" /> See grocery list
         </button>
       </div>
     </>
   );
 }
 
+// ── Recipe preview modal (in-flow, no navigation away) ───────────────────
+
+function RecipePreviewModal({ recipe, onClose }: { recipe: Recipe; onClose: () => void }) {
+  return (
+    <div className="recipe-modal-backdrop" onClick={onClose}>
+      <div
+        className="recipe-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={recipe.title}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="recipe-modal-head">
+          <h3>{recipe.title}</h3>
+          <button className="icon-btn" onClick={onClose} aria-label="Close">
+            <Icon name="xmark" />
+          </button>
+        </div>
+        <div className="recipe-modal-body">
+          <div className="guided-meta" style={{ marginTop: 0 }}>
+            <span className={`pill ${recipe.difficulty}`}>{recipe.difficulty}</span>
+            <span className="pill">{recipe.cookTime} min</span>
+            <span className="pill">{recipe.servings} serving{recipe.servings === 1 ? "" : "s"}</span>
+          </div>
+          {recipe.summary && <p className="summary">{recipe.summary}</p>}
+          <section>
+            <h4>Ingredients</h4>
+            <ul>
+              {recipe.ingredients.map((ing, i) => (
+                <li key={i}>{ing}</li>
+              ))}
+            </ul>
+          </section>
+          <section>
+            <h4>Instructions</h4>
+            <ol>
+              {recipe.instructions.map((step, i) => (
+                <li key={i}>{step}</li>
+              ))}
+            </ol>
+          </section>
+        </div>
+        <div className="recipe-modal-foot">
+          <button className="btn" onClick={onClose}>Back to my week</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Shopping ───────────────────────────────────────────────────────────
 
+function groupByAisle(list: ShoppingListItem[]): [string, ShoppingListItem[]][] {
+  const m = new Map<string, ShoppingListItem[]>();
+  for (const item of list) {
+    const arr = m.get(item.aisle) ?? [];
+    arr.push(item);
+    m.set(item.aisle, arr);
+  }
+  return [...m.entries()];
+}
+
 function ShoppingStep({
-  plan,
+  items,
+  mealCount,
   saving,
   savedPath,
+  savedJustNow,
+  onAddItem,
+  onRemoveItem,
   onBack,
   onSave,
+  onGoToPlan,
 }: {
-  plan: WeekPlan;
+  items: ShoppingListItem[];
+  mealCount: number;
   saving: boolean;
   savedPath: string | null;
+  savedJustNow: boolean;
+  onAddItem: (name: string) => void;
+  onRemoveItem: (canonical: string) => void;
   onBack: () => void;
   onSave: () => void;
+  onGoToPlan: () => void;
 }) {
-  const byAisle = useMemo(() => {
-    const m = new Map<string, typeof plan.shoppingList>();
-    for (const item of plan.shoppingList) {
-      const arr = m.get(item.aisle) ?? [];
-      arr.push(item);
-      m.set(item.aisle, arr);
-    }
-    return [...m.entries()];
-  }, [plan]);
+  const [newItem, setNewItem] = useState("");
+  const byAisle = useMemo(() => groupByAisle(items), [items]);
+
+  const add = (e: FormEvent) => {
+    e.preventDefault();
+    onAddItem(newItem);
+    setNewItem("");
+  };
 
   return (
     <>
       <div className="muted" style={{ fontSize: 13 }}>
-        One list for {plan.picks.length} meals, deduped so shared ingredients are bought once.
+        Your grocery list for {mealCount} meal{mealCount === 1 ? "" : "s"}, deduped so shared
+        ingredients are bought once. Add or remove anything before you save.
       </div>
 
-      {plan.shoppingList.length === 0 ? (
+      <form className="add-ing-form" onSubmit={add}>
+        <input
+          type="text"
+          placeholder="Add something to the list…"
+          value={newItem}
+          onChange={(e) => setNewItem(e.target.value)}
+          maxLength={60}
+        />
+        <button className="btn secondary" type="submit" disabled={!newItem.trim()}>
+          <Icon name="plus" /> Add
+        </button>
+      </form>
+
+      {items.length === 0 ? (
         <div className="empty-state">
           <Icon name="check" className="empty-icon" />
           <div>Nothing to buy. Your week is fully covered by what you have.</div>
         </div>
       ) : (
-        byAisle.map(([aisle, items]) => (
+        byAisle.map(([aisle, list]) => (
           <div key={aisle} className="shopping-group">
             <div className="ing-group-label">{aisle}</div>
-            {items.map((item) => (
+            {list.map((item) => (
               <div key={item.canonical} className="shopping-line">
                 <div className="shopping-line-main">
                   <span className="shopping-name">{item.name}</span>
                   {item.quantity && <span className="shopping-qty">{item.quantity}</span>}
                   {item.quantityNote && <span className="serves">{item.quantityNote}</span>}
                 </div>
-                <div className="shopping-for">
-                  {item.recipes.map((r) => (
-                    <span key={r.id} className="pill">{r.title}</span>
-                  ))}
+                <div className="shopping-line-end">
+                  <div className="shopping-for">
+                    {item.recipes.map((r) => (
+                      <span key={r.id} className="pill">{r.title}</span>
+                    ))}
+                  </div>
+                  <button
+                    className="icon-btn shopping-remove"
+                    onClick={() => onRemoveItem(item.canonical)}
+                    aria-label={`Remove ${item.name}`}
+                    title="Remove"
+                  >
+                    <Icon name="xmark" />
+                  </button>
                 </div>
               </div>
             ))}
@@ -652,9 +992,15 @@ function ShoppingStep({
         </button>
         <div style={{ flex: 1 }} />
         {savedPath ? (
-          <span className="muted" style={{ fontSize: 13, display: "inline-flex", alignItems: "center", gap: 5 }}>
-            <Icon name="check" /> Saved to your plans
-          </span>
+          savedJustNow ? (
+            <span className="muted" style={{ fontSize: 13, display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <Icon name="check" /> Saved to plans
+            </span>
+          ) : (
+            <button className="btn" onClick={onGoToPlan}>
+              <Icon name="calendar-days" /> Go to plan
+            </button>
+          )
         ) : (
           <button className="btn" disabled={saving} onClick={onSave}>
             {saving ? "Saving…" : "Save this plan"}

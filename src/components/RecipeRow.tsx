@@ -2,6 +2,7 @@ import type { FeedRecipe } from "../types";
 import type { CoverageResult } from "../features/scaling";
 import { prettyIngredient } from "../features/scaling";
 import { Icon } from "../icons";
+import { Stars } from "./Stars";
 
 /**
  * One dense recipe row for the browse / favorites / home feeds. Shows title,
@@ -25,6 +26,7 @@ export function RecipeRow({
         <div className="title">
           {r.title}
           {fi.favorite && <Icon name="heart" className="fav-mark" />}
+          {!!r.rating && <Stars value={r.rating} size={12} />}
         </div>
         <div className="meta">
           {category && (

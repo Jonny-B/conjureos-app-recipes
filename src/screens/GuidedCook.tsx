@@ -1,21 +1,24 @@
 import { useMemo, useState } from "react";
-import type { PantryItem, Recipe } from "../types";
+import type { PantryItem, Recipe, SavedRecipe } from "../types";
 import { ingredientsFromPantry } from "../features/pantry";
 import { computeAvailability, computeCoverage, scaleRecipe } from "../features/scaling";
 import { parseIngredient } from "../features/nutrition";
 import { Icon } from "../icons";
+import { Stars } from "../components/Stars";
 import { ChefChat } from "./ChefChat";
 
 interface Props {
   recipe: Recipe;
   pantry: PantryItem[] | null;
-  /** True when this recipe is already in the user's library (offer "mark as made"). */
-  saved?: boolean;
+  /** The library row when this recipe is already saved (offer "mark as made"). */
+  savedRecipe?: SavedRecipe | null;
   onBack: () => void;
   /** Saved recipes: increment made-count. Rejects if persistence fails. */
   onMade?: () => Promise<void>;
-  /** Unsaved (AI-described / catalog) recipes: save the (scaled) recipe. Rejects on failure. */
-  onSave?: (recipe: Recipe) => Promise<void>;
+  /** Unsaved (AI-described / catalog) recipes: save the (scaled) recipe; returns the new row. */
+  onSave?: (recipe: Recipe) => Promise<SavedRecipe>;
+  /** Persist a 1-5 star rating against a saved recipe (after cooking). */
+  onRate?: (saved: SavedRecipe, rating: number) => Promise<void>;
 }
 
 /**
@@ -24,7 +27,8 @@ interface Props {
  * popover (never a visible row). An unobtrusive "Ask the chef" button floats in
  * the corner. Resting chrome = back + Adjust; everything else is the checklist.
  */
-export function GuidedCook({ recipe, pantry, saved, onBack, onMade, onSave }: Props) {
+export function GuidedCook({ recipe, pantry, savedRecipe, onBack, onMade, onSave, onRate }: Props) {
+  const saved = !!savedRecipe;
   const [checkedIng, setCheckedIng] = useState<Set<number>>(new Set());
   const [checkedStep, setCheckedStep] = useState<Set<number>>(new Set());
   const [factor, setFactor] = useState(1);
@@ -34,6 +38,9 @@ export function GuidedCook({ recipe, pantry, saved, onBack, onMade, onSave }: Pr
   const [madeDone, setMadeDone] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // After finishing, which saved row we can attach a rating to, and the rating.
+  const [rateTarget, setRateTarget] = useState<SavedRecipe | null>(savedRecipe ?? null);
+  const [rating, setRating] = useState<number | null>(savedRecipe?.rating ?? null);
 
   // Catalog/DB recipes can carry a bad servings value; fall back to 1 so the
   // stepper + scaling never divide by zero into NaN.
@@ -67,16 +74,29 @@ export function GuidedCook({ recipe, pantry, saved, onBack, onMade, onSave }: Pr
   };
 
   // Persist on completion; only flip to the "done" confirmation if it succeeds.
-  const finish = async (fn: () => Promise<void>) => {
+  // A returned SavedRecipe (the save path) becomes the row we can then rate.
+  const finish = async (fn: () => Promise<SavedRecipe | void>) => {
     setSaveError(null);
     setSaving(true);
     try {
-      await fn();
+      const result = await fn();
+      if (result) setRateTarget(result);
       setMadeDone(true);
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const pickRating = async (n: number) => {
+    if (!rateTarget || !onRate) return;
+    const prev = rating;
+    setRating(n); // optimistic
+    try {
+      await onRate(rateTarget, n);
+    } catch {
+      setRating(prev); // revert on failure
     }
   };
   const scaleToPantry = () => {
@@ -209,8 +229,16 @@ export function GuidedCook({ recipe, pantry, saved, onBack, onMade, onSave }: Pr
         </div>
       )}
       {madeDone && (
-        <div className="guided-done">
-          <Icon name="check" /> {saved ? "Marked as made." : "Saved to your recipes."}
+        <div className="guided-done guided-rated">
+          <div>
+            <Icon name="check" /> {saved ? "Marked as made." : "Saved to your recipes."}
+          </div>
+          {onRate && rateTarget && (
+            <div className="rate-prompt">
+              <span className="rate-label">{rating ? "Your rating" : "How was it?"}</span>
+              <Stars value={rating} onPick={pickRating} size={26} />
+            </div>
+          )}
         </div>
       )}
 

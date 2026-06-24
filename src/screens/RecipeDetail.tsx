@@ -4,6 +4,7 @@ import { ingredientsFromPantry } from "../features/pantry";
 import { computeAvailability, computeCoverage } from "../features/scaling";
 import { parseIngredient, formatStrip } from "../features/nutrition";
 import { Icon } from "../icons";
+import { Stars } from "../components/Stars";
 
 interface Props {
   feed: FeedRecipe;
@@ -150,6 +151,11 @@ export function RecipeDetail({
             <span className="pill">made {feed.recipe.madeCount}×</span>
           )}
         </div>
+        {!!recipe.rating && (
+          <div style={{ marginTop: 6 }}>
+            <Stars value={recipe.rating} size={16} />
+          </div>
+        )}
 
         {recipe.summary && <p className="summary">{recipe.summary}</p>}
         {recipe.nutrition && (

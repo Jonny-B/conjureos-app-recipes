@@ -61,6 +61,8 @@ export interface Recipe {
   summary?: string;
   /** Per-serving estimated macros from USDA FoodData Central. Null when lookup hasn't run yet or failed. */
   nutrition?: NutritionStrip | null;
+  /** 1-5 star rating the user gave after cooking. Null/undefined = not rated. */
+  rating?: number | null;
 }
 
 /**
