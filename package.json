@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Recipes for ConjureOS: browse a catalog, keep a pantry, get suggestions ranked by what you have, and plan a week of meals that shares a shopping list.",
   "type": "module",
   "license": "MIT",

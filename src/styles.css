@@ -1125,33 +1125,6 @@ select {
   font-weight: 600;
 }
 
-/* Title + "New recipe" share the top row; the button hugs the right edge. */
-.browse-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-}
-
-.new-recipe-btn {
-  flex: 0 0 auto;
-  padding: 9px 16px;
-  font-size: 13px;
-}
-
-/* "Cook from my kitchen" + "Browse what I can make" action row. */
-.kitchen-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.kitchen-actions .btn {
-  flex: 1 1 auto;
-  justify-content: center;
-}
-
 /* Primary source filter (All / My recipes / Favorites) — a pill segmented row
    sharing the .nav-btn look. */
 .source-filter {
@@ -1163,24 +1136,6 @@ select {
 .source-filter .nav-btn {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--cui-border);
-}
-
-/* Sort toolbar + its one-line explainer, grouped so they sit tight together. */
-.feed-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.feed-controls .feed-toolbar {
-  margin-bottom: 0;
-}
-
-.feed-hint {
-  margin: 0;
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: var(--fg-dim);
 }
 
 .browse-filter {
@@ -1513,39 +1468,6 @@ select {
   body::after {
     animation: none !important;
   }
-}
-
-/* ── Feed toolbar (mode toggles: Cook scan/write, Recipes browse/suggest) ── */
-
-.feed-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-bottom: 18px;
-}
-
-.feed-toolbar .nav-btn {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--cui-border);
-}
-
-.feed-toolbar .nav-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.feed-toolbar .nav-btn .fa-icon {
-  width: 12px;
-  height: 12px;
-  margin-right: 3px;
-  vertical-align: -1px;
-}
-
-.feed-toolbar-cta {
-  margin-left: auto;
-  padding: 7px 12px;
-  font-size: 12px;
 }
 
 /* ── Pantry-coverage match chips (mint = have, amber = short, coral = miss) ── */
@@ -2279,16 +2201,6 @@ select {
 .stepper-val { min-width: 28px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
 
 /* ── Ask-the-chef chat ──────────────────────────────────────────────── */
-.chef-fab {
-  position: fixed; right: 16px; bottom: 16px;
-  width: 52px; height: 52px; border-radius: 999px;
-  background: var(--grad-primary); color: #fff; border: none;
-  box-shadow: var(--cui-shadow-accent); cursor: pointer; z-index: 60;
-  display: inline-flex; align-items: center; justify-content: center;
-  transition: transform var(--cui-duration-fast) var(--cui-ease);
-}
-.chef-fab:hover { transform: translateY(-2px); }
-.chef-fab .fa-icon { width: 22px; height: 22px; }
 .chef-sheet {
   position: fixed; left: 0; right: 0; bottom: 0;
   max-width: 640px; margin: 0 auto;
@@ -2334,3 +2246,37 @@ select {
 .icon-btn:hover,
 .icon-btn.active { background: var(--cui-accent-mute); color: var(--fg); }
 .icon-btn .fa-icon { width: 16px; height: 16px; }
+
+/* ── 0.9.1 review fixes: overflow menu, confirm row, kitchen section ──── */
+.overflow-wrap { position: relative; flex: 0 0 auto; }
+.overflow-menu {
+  position: absolute; top: calc(100% + 6px); right: 0;
+  min-width: 192px; padding: 6px;
+  background: var(--bg-1); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: var(--shadow-soft); z-index: 50;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.overflow-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; text-align: left;
+  padding: 9px 12px; background: transparent; border: none;
+  border-radius: 8px; color: var(--fg); cursor: pointer; font-size: 14px;
+}
+.overflow-item:hover { background: var(--cui-accent-mute); }
+.overflow-item:disabled { opacity: 0.5; cursor: default; }
+.overflow-item.danger { color: var(--cui-error, #ff7a7a); }
+.overflow-item .fa-icon { width: 14px; height: 14px; flex: 0 0 auto; }
+
+.confirm-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--cui-accent-mute);
+  border: 1px solid var(--border);
+  border-radius: 12px; font-size: 14px;
+}
+.confirm-row .btn { padding: 6px 12px; font-size: 13px; }
+
+.kitchen-make-section { display: flex; flex-direction: column; gap: 10px; }
+.kitchen-make .fa-icon:last-child { width: 12px; height: 12px; opacity: 0.8; }
+
+.describe-toggle.disabled { opacity: 0.65; cursor: default; }
