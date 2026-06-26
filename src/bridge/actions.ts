@@ -34,11 +34,13 @@ import type {
   Recipe,
   SavedRecipe,
 } from "../types";
+import type { ChatImage } from "./ai";
 import {
   listSavedRecipes,
   markMade,
   saveRecipe,
 } from "../features/storage";
+import { extractRecipeFromImages } from "../features/customRecipe";
 
 declare global {
   /**
@@ -248,6 +250,63 @@ async function addRecipe(rawParams?: unknown): Promise<{ slug: string; path: str
   return { slug: saved.slug, path: saved.path };
 }
 
+const ALLOWED_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
+const MAX_IMPORT_IMAGES = 6;
+
+/**
+ * Validate untrusted { mediaType, data } image params from another app
+ * (the ConjureOS orchestrator forwards the user's attached photos here).
+ * Whitelist the media type, require a non-empty base64 string, cap the
+ * count. We do NOT decode/inspect the bytes; the vision model + the
+ * editable-preview-on-save step are the content defenses (same posture as
+ * Snap-a-recipe in the app UI).
+ */
+function asChatImages(v: unknown): ChatImage[] {
+  if (!Array.isArray(v)) {
+    throw new Error("params.images must be an array of { mediaType, data }");
+  }
+  if (v.length === 0) throw new Error("params.images cannot be empty");
+  const out: ChatImage[] = [];
+  for (let i = 0; i < v.length && out.length < MAX_IMPORT_IMAGES; i++) {
+    const it = v[i];
+    if (!it || typeof it !== "object") continue;
+    const o = it as Record<string, unknown>;
+    if (typeof o.mediaType !== "string" || !ALLOWED_IMAGE_TYPES.has(o.mediaType)) {
+      throw new Error(
+        `params.images[${i}].mediaType must be one of image/jpeg, image/png, image/webp, image/gif`,
+      );
+    }
+    if (typeof o.data !== "string" || o.data.length === 0) {
+      throw new Error(`params.images[${i}].data must be a non-empty base64 string`);
+    }
+    out.push({ mediaType: o.mediaType as ChatImage["mediaType"], data: o.data });
+  }
+  if (out.length === 0) throw new Error("params.images had no usable images");
+  return out;
+}
+
+/**
+ * Transcribe a recipe from one or more attached photos and save it to the
+ * user's library. This is the action behind "add this recipe to my recipe
+ * app" with a photo: the ConjureOS orchestrator routes the user's attached
+ * image here, we run the same vision transcription Snap-a-recipe uses, then
+ * persist via saveRecipe. Returns the new slug so the caller can deep-link.
+ */
+async function importRecipeFromImage(
+  rawParams?: unknown,
+): Promise<{ slug: string; title: string; path: string }> {
+  const p = asObject(rawParams);
+  const images = asChatImages(p.images);
+  const recipe = await extractRecipeFromImages(images);
+  const saved = await saveRecipe(recipe);
+  return { slug: saved.slug, title: saved.title, path: saved.path };
+}
+
 async function markCooked(rawParams?: unknown): Promise<{ madeCount: number; lastMadeAt: string }> {
   const p = asObject(rawParams);
   const slug = asSlug(p.slug);
@@ -274,6 +333,7 @@ export async function registerActions(): Promise<void> {
     listRecipes,
     getRecipe,
     addRecipe,
+    importRecipeFromImage,
     markCooked,
   });
 }

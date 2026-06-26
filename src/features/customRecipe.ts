@@ -147,11 +147,24 @@ Security:
 export async function extractRecipeFromPhotos(photos: CapturedPhoto[]): Promise<Recipe> {
   if (photos.length === 0) throw new Error("Add at least one photo of a recipe first.");
   const images: ChatImage[] = photos.map((p) => ({ mediaType: p.mediaType, data: p.base64 }));
+  return extractRecipeFromImages(images);
+}
+
+/**
+ * Same transcription as extractRecipeFromPhotos, but takes the bridge's
+ * ChatImage shape ({ mediaType, data }) directly. The cross-app
+ * `importRecipeFromImage` action calls this with images forwarded from the
+ * ConjureOS orchestrator (which only carries mediaType + base64, not the
+ * capture-screen's full CapturedPhoto), so there's no need to fabricate
+ * dataUrl / width / height / id fields just to feed the vision model.
+ */
+export async function extractRecipeFromImages(images: ChatImage[]): Promise<Recipe> {
+  if (images.length === 0) throw new Error("Add at least one photo of a recipe first.");
 
   const raw = await complete({
     tier: "capable",
     system: PHOTO_SYSTEM,
-    maxTokens: Math.min(2400, 1200 + photos.length * 300),
+    maxTokens: Math.min(2400, 1200 + images.length * 300),
     messages: [
       {
         role: "user",
