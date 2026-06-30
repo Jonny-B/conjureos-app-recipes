@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "description": "Recipes for ConjureOS: browse a catalog, keep a pantry, get suggestions ranked by what you have, and plan a week of meals that shares a shopping list.",
   "type": "module",
   "license": "MIT",
@@ -20,19 +20,112 @@
     "actions": {
       "listRecipes": {
         "permission": "actions.read",
-        "description": "List the user's saved recipes, optionally filtered by title or ingredient substring. Returns title, slug, difficulty, cookTime, servings, ingredients, savedAt, madeCount, lastMadeAt, and per-serving nutrition when available."
+        "description": "List the user's saved recipes, optionally filtered by title or ingredient substring. Returns title, slug, difficulty, cookTime, servings, ingredients, savedAt, madeCount, lastMadeAt, and per-serving nutrition when available.",
+        "params": {
+          "type": "object",
+          "properties": {
+            "filter": { "type": "string", "maxLength": 100, "description": "Case-insensitive substring matched against title, summary, and ingredients." },
+            "limit": { "type": "integer", "minimum": 0, "maximum": 500, "description": "Max recipes to return (default 50)." }
+          }
+        },
+        "returns": {
+          "type": "object",
+          "properties": {
+            "recipes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "slug": { "type": "string" },
+                  "title": { "type": "string" },
+                  "difficulty": { "type": "string", "enum": ["easy", "medium", "hard"] },
+                  "cookTime": { "type": "integer", "description": "Minutes." },
+                  "servings": { "type": "integer" },
+                  "ingredients": { "type": "array", "items": { "type": "string" } },
+                  "savedAt": { "type": "string", "description": "ISO timestamp." },
+                  "madeCount": { "type": "integer" },
+                  "lastMadeAt": { "type": ["string", "null"], "description": "ISO timestamp of the last cook, or null." },
+                  "nutrition": { "type": ["object", "null"], "description": "Per-serving estimate, or null." }
+                }
+              }
+            }
+          }
+        }
       },
       "getRecipe": {
         "permission": "actions.read",
-        "description": "Fetch one saved recipe by slug. Returns the full recipe including ingredients, instructions, summary, servings, and nutrition. Useful when a calorie tracker wants to log every ingredient of a meal the user cooked."
+        "description": "Fetch one saved recipe by slug. Returns the full recipe including ingredients, instructions, summary, servings, and nutrition. Useful when a calorie tracker wants to log every ingredient of a meal the user cooked.",
+        "params": {
+          "type": "object",
+          "properties": {
+            "slug": { "type": "string", "maxLength": 80, "description": "URL-safe recipe id (lowercase letters, digits, hyphens)." }
+          },
+          "required": ["slug"]
+        },
+        "returns": {
+          "type": "object",
+          "properties": {
+            "recipe": { "type": ["object", "null"], "description": "Full saved recipe (title, ingredients, instructions, summary, servings, nutrition), or null if no match." }
+          }
+        }
       },
       "addRecipe": {
         "permission": "actions.write",
-        "description": "Save a recipe to the user's Recipes folder. Takes title, difficulty, cookTime, servings, ingredients, instructions, and optional summary + nutrition. Useful for meal planners pushing recipes into the user's library."
+        "description": "Save a recipe to the user's Recipes folder. Takes title, difficulty, cookTime, servings, ingredients, instructions, and optional summary + nutrition. Useful for meal planners pushing recipes into the user's library.",
+        "params": {
+          "type": "object",
+          "properties": {
+            "recipe": {
+              "type": "object",
+              "properties": {
+                "title": { "type": "string", "maxLength": 80 },
+                "difficulty": { "type": "string", "enum": ["easy", "medium", "hard"] },
+                "cookTime": { "type": "integer", "minimum": 0, "maximum": 720, "description": "Minutes." },
+                "servings": { "type": "integer", "minimum": 1, "maximum": 24, "description": "Defaults to 2 when omitted." },
+                "ingredients": { "type": "array", "items": { "type": "string", "maxLength": 80 } },
+                "instructions": { "type": "array", "items": { "type": "string", "maxLength": 400 } },
+                "summary": { "type": "string", "maxLength": 400 },
+                "nutrition": {
+                  "type": "object",
+                  "description": "Per-serving estimate (optional).",
+                  "properties": {
+                    "calories": { "type": "integer", "minimum": 0, "maximum": 10000 },
+                    "protein": { "type": "integer", "minimum": 0, "maximum": 1000 },
+                    "fat": { "type": "integer", "minimum": 0, "maximum": 1000 },
+                    "carbs": { "type": "integer", "minimum": 0, "maximum": 1000 }
+                  }
+                }
+              },
+              "required": ["title", "difficulty", "cookTime", "ingredients", "instructions"]
+            }
+          },
+          "required": ["recipe"]
+        },
+        "returns": {
+          "type": "object",
+          "properties": {
+            "slug": { "type": "string" },
+            "path": { "type": "string", "description": "VFS path the recipe was saved to." }
+          }
+        }
       },
       "markCooked": {
         "permission": "actions.write",
-        "description": "Mark a saved recipe as cooked (increment madeCount, update lastMadeAt). Takes slug. Useful for calorie/health apps confirming that a meal was eaten."
+        "description": "Mark a saved recipe as cooked (increment madeCount, update lastMadeAt). Takes slug. Useful for calorie/health apps confirming that a meal was eaten.",
+        "params": {
+          "type": "object",
+          "properties": {
+            "slug": { "type": "string", "maxLength": 80, "description": "URL-safe recipe id." }
+          },
+          "required": ["slug"]
+        },
+        "returns": {
+          "type": "object",
+          "properties": {
+            "madeCount": { "type": "integer" },
+            "lastMadeAt": { "type": "string", "description": "ISO timestamp of this cook." }
+          }
+        }
       }
     },
     "remoteActions": {
