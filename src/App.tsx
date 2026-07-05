@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { PantryItem, Recipe, RecipeSource, SavedRecipe } from "./types";
 import { HomeScreen } from "./screens/HomeScreen";
 import { RecipesBrowseScreen } from "./screens/RecipesBrowseScreen";
+import { StudioScreen } from "./screens/StudioScreen";
 import { PantryScreen } from "./screens/PantryScreen";
 import { PlanWeekScreen } from "./screens/PlanWeekScreen";
 import { GuidedCook } from "./screens/GuidedCook";
@@ -12,10 +13,11 @@ import { registerActions } from "./bridge/actions";
 import { ensureCatalogLoaded } from "./features/catalog";
 import { loadPantry, ingredientsFromPantry } from "./features/pantry";
 import { listSavedRecipes, markMade, saveRecipe } from "./features/storage";
+import { useWhoami } from "./hooks/useWhoami";
 import { Icon } from "./icons";
 import { APP_VERSION } from "./version";
 
-type Tab = "home" | "recipes" | "cook" | "plan";
+type Tab = "home" | "recipes" | "cook" | "plan" | "studio";
 type CookMode = "launcher" | "kitchen" | "describe" | "choose";
 /** What's loaded into the guided cook. `saved` set when it's a library recipe. */
 interface CookTarget {
@@ -31,6 +33,10 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export function App() {
+  const who = useWhoami();
+  // The Studio tab appears only for the chef account (whoami is display-only;
+  // the recipes-db backend re-verifies the chef role before any publish).
+  const tabs = who?.isChef ? [...TABS, { id: "studio" as Tab, label: "Studio" }] : TABS;
   const [tab, setTab] = useState<Tab>("home");
   const [recipeSource, setRecipeSource] = useState<RecipeSource>("all");
   const [cookMode, setCookMode] = useState<CookMode>("launcher");
@@ -76,7 +82,7 @@ export function App() {
         </h1>
         <div className="header-spacer" />
         <nav className="app-nav">
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <button
               key={t.id}
               className={`nav-btn${tab === t.id ? " active" : ""}`}
@@ -143,6 +149,7 @@ export function App() {
           </>
         )}
         {tab === "plan" && <PlanWeekScreen pantry={pantry} catalogVersion={catalogVersion} />}
+        {tab === "studio" && <StudioScreen />}
       </main>
       <footer className="app-version">v{APP_VERSION}</footer>
     </div>
