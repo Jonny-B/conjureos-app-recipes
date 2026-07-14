@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "description": "Recipes for ConjureOS: browse a catalog, keep a pantry, get suggestions ranked by what you have, and plan a week of meals that shares a shopping list.",
   "type": "module",
   "license": "MIT",
@@ -45,11 +45,26 @@
                   "savedAt": { "type": "string", "description": "ISO timestamp." },
                   "madeCount": { "type": "integer" },
                   "lastMadeAt": { "type": ["string", "null"], "description": "ISO timestamp of the last cook, or null." },
-                  "nutrition": { "type": ["object", "null"], "description": "Per-serving estimate, or null." }
-                }
+                  "nutrition": {
+                    "type": ["object", "null"],
+                    "description": "Per-serving estimate, or null when the lookup hasn't run or failed.",
+                    "properties": {
+                      "calories": { "type": "integer" },
+                      "protein": { "type": "integer", "description": "Grams." },
+                      "fat": { "type": "integer", "description": "Grams." },
+                      "carbs": { "type": "integer", "description": "Grams." },
+                      "matched": { "type": "integer", "description": "Ingredients matched to USDA entries." },
+                      "total": { "type": "integer", "description": "Total ingredient count." },
+                      "est": { "type": "boolean", "description": "Always true: estimated, not measured." }
+                    },
+                    "required": ["calories", "protein", "fat", "carbs", "matched", "total", "est"]
+                  }
+                },
+                "required": ["slug", "title", "difficulty", "cookTime", "servings", "ingredients", "savedAt", "madeCount", "lastMadeAt", "nutrition"]
               }
             }
-          }
+          },
+          "required": ["recipes"]
         }
       },
       "getRecipe": {
@@ -66,7 +81,8 @@
           "type": "object",
           "properties": {
             "recipe": { "type": ["object", "null"], "description": "Full saved recipe (title, ingredients, instructions, summary, servings, nutrition), or null if no match." }
-          }
+          },
+          "required": ["recipe"]
         }
       },
       "addRecipe": {
@@ -106,7 +122,8 @@
           "properties": {
             "slug": { "type": "string" },
             "path": { "type": "string", "description": "VFS path the recipe was saved to." }
-          }
+          },
+          "required": ["slug", "path"]
         }
       },
       "markCooked": {
@@ -124,7 +141,8 @@
           "properties": {
             "madeCount": { "type": "integer" },
             "lastMadeAt": { "type": "string", "description": "ISO timestamp of this cook." }
-          }
+          },
+          "required": ["madeCount", "lastMadeAt"]
         }
       }
     },
