@@ -13,7 +13,13 @@ import { Icon } from "../icons";
  * recipe library. Distinct from "Scan fridge", which reads ingredients to
  * generate brand-new recipes.
  */
-export function SnapRecipeScreen() {
+export function SnapRecipeScreen({
+  chefMode = false,
+  onPublished,
+}: {
+  chefMode?: boolean;
+  onPublished?: () => void;
+} = {}) {
   const [stage, setStage] = useState<"capture" | "reading" | "editing">("capture");
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   // Bumped per extraction so the RecipeEditor remounts on a re-snap.
@@ -58,7 +64,14 @@ export function SnapRecipeScreen() {
         <div className="muted" style={{ fontSize: 13 }}>
           Transcribed from your photo. Check it over, fix any line, then save.
         </div>
-        <RecipeEditor key={nonce} initial={recipe} onStartOver={reset} startOverLabel="Snap another" />
+        <RecipeEditor
+          key={nonce}
+          initial={recipe}
+          onStartOver={reset}
+          startOverLabel="Snap another"
+          chefMode={chefMode}
+          onPublished={onPublished}
+        />
       </div>
     );
   }

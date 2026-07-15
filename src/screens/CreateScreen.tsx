@@ -10,7 +10,13 @@ import { Icon } from "../icons";
  * RecipeEditor takes over: every line is editable by hand, an optional AI
  * "verify & tidy" pass runs over manual edits, and Save writes it to the DB.
  */
-export function CreateScreen() {
+export function CreateScreen({
+  chefMode = false,
+  onPublished,
+}: {
+  chefMode?: boolean;
+  onPublished?: () => void;
+} = {}) {
   const [text, setText] = useState("");
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   // Bumped on each (re)generate so the RecipeEditor remounts with fresh state.
@@ -80,7 +86,14 @@ export function CreateScreen() {
       </div>
 
       {recipe && (
-        <RecipeEditor key={nonce} initial={recipe} onStartOver={startOver} startOverLabel="Create another" />
+        <RecipeEditor
+          key={nonce}
+          initial={recipe}
+          onStartOver={startOver}
+          startOverLabel="Create another"
+          chefMode={chefMode}
+          onPublished={onPublished}
+        />
       )}
     </div>
   );

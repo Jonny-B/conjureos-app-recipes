@@ -45,6 +45,8 @@ interface DbRecipe {
   tokens: string[];
   nutrition: { calories: number; protein: number; fat: number; carbs: number } | null;
   summary: string | null;
+  blog: string | null;
+  chefFeatured: boolean;
   favorite: boolean;
   tags: string[];
   sourceUrl: string | null;
@@ -82,6 +84,8 @@ export function toCatalogRecipe(r: DbRecipe): CatalogRecipe {
     instructions: r.instructions,
     summary: r.summary ?? undefined,
     nutrition: toStrip(r.nutrition, r.ingredients.length),
+    blog: r.blog ?? undefined,
+    chefFeatured: r.chefFeatured,
     tags: r.tags,
     sourceUrl: r.sourceUrl ?? "",
     tokens: r.tokens,
@@ -98,6 +102,8 @@ export function toSavedRecipe(r: DbRecipe): SavedRecipe {
     instructions: r.instructions,
     summary: r.summary ?? undefined,
     nutrition: toStrip(r.nutrition, r.ingredients.length),
+    blog: r.blog ?? undefined,
+    chefFeatured: r.chefFeatured,
     path: `db:${r.id}`,
     slug: r.id,
     savedAt: r.createdAt,
@@ -131,6 +137,7 @@ function toPayload(
     ingredients: recipe.ingredients,
     instructions: recipe.instructions,
     summary: recipe.summary ?? null,
+    blog: recipe.blog ?? null,
     tokens: recipe.tokens ?? [],
     tags: recipe.tags ?? [],
     sourceUrl: recipe.sourceUrl ?? null,
@@ -221,4 +228,36 @@ export async function setVisibility(id: string, visibility: "public" | "unlisted
   const r = await invoke("setVisibility", { id, visibility });
   if (!r.recipe) throw new Error("setVisibility failed");
   return toSavedRecipe(r.recipe);
+}
+
+// ── Chef Payson ─────────────────────────────────────────────────────────
+
+/**
+ * Create or update a promoted "Chef Payson" recipe (with optional blog). The
+ * backend re-verifies the chef role from the minted token; a non-chef caller
+ * gets a 403 here. Chef posts are forced public + chef_featured server-side.
+ */
+export async function publishChefRecipe(
+  recipe: Recipe & { category?: string; tags?: string[]; sourceUrl?: string; blog?: string },
+  id?: string,
+): Promise<SavedRecipe> {
+  const r = await invoke("chefUpsert", { ...(id ? { id } : {}), recipe: toPayload(recipe) });
+  if (!r.recipe) throw new Error("publish failed");
+  return toSavedRecipe(r.recipe);
+}
+
+/**
+ * Public feed of promoted chef recipes, newest first (no auth). Returned as
+ * CatalogRecipe (read-only public shape, carries blog + chefFeatured) so both
+ * the home promo and the Studio list reuse the existing catalog detail path.
+ */
+export async function fetchChefLatest(limit = 12): Promise<CatalogRecipe[]> {
+  const res = await fetch(apiUrl(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "chefFeed", limit }),
+  });
+  if (!res.ok) throw new Error(`chefFeed ${res.status}`);
+  const j = (await res.json()) as { recipes?: DbRecipe[] };
+  return (j.recipes ?? []).map(toCatalogRecipe);
 }

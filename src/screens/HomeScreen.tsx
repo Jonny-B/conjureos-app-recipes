@@ -14,6 +14,8 @@ import { ingredientsFromPantry } from "../features/pantry";
 import { computeCoverage, prettyIngredient } from "../features/scaling";
 import { RecipeRow } from "../components/RecipeRow";
 import { RecipeDetail } from "./RecipeDetail";
+import { CHEF_NAME } from "./StudioScreen";
+import { fetchChefLatest } from "../bridge/recipesApi";
 import { Icon, type IconName } from "../icons";
 
 type NavTab = "cook" | "recipes" | "plan";
@@ -48,6 +50,7 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
   const [loaded, setLoaded] = useState(false);
   const [shuffle, setShuffle] = useState(0);
   const [selected, setSelected] = useState<FeedRecipe | null>(null);
+  const [chefPick, setChefPick] = useState<CatalogRecipe | null>(null);
 
   const refresh = useCallback(async () => {
     const [s, f] = await Promise.all([listSavedRecipes(), loadFavorites()]);
@@ -58,6 +61,12 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
   useEffect(() => {
     refresh();
   }, [refresh]);
+  // Chef Payson's newest promoted recipe (best-effort; absent if none/offline).
+  useEffect(() => {
+    fetchChefLatest(1)
+      .then((list) => setChefPick(list[0] ?? null))
+      .catch(() => {});
+  }, []);
 
   const catalog = useMemo(() => getCatalog(), [catalogVersion]);
   const pantryIng = useMemo(() => (pantry ? ingredientsFromPantry(pantry) : []), [pantry]);
@@ -159,6 +168,21 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
           onShuffle={() => setShuffle((s) => s + 1)}
           canShuffle={topN > 1}
         />
+      )}
+
+      {chefPick && (
+        <button
+          className="chef-promo"
+          onClick={() =>
+            setSelected({ kind: "catalog", id: chefPick.id, recipe: chefPick, favorite: favs.has(chefPick.id) })
+          }
+        >
+          <span className="chef-promo-eyebrow">
+            <Icon name="utensils" /> {CHEF_NAME}'s newest recipe
+          </span>
+          <span className="chef-promo-title">{chefPick.title}</span>
+          {chefPick.summary && <span className="chef-promo-sub">{chefPick.summary}</span>}
+        </button>
       )}
 
       <div className="stat-row">
