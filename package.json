@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.9.4",
+  "version": "0.11.0",
   "description": "Recipes for ConjureOS: browse a catalog, keep a pantry, get suggestions ranked by what you have, and plan a week of meals that shares a shopping list.",
   "type": "module",
   "license": "MIT",
@@ -125,6 +125,10 @@
           },
           "required": ["slug", "path"]
         }
+      },
+      "importRecipeFromImage": {
+        "permission": "actions.write",
+        "description": "Transcribe a recipe from one or more attached photos (a recipe card, cookbook or magazine page, handwritten note, or screenshot) and save it to the user's recipe library. Takes images: an array of { mediaType, data } photos. THIS is the action to use when the user attaches a photo of a recipe and asks to add, save, or import it into their recipes."
       },
       "markCooked": {
         "permission": "actions.write",
