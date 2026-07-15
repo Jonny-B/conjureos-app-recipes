@@ -2,6 +2,7 @@ import { useEffect, useState, type KeyboardEvent } from "react";
 import type { Recipe } from "../types";
 import { reviewRecipe } from "../features/customRecipe";
 import { saveRecipe } from "../features/storage";
+import { publishChefRecipe } from "../bridge/recipesApi";
 import { Icon } from "../icons";
 
 /**
@@ -18,12 +19,25 @@ export function RecipeEditor({
   initial,
   onStartOver,
   startOverLabel = "Create another",
+  chefMode = false,
+  editId,
+  onPublished,
 }: {
   initial: Recipe;
   onStartOver: () => void;
   startOverLabel?: string;
+  /** Chef Payson Studio: show the blog editor + publish as a promoted post. */
+  chefMode?: boolean;
+  /** When editing an existing chef post, its DB id (chefUpsert updates it). */
+  editId?: string;
+  /** Called after a successful chef publish, so the Studio can refresh its list. */
+  onPublished?: () => void;
 }) {
   const [recipe, setRecipe] = useState<Recipe>(initial);
+  // Blog lives in its OWN state (not on `recipe`) so writing it never marks the
+  // recipe dirty and the AI "tidy" pass — which only reshapes the recipe — can't
+  // strip it. Merged back in only at publish time.
+  const [blog, setBlog] = useState(initial.blog ?? "");
   const [busy, setBusy] = useState<null | "tidying" | "saving">(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -57,7 +71,12 @@ export function RecipeEditor({
     setError(null);
     setBusy("saving");
     try {
-      await saveRecipe(recipe);
+      if (chefMode) {
+        await publishChefRecipe({ ...recipe, blog: blog.trim() || undefined }, editId);
+        onPublished?.();
+      } else {
+        await saveRecipe(recipe);
+      }
       setSaved(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -84,6 +103,10 @@ export function RecipeEditor({
         onSave={save}
         onStartOver={onStartOver}
         startOverLabel={startOverLabel}
+        chefMode={chefMode}
+        editId={editId}
+        blog={blog}
+        onBlogChange={setBlog}
       />
     </>
   );
@@ -99,6 +122,10 @@ interface PreviewProps {
   onSave: () => void;
   onStartOver: () => void;
   startOverLabel: string;
+  chefMode: boolean;
+  editId?: string;
+  blog: string;
+  onBlogChange: (v: string) => void;
 }
 
 function EditablePreview({
@@ -111,6 +138,10 @@ function EditablePreview({
   onSave,
   onStartOver,
   startOverLabel,
+  chefMode,
+  editId,
+  blog,
+  onBlogChange,
 }: PreviewProps) {
   // Edit mode is off by default: the recipe reads as a clean card until the
   // user clicks Edit, which reveals the inline editors, trash, and add
@@ -193,11 +224,32 @@ function EditablePreview({
         )}
       </section>
 
+      {chefMode && (
+        <section>
+          <h4>
+            Your story{" "}
+            <span className="muted" style={{ fontWeight: 400, fontSize: 13 }}>(optional blog)</span>
+          </h4>
+          <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+            The story behind the dish — a memory, where it's from, a bit of your life and career.
+            Readers scroll through this before the recipe, or skip straight to it. Markdown supported.
+          </p>
+          <textarea
+            className="chef-blog-input"
+            value={blog}
+            onChange={(e) => onBlogChange(e.target.value)}
+            placeholder="Write as much or as little as you like…"
+            rows={8}
+            maxLength={20000}
+          />
+        </section>
+      )}
+
       <div className="row" style={{ marginTop: "auto", flexWrap: "wrap", gap: 8 }}>
         {saved ? (
           <>
             <span className="muted" style={{ fontSize: 13, display: "inline-flex", alignItems: "center", gap: 5 }}>
-              <Icon name="check" /> Saved to your Recipes
+              <Icon name="check" /> {chefMode ? "Published as Chef Payson" : "Saved to your Recipes"}
             </span>
             <button className="btn secondary" onClick={onStartOver}>{startOverLabel}</button>
           </>
@@ -215,7 +267,15 @@ function EditablePreview({
               </button>
             ) : (
               <button className="btn" onClick={onSave} disabled={busy !== null}>
-                {busy === "saving" ? "Saving…" : "Save recipe"}
+                {busy === "saving"
+                  ? chefMode
+                    ? "Publishing…"
+                    : "Saving…"
+                  : chefMode
+                    ? editId
+                      ? "Update recipe"
+                      : "Publish as Chef Payson"
+                    : "Save recipe"}
               </button>
             )}
           </>

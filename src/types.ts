@@ -61,6 +61,14 @@ export interface Recipe {
   summary?: string;
   /** Per-serving estimated macros from USDA FoodData Central. Null when lookup hasn't run yet or failed. */
   nutrition?: NutritionStrip | null;
+  /**
+   * Optional long-form markdown story attached to the recipe (Chef Payson's
+   * blog — his life/career notes). Rendered above the recipe like mainstream
+   * recipe sites, with a "Jump to recipe" skip. Only chef posts set this today.
+   */
+  blog?: string;
+  /** True when this is a promoted "Chef Payson" recipe (server-set). */
+  chefFeatured?: boolean;
 }
 
 /**

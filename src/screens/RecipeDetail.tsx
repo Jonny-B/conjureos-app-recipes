@@ -1,9 +1,31 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FeedRecipe, PantryItem, Recipe, SavedRecipe } from "../types";
 import { ingredientsFromPantry } from "../features/pantry";
 import { computeAvailability, computeCoverage } from "../features/scaling";
 import { parseIngredient, formatStrip } from "../features/nutrition";
+import { CHEF_NAME } from "./StudioScreen";
 import { Icon } from "../icons";
+
+/**
+ * Minimal, safe blog renderer: blank-line-separated blocks become headings
+ * (`#`, `##`) or paragraphs. Single newlines are preserved. No HTML/markdown
+ * library, no dangerouslySetInnerHTML — just text, so nothing can be injected.
+ */
+function renderBlog(text: string): ReactNode[] {
+  return text
+    .split(/\n{2,}/)
+    .map((b) => b.trim())
+    .filter(Boolean)
+    .map((block, i) => {
+      if (block.startsWith("## ")) return <h5 key={i}>{block.slice(3)}</h5>;
+      if (block.startsWith("# ")) return <h4 key={i}>{block.slice(2)}</h4>;
+      return (
+        <p key={i} style={{ whiteSpace: "pre-wrap" }}>
+          {block}
+        </p>
+      );
+    });
+}
 
 interface Props {
   feed: FeedRecipe;
@@ -39,6 +61,7 @@ export function RecipeDetail({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const recipeRef = useRef<HTMLDivElement | null>(null);
   const recipe: Recipe = feed.recipe;
 
   useEffect(() => {
@@ -150,10 +173,24 @@ export function RecipeDetail({
             <span className="pill">made {feed.recipe.madeCount}×</span>
           )}
         </div>
+        {recipe.chefFeatured && <div className="chef-byline">By {CHEF_NAME}</div>}
 
         {recipe.summary && <p className="summary">{recipe.summary}</p>}
         {recipe.nutrition && (
           <div className="muted" style={{ fontSize: 12, lineHeight: 1.4 }}>{formatStrip(recipe.nutrition)}</div>
+        )}
+
+        {/* Chef's blog: the story you scroll past on recipe sites — with a skip. */}
+        {recipe.blog && (
+          <section className="chef-blog">
+            <button
+              className="btn ghost jump-to-recipe"
+              onClick={() => recipeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            >
+              Jump to recipe <Icon name="chevron-down" />
+            </button>
+            <div className="chef-blog-body">{renderBlog(recipe.blog)}</div>
+          </section>
         )}
 
         {cov && (
@@ -167,6 +204,7 @@ export function RecipeDetail({
           </div>
         )}
 
+        <div ref={recipeRef} />
         <section>
           <h4>Ingredients</h4>
           <ul>
