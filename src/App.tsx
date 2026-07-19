@@ -15,6 +15,7 @@ import { loadPantry, ingredientsFromPantry } from "./features/pantry";
 import { listSavedRecipes, markMade, saveRecipe } from "./features/storage";
 import { useWhoami } from "./hooks/useWhoami";
 import { Icon } from "./icons";
+import type { IconName } from "./icons";
 import { APP_VERSION } from "./version";
 
 type Tab = "home" | "recipes" | "cook" | "plan" | "studio";
@@ -25,18 +26,20 @@ interface CookTarget {
   saved: SavedRecipe | null;
 }
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "home", label: "Home" },
-  { id: "recipes", label: "Recipes" },
-  { id: "cook", label: "Cook" },
-  { id: "plan", label: "Plan" },
+const TABS: { id: Tab; label: string; icon: IconName }[] = [
+  { id: "home", label: "Home", icon: "house" },
+  { id: "recipes", label: "Recipes", icon: "utensils" },
+  { id: "cook", label: "Cook", icon: "bowl-food" },
+  { id: "plan", label: "Plan", icon: "calendar-days" },
 ];
 
 export function App() {
   const who = useWhoami();
   // The Studio tab appears only for the chef account (whoami is display-only;
   // the recipes-db backend re-verifies the chef role before any publish).
-  const tabs = who?.isChef ? [...TABS, { id: "studio" as Tab, label: "Studio" }] : TABS;
+  const tabs = who?.isChef
+    ? [...TABS, { id: "studio" as Tab, label: "Studio", icon: "wand" as IconName }]
+    : TABS;
   const [tab, setTab] = useState<Tab>("home");
   const [recipeSource, setRecipeSource] = useState<RecipeSource>("all");
   const [cookMode, setCookMode] = useState<CookMode>("launcher");
@@ -75,28 +78,12 @@ export function App() {
 
   return (
     <div className="app">
-      <header className="app-header">
-        <h1>
-          <Icon name="utensils" className="brand-icon" />
-          Recipes
-        </h1>
-        <div className="header-spacer" />
-        <nav className="app-nav">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              className={`nav-btn${tab === t.id ? " active" : ""}`}
-              onClick={() => {
-                // Leaving a guided cook via the nav always returns to a real
-                // tab view (the launcher / last pane), never a stale recipe.
-                setCookTarget(null);
-                setTab(t.id);
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
-        </nav>
+      <header className="topbar">
+        <span className="brand-mark">
+          <Icon name="utensils" />
+        </span>
+        <span className="topbar-title">Recipes</span>
+        <span className="topbar-slot" />
       </header>
       <main className="app-body">
         {tab === "home" && (
@@ -151,6 +138,27 @@ export function App() {
         {tab === "plan" && <PlanWeekScreen pantry={pantry} catalogVersion={catalogVersion} />}
         {tab === "studio" && <StudioScreen />}
       </main>
+      <nav className="tabbar">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            className={`tab${tab === t.id ? " active" : ""}`}
+            aria-label={t.label}
+            aria-current={tab === t.id ? "page" : undefined}
+            onClick={() => {
+              // Leaving a guided cook via the nav always returns to a real
+              // tab view (the launcher / last pane), never a stale recipe.
+              setCookTarget(null);
+              setTab(t.id);
+            }}
+          >
+            <span className="tab-icon">
+              <Icon name={t.icon} />
+            </span>
+            <span className="tab-label">{t.label}</span>
+          </button>
+        ))}
+      </nav>
       <footer className="app-version">v{APP_VERSION}</footer>
     </div>
   );
