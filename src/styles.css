@@ -2024,8 +2024,10 @@ select {
 
 .quick-actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
+  /* Three across on one line (minmax(0,…) lets them shrink on a phone rather
+     than wrapping the third card onto its own row). */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .quick-action {
@@ -2033,7 +2035,7 @@ select {
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
-  padding: 18px;
+  padding: 14px 12px;
   border-radius: 18px;
   background: var(--bg-1);
   border: 1px solid var(--border);
