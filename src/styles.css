@@ -2137,6 +2137,38 @@ select {
 .describe-toggle input { width: 16px; height: 16px; }
 
 /* ── Library header (search + filter + add) ─────────────────────────── */
+/* Segmented "ours vs. yours" switch — the primary control on the Recipes tab. */
+.seg {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--cui-border);
+  border-radius: var(--cui-radius-pill);
+}
+.seg-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--cui-fg-mute);
+  padding: 9px 10px;
+  border-radius: var(--cui-radius-pill);
+  font-size: 13px;
+  font-weight: var(--cui-weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--cui-duration-fast) var(--cui-ease),
+              color var(--cui-duration-fast) var(--cui-ease);
+}
+.seg-btn:hover {
+  color: var(--cui-fg);
+}
+.seg-btn.active {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(124, 106, 247, 0.6), rgba(74, 158, 255, 0.45));
+  box-shadow: 0 0 0 1px var(--cui-accent-tint), 0 4px 12px rgba(124, 106, 247, 0.25);
+}
+
 .lib-header { display: flex; align-items: center; gap: 8px; }
 .lib-header .browse-filter { flex: 1; }
 .lib-icon {

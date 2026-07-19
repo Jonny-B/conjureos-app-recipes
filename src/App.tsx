@@ -7,19 +7,18 @@ import { PantryScreen } from "./screens/PantryScreen";
 import { PlanWeekScreen } from "./screens/PlanWeekScreen";
 import { GuidedCook } from "./screens/GuidedCook";
 import { RecipesScreen } from "./screens/RecipesScreen";
-import { RecipeRow } from "./components/RecipeRow";
 import { generateFromDescription } from "./features/recipes";
 import { registerActions } from "./bridge/actions";
 import { ensureCatalogLoaded } from "./features/catalog";
 import { loadPantry, ingredientsFromPantry } from "./features/pantry";
-import { listSavedRecipes, markMade, saveRecipe } from "./features/storage";
+import { markMade, saveRecipe } from "./features/storage";
 import { useWhoami } from "./hooks/useWhoami";
 import { Icon } from "./icons";
 import type { IconName } from "./icons";
 import { APP_VERSION } from "./version";
 
 type Tab = "home" | "recipes" | "cook" | "plan" | "studio";
-type CookMode = "launcher" | "kitchen" | "describe" | "choose";
+type CookMode = "launcher" | "kitchen" | "describe";
 /** What's loaded into the guided cook. `saved` set when it's a library recipe. */
 interface CookTarget {
   recipe: Recipe;
@@ -196,7 +195,6 @@ function CookTab({
       />
     );
   if (mode === "describe") return <DescribePane pantry={pantry} onBack={back} onCook={onCook} />;
-  if (mode === "choose") return <ChoosePane onBack={back} onCook={onCook} />;
 
   return (
     <div className="cook-launcher">
@@ -211,12 +209,6 @@ function CookTab({
         title="Describe a dish"
         sub="Tell the AI what you fancy and it writes you a recipe"
         onClick={() => onModeChange("describe")}
-      />
-      <LauncherCard
-        icon="bowl-food"
-        title="Cook one of mine"
-        sub="Pick a saved recipe and cook it step by step"
-        onClick={() => onModeChange("choose")}
       />
     </div>
   );
@@ -329,63 +321,6 @@ function DescribePane({
       <button className="btn" disabled={!text.trim()} onClick={go}>
         <Icon name="wand" /> Create recipe
       </button>
-    </div>
-  );
-}
-
-/** Pick a saved recipe to cook. */
-function ChoosePane({
-  onBack,
-  onCook,
-}: {
-  onBack: () => void;
-  onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
-}) {
-  const [saved, setSaved] = useState<SavedRecipe[]>([]);
-  const [q, setQ] = useState("");
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    listSavedRecipes()
-      .then((s) => {
-        setSaved(s);
-        setLoaded(true);
-      })
-      .catch(() => setLoaded(true));
-  }, []);
-
-  const filtered = saved.filter((r) => !q || r.title.toLowerCase().includes(q.toLowerCase()));
-
-  return (
-    <div className="browse-screen">
-      <BackBar label="Cook" onBack={onBack} />
-      <h2>Cook one of mine</h2>
-      <div className="browse-filter">
-        <Icon name="magnifying-glass" />
-        <input type="text" placeholder="Search your recipes…" value={q} onChange={(e) => setQ(e.target.value)} />
-      </div>
-      {!loaded ? (
-        <div className="center-spinner"><div className="spinner" /></div>
-      ) : filtered.length === 0 ? (
-        <div className="empty-state">
-          <Icon name="bowl-food" className="empty-icon" />
-          <div>
-            {saved.length === 0
-              ? "No saved recipes yet. Add some in the Recipes tab, then cook them here."
-              : "No saved recipes match that search."}
-          </div>
-        </div>
-      ) : (
-        <div className="browse-list">
-          {filtered.map((r) => (
-            <RecipeRow
-              key={r.path}
-              fi={{ kind: "saved", recipe: r, favorite: !!r.favorite }}
-              onOpen={() => onCook(r, r)}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
