@@ -106,7 +106,9 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
   );
 
   const resetPaging = () => setPage(1);
-  const activeFilters = (source !== "all" ? 1 : 0) + (source === "all" && category !== "all" ? 1 : 0);
+  // Source now lives in the always-visible segmented switch, so it's no longer a
+  // hidden "filter"; only the category dropdown (All view) counts here.
+  const activeFilters = source === "all" && category !== "all" ? 1 : 0;
 
   // ── mutations ──────────────────────────────────────────────────────
   const onToggleFavorite = async (fi: FeedRecipe) => {
@@ -181,6 +183,25 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
 
   return (
     <div className="browse-screen">
+      {/* Ours vs. yours: the primary switch for the whole tab. */}
+      <div className="seg" role="tablist" aria-label="Which recipes">
+        {SOURCE_TABS.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={source === t.id}
+            className={`seg-btn${source === t.id ? " active" : ""}`}
+            onClick={() => {
+              onSourceChange(t.id);
+              setFilterOpen(false);
+              resetPaging();
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       {/* One slim control bar: search + filter + add. Everything else is the list. */}
       <div className="lib-header">
         <div className="browse-filter">
@@ -195,18 +216,20 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
             }}
           />
         </div>
-        <button
-          className={`icon-btn lib-icon${filterOpen || activeFilters ? " active" : ""}`}
-          onClick={() => {
-            setFilterOpen((v) => !v);
-            setAddOpen(false);
-          }}
-          aria-label="Filter"
-          title="Filter"
-        >
-          <Icon name="sliders" />
-          {activeFilters > 0 && <span className="lib-badge">{activeFilters}</span>}
-        </button>
+        {source === "all" && (
+          <button
+            className={`icon-btn lib-icon${filterOpen || activeFilters ? " active" : ""}`}
+            onClick={() => {
+              setFilterOpen((v) => !v);
+              setAddOpen(false);
+            }}
+            aria-label="Filter"
+            title="Filter by category"
+          >
+            <Icon name="sliders" />
+            {activeFilters > 0 && <span className="lib-badge">{activeFilters}</span>}
+          </button>
+        )}
         <button
           className={`icon-btn lib-icon${addOpen ? " active" : ""}`}
           onClick={() => {
@@ -220,37 +243,18 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
         </button>
       </div>
 
-      {filterOpen && (
+      {filterOpen && source === "all" && (
         <div className="lib-panel">
-          <div className="lib-panel-label">Show</div>
-          <div className="source-filter">
-            {SOURCE_TABS.map((t) => (
-              <button
-                key={t.id}
-                className={`nav-btn${source === t.id ? " active" : ""}`}
-                onClick={() => {
-                  onSourceChange(t.id);
-                  resetPaging();
-                }}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-          {source === "all" && (
-            <>
-              <div className="lib-panel-label">Category</div>
-              <Dropdown
-                options={categoryOptions}
-                value={category}
-                onChange={(v) => {
-                  setCategory(v);
-                  resetPaging();
-                }}
-                ariaLabel="Filter by category"
-              />
-            </>
-          )}
+          <div className="lib-panel-label">Category</div>
+          <Dropdown
+            options={categoryOptions}
+            value={category}
+            onChange={(v) => {
+              setCategory(v);
+              resetPaging();
+            }}
+            ariaLabel="Filter by category"
+          />
         </div>
       )}
 
