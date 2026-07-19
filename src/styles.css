@@ -1913,8 +1913,10 @@ select {
 /* At-a-glance stats */
 .stat-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 12px;
+  /* Always three across on one line (minmax(0,…) lets them shrink on a phone
+     instead of wrapping the third tile onto its own row). */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .stat-tile {
@@ -1922,7 +1924,7 @@ select {
   flex-direction: column;
   align-items: flex-start;
   gap: 3px;
-  padding: 16px 18px;
+  padding: 15px 14px;
   border-radius: 18px;
   background: var(--bg-1);
   border: 1px solid var(--border);

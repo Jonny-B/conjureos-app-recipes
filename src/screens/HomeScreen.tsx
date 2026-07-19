@@ -72,9 +72,12 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
   const pantryIng = useMemo(() => (pantry ? ingredientsFromPantry(pantry) : []), [pantry]);
   const hasPantry = pantryIng.length > 0;
 
+  // Daily seed: reshuffles equal-scored ties once a day so "Tonight's pick"
+  // (and the idea lists) feel fresh day-to-day instead of frozen.
+  const seed = daySeed();
   const scored = useMemo(
-    () => buildScored(catalog, saved, favs, pantryIng, hasPantry),
-    [catalog, saved, favs, pantryIng, hasPantry],
+    () => buildScored(catalog, saved, favs, pantryIng, hasPantry, seed),
+    [catalog, saved, favs, pantryIng, hasPantry, seed],
   );
 
   const favoriteItems = useMemo(() => scored.filter((s) => s.fi.favorite), [scored]);
@@ -83,10 +86,14 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
     [scored, hasPantry],
   );
 
-  // "Tonight's pick" rotates among the top matches: best-first, with a daily
-  // seed for a fresh feel and a reshuffle button to cycle through.
-  const topN = Math.min(8, scored.length);
-  const heroIdx = topN > 0 ? (daySeed() + shuffle) % topN : -1;
+  // "Tonight's pick" rotates through the matches. With a pantry we keep the
+  // pool tight (the best coverage matches); without one, every catalog recipe
+  // scores about the same, so we open the pool wide and let the seeded-hash
+  // ordering (see buildScored) spread the picks across the whole catalog —
+  // otherwise the flat scores fall back to an alphabetical tiebreak and the
+  // rotate button just loops through the "A" recipes forever.
+  const heroPoolSize = Math.min(hasPantry ? 12 : 50, scored.length);
+  const heroIdx = heroPoolSize > 0 ? shuffle % heroPoolSize : -1;
   const hero = heroIdx >= 0 ? scored[heroIdx]! : null;
   const ideas = useMemo(
     () => scored.filter((_, i) => i !== heroIdx).slice(0, 4),
@@ -166,7 +173,7 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
           scored={hero}
           onView={() => setSelected(hero.fi)}
           onShuffle={() => setShuffle((s) => s + 1)}
-          canShuffle={topN > 1}
+          canShuffle={heroPoolSize > 1}
         />
       )}
 
@@ -380,6 +387,7 @@ function buildScored(
   favs: Set<string>,
   pantryIng: ReturnType<typeof ingredientsFromPantry>,
   hasPantry: boolean,
+  seed: number,
 ): Scored[] {
   const items: FeedRecipe[] = [];
   for (const r of saved) if (r.favorite) items.push({ kind: "saved", recipe: r, favorite: true });
@@ -395,8 +403,23 @@ function buildScored(
     if (cov && cov.total > 0 && cov.missing === 0) score += 0.3;
     return { fi, cov, score, reason: reasonFor(fi, cov) };
   });
-  scored.sort((a, b) => b.score - a.score || a.fi.recipe.title.localeCompare(b.fi.recipe.title));
-  return scored;
+  // Tiebreak on a per-recipe seeded hash, NOT the title. A title tiebreak makes
+  // equal-scored recipes sort alphabetically, so when scores are flat (no
+  // pantry) the whole top of the list is "A" recipes and the hero rotation
+  // loops through them. The hash scatters equal-scored items across the
+  // catalog, and folding in the daily seed reshuffles them once a day.
+  return scored.sort((a, b) => b.score - a.score || shuffleKey(a.fi, seed) - shuffleKey(b.fi, seed));
+}
+
+/** Stable FNV-1a hash of the recipe key mixed with a seed → a uint32 sort key. */
+function shuffleKey(fi: FeedRecipe, seed: number): number {
+  const str = `${keyOf(fi)}:${seed}`;
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
 }
 
 function reasonFor(fi: FeedRecipe, cov: CoverageResult | null): string {
