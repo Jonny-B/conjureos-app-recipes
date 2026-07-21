@@ -2492,3 +2492,49 @@ select {
   background: var(--accent-soft);
   color: var(--accent-warm);
 }
+
+/* ── Admin console ─────────────────────────────────────────────────────── */
+.admin-screen {
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.admin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  transition: opacity var(--cui-duration) var(--cui-ease);
+}
+.admin-row.busy { opacity: 0.5; pointer-events: none; }
+.admin-id { min-width: 0; }
+.admin-name {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.admin-you {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cui-accent-soft);
+  background: var(--cui-accent-mute);
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+.admin-email { font-size: 12px; color: var(--fg-dim); margin-top: 2px; }
+.admin-seen { font-size: 11px; color: var(--fg-faint); margin-top: 2px; }
+.admin-role { flex: 0 0 auto; }
