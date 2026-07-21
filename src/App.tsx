@@ -3,6 +3,7 @@ import type { PantryItem, Recipe, RecipeSource, SavedRecipe } from "./types";
 import { HomeScreen } from "./screens/HomeScreen";
 import { RecipesBrowseScreen } from "./screens/RecipesBrowseScreen";
 import { StudioScreen } from "./screens/StudioScreen";
+import { AdminScreen } from "./screens/AdminScreen";
 import { PantryScreen } from "./screens/PantryScreen";
 import { PlanWeekScreen } from "./screens/PlanWeekScreen";
 import { GuidedCook } from "./screens/GuidedCook";
@@ -13,11 +14,12 @@ import { ensureCatalogLoaded } from "./features/catalog";
 import { loadPantry, ingredientsFromPantry } from "./features/pantry";
 import { markMade, saveRecipe } from "./features/storage";
 import { useWhoami } from "./hooks/useWhoami";
+import { useRole } from "./hooks/useRole";
 import { Icon } from "./icons";
 import type { IconName } from "./icons";
 import { APP_VERSION } from "./version";
 
-type Tab = "home" | "recipes" | "cook" | "plan" | "studio";
+type Tab = "home" | "recipes" | "cook" | "plan" | "studio" | "admin";
 type CookMode = "launcher" | "kitchen" | "describe";
 /** What's loaded into the guided cook. `saved` set when it's a library recipe. */
 interface CookTarget {
@@ -34,11 +36,13 @@ const TABS: { id: Tab; label: string; icon: IconName }[] = [
 
 export function App() {
   const who = useWhoami();
-  // The Studio tab appears only for the chef account (whoami is display-only;
-  // the recipes-db backend re-verifies the chef role before any publish).
-  const tabs = who?.isChef
-    ? [...TABS, { id: "studio" as Tab, label: "Studio", icon: "wand" as IconName }]
-    : TABS;
+  // Role comes from recipes-db (derived from the minted identity token) — the
+  // server is authoritative; these tabs are just the reveal. Studio stays on the
+  // legacy whoami flag until the chef publish backend lands; Admin is role-gated.
+  const { role, email: myEmail } = useRole();
+  const tabs = [...TABS];
+  if (who?.isChef) tabs.push({ id: "studio" as Tab, label: "Studio", icon: "wand" as IconName });
+  if (role === "admin") tabs.push({ id: "admin" as Tab, label: "Admin", icon: "sliders" as IconName });
   const [tab, setTab] = useState<Tab>("home");
   const [recipeSource, setRecipeSource] = useState<RecipeSource>("all");
   const [cookMode, setCookMode] = useState<CookMode>("launcher");
@@ -136,6 +140,7 @@ export function App() {
         )}
         {tab === "plan" && <PlanWeekScreen pantry={pantry} catalogVersion={catalogVersion} />}
         {tab === "studio" && <StudioScreen />}
+        {tab === "admin" && <AdminScreen myEmail={myEmail} />}
       </main>
       <nav className="tabbar">
         {tabs.map((t) => (

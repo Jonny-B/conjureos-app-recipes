@@ -261,3 +261,60 @@ export async function fetchChefLatest(limit = 12): Promise<CatalogRecipe[]> {
   const j = (await res.json()) as { recipes?: DbRecipe[] };
   return (j.recipes ?? []).map(toCatalogRecipe);
 }
+
+// ── roles + admin console ────────────────────────────────────────────────
+
+export type AppRole = "user" | "chef" | "admin";
+
+export interface AppUser {
+  userId: string;
+  email: string | null;
+  displayName: string | null;
+  role: AppRole;
+  createdAt: string;
+  lastSeenAt: string;
+}
+
+/** Generic remote-action call for endpoints that don't return recipe shapes. */
+async function invokeRaw<T>(action: string, params: Record<string, unknown> = {}): Promise<T> {
+  const actions = cjs().actions;
+  if (!actions?.invoke) throw new Error("Recipes backend is unavailable (open this inside ConjureOS).");
+  return (await actions.invoke(APP_PATH, REMOTE_ACTION, { action, ...params })) as T;
+}
+
+/**
+ * The signed-in user's role. Drives which surfaces the app reveals (chef →
+ * Studio, admin → Admin console). Server-authoritative: derived from the
+ * minted identity token in recipes-db, never trusted from the client.
+ * Dev mock poses as admin so both gated surfaces are iterable under `npm run dev`.
+ */
+export async function getMyRole(): Promise<{ role: AppRole; email: string | null }> {
+  if (!isBackendAvailable()) return { role: "admin", email: "dev@local" };
+  const r = await invokeRaw<{ role?: AppRole; email?: string | null }>("myRole");
+  return { role: r.role ?? "user", email: r.email ?? null };
+}
+
+/** Admin-only: search the user directory (by email / display name). */
+export async function adminListUsers(query = "", limit = 50, offset = 0): Promise<{ users: AppUser[]; total: number }> {
+  if (!isBackendAvailable()) return { users: MOCK_USERS, total: MOCK_USERS.length };
+  const r = await invokeRaw<{ users?: AppUser[]; total?: number }>("adminListUsers", { query, limit, offset });
+  return { users: r.users ?? [], total: r.total ?? 0 };
+}
+
+/** Admin-only: set a user's role. */
+export async function adminSetRole(userId: string, role: AppRole): Promise<AppUser> {
+  if (!isBackendAvailable()) {
+    const u = MOCK_USERS.find((m) => m.userId === userId);
+    if (u) u.role = role;
+    return u ?? { userId, email: null, displayName: null, role, createdAt: "", lastSeenAt: "" };
+  }
+  const r = await invokeRaw<{ user?: AppUser }>("adminSetRole", { userId, role });
+  if (!r.user) throw new Error("role change failed");
+  return r.user;
+}
+
+const MOCK_USERS: AppUser[] = [
+  { userId: "u-1", email: "you@dev.local", displayName: "You", role: "admin", createdAt: "2026-05-28T00:00:00Z", lastSeenAt: "2026-07-20T12:00:00Z" },
+  { userId: "u-2", email: "uncle@dev.local", displayName: "Uncle (Chef)", role: "chef", createdAt: "2026-06-01T00:00:00Z", lastSeenAt: "2026-07-19T09:00:00Z" },
+  { userId: "u-3", email: "tester@dev.local", displayName: "Tester", role: "user", createdAt: "2026-06-10T00:00:00Z", lastSeenAt: "2026-07-18T20:00:00Z" },
+];
