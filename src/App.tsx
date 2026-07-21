@@ -39,7 +39,7 @@ export function App() {
   // Role comes from recipes-db (derived from the minted identity token) — the
   // server is authoritative; these tabs are just the reveal. Studio stays on the
   // legacy whoami flag until the chef publish backend lands; Admin is role-gated.
-  const { role, email: myEmail } = useRole();
+  const { role, email: myEmail, loading: roleLoading } = useRole();
   const tabs = [...TABS];
   if (who?.isChef) tabs.push({ id: "studio" as Tab, label: "Studio", icon: "wand" as IconName });
   if (role === "admin") tabs.push({ id: "admin" as Tab, label: "Admin", icon: "sliders" as IconName });
@@ -163,7 +163,10 @@ export function App() {
           </button>
         ))}
       </nav>
-      <footer className="app-version">v{APP_VERSION}</footer>
+      <footer className="app-version">
+        v{APP_VERSION}
+        {!roleLoading && (myEmail ? ` · ${myEmail} · ${role}` : " · not signed in")}
+      </footer>
     </div>
   );
 }
