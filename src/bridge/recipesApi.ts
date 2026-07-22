@@ -288,10 +288,16 @@ async function invokeRaw<T>(action: string, params: Record<string, unknown> = {}
  * minted identity token in recipes-db, never trusted from the client.
  * Dev mock poses as admin so both gated surfaces are iterable under `npm run dev`.
  */
-export async function getMyRole(): Promise<{ role: AppRole; email: string | null }> {
-  if (!isBackendAvailable()) return { role: "admin", email: "dev@local" };
-  const r = await invokeRaw<{ role?: AppRole; email?: string | null }>("myRole");
-  return { role: r.role ?? "user", email: r.email ?? null };
+export async function getMyRole(): Promise<{ role: AppRole; email: string | null; err: string | null }> {
+  if (!isBackendAvailable()) return { role: "admin", email: "dev@local", err: null };
+  try {
+    const r = await invokeRaw<{ role?: AppRole; email?: string | null }>("myRole");
+    return { role: r.role ?? "user", email: r.email ?? null, err: null };
+  } catch (e) {
+    // Surface the reason (REQUIRES_AUTH / blocked consent / HTTP 4xx) so the
+    // footer can show why the identity call didn't land, on-device.
+    return { role: "user", email: null, err: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 /** Admin-only: search the user directory (by email / display name). */
