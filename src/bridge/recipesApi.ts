@@ -18,7 +18,28 @@ import type { CatalogRecipe, Difficulty, NutritionStrip, Recipe, SavedRecipe } f
 
 /** Dev project recipes-db, used when the host has not injected a URL (conj-pack dev). */
 const DEV_RECIPES_URL = "https://mqpvjlsywrptefgwuztn.supabase.co/functions/v1/recipes-db";
-const APP_PATH = "/apps/recipes";
+/**
+ * The app's OWN kernel path, derived from its per-app origin rather than
+ * hardcoded — desktop serves each app from `<slug>.conjureos.app`, mobile from
+ * `<slug>.mobile.conjureos.app`. A self-invoke must target the ACTUAL install
+ * slug: mobile's install-time collision avoidance (appStore `pickSlug`) can
+ * land the app at `/apps/recipes-2`, and a hardcoded `/apps/recipes` then fails
+ * to resolve (`target app not installed`), silently breaking every per-user
+ * backend call. Falls back to `/apps/recipes` off-origin (dev / standalone).
+ */
+function selfAppPath(): string {
+  try {
+    const host = (globalThis as { location?: { hostname?: string } }).location?.hostname ?? "";
+    if (host.endsWith(".conjureos.app")) {
+      const slug = host.split(".")[0] ?? "";
+      if (/^[a-z0-9][a-z0-9-]*$/.test(slug)) return `/apps/${slug}`;
+    }
+  } catch {
+    /* ignore — fall back below */
+  }
+  return "/apps/recipes";
+}
+const APP_PATH = selfAppPath();
 const REMOTE_ACTION = "recipesDb";
 
 interface Bridge {
