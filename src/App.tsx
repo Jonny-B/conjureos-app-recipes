@@ -39,11 +39,14 @@ const TABS: { id: Tab; label: string; icon: IconName }[] = [
 export function App() {
   const who = useWhoami();
   // Role comes from recipes-db (derived from the minted identity token) — the
-  // server is authoritative; these tabs are just the reveal. Studio stays on the
-  // legacy whoami flag until the chef publish backend lands; Admin is role-gated.
+  // server is authoritative; these tabs are just the reveal (Studio for
+  // chef/admin, Admin for admin). Every write re-checks the role server-side.
   const { role, email: myEmail, loading: roleLoading, err: roleErr } = useRole();
   const tabs = [...TABS];
-  if (who?.isChef) tabs.push({ id: "studio" as Tab, label: "Studio", icon: "wand" as IconName });
+  // Studio (chef blog authoring) is open to chefs AND admins — admins see all
+  // role surfaces. The recipes-db chefUpsert re-verifies the role server-side.
+  if (role === "chef" || role === "admin")
+    tabs.push({ id: "studio" as Tab, label: "Studio", icon: "wand" as IconName });
   if (role === "admin") tabs.push({ id: "admin" as Tab, label: "Admin", icon: "sliders" as IconName });
   const [tab, setTab] = useState<Tab>("home");
   const [recipeSource, setRecipeSource] = useState<RecipeSource>("all");
