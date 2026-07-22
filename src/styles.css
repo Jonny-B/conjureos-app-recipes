@@ -2496,6 +2496,86 @@ select {
 }
 .chef-blog-input:focus { outline: none; border-color: var(--accent-warm); }
 
+/* ── Recipe / blog images ─────────────────────────────────────────────── */
+
+/* Hero image at the top of a recipe/chef-blog detail card. Full-bleed to the
+   card edges (the card has 20px padding), 16:9, rounded to the card radius. */
+.recipe-hero {
+  margin: -4px -20px 14px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 16px 16px 0 0;
+  background: var(--bg-2);
+}
+.recipe-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Thumbnail on a browse/feed row. */
+.browse-thumb {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-2);
+}
+.browse-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* ── Image picker (recipe editor / chef Studio) ───────────────────────── */
+.image-picker { display: flex; flex-direction: column; gap: 8px; margin: 4px 0; }
+.image-picker-head h4 { margin: 0; }
+
+/* Empty state: a dashed drop target. */
+.image-picker-drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 220px;
+  border: 2px dashed var(--border);
+  border-radius: 14px;
+  background: var(--bg-2);
+  color: var(--fg-dim);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s, color 0.18s;
+}
+.image-picker-drop:hover:not(:disabled) {
+  border-color: var(--accent-warm);
+  color: var(--fg);
+  background: var(--bg-3);
+}
+.image-picker-drop:disabled { cursor: default; opacity: 0.8; }
+
+/* Filled state: the preview with Change / Remove. */
+.image-picker-preview { position: relative; }
+.image-picker-preview img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 260px;
+  object-fit: cover;
+  border-radius: 14px;
+  display: block;
+  background: var(--bg-2);
+}
+.image-picker-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 14px;
+}
+.image-picker-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
 /* Studio screen */
 .studio-screen { display: flex; flex-direction: column; gap: 8px; }
 .studio-hero { display: flex; align-items: flex-start; gap: 14px; }

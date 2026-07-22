@@ -3,6 +3,7 @@ import type { Recipe } from "../types";
 import { reviewRecipe } from "../features/customRecipe";
 import { saveRecipe } from "../features/storage";
 import { publishChefRecipe } from "../bridge/recipesApi";
+import { ImagePicker } from "./ImagePicker";
 import { Icon } from "../icons";
 
 /**
@@ -38,6 +39,9 @@ export function RecipeEditor({
   // recipe dirty and the AI "tidy" pass — which only reshapes the recipe — can't
   // strip it. Merged back in only at publish time.
   const [blog, setBlog] = useState(initial.blog ?? "");
+  // Like `blog`, the image lives outside `recipe` so the AI "tidy" pass (which
+  // reshapes only the recipe body) can't drop it; merged back in at save.
+  const [image, setImage] = useState<string | undefined>(initial.imageUrl);
   const [busy, setBusy] = useState<null | "tidying" | "saving">(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -72,10 +76,10 @@ export function RecipeEditor({
     setBusy("saving");
     try {
       if (chefMode) {
-        await publishChefRecipe({ ...recipe, blog: blog.trim() || undefined }, editId);
+        await publishChefRecipe({ ...recipe, blog: blog.trim() || undefined, imageUrl: image }, editId);
         onPublished?.();
       } else {
-        await saveRecipe(recipe);
+        await saveRecipe({ ...recipe, imageUrl: image });
       }
       setSaved(true);
     } catch (e) {
@@ -107,6 +111,8 @@ export function RecipeEditor({
         editId={editId}
         blog={blog}
         onBlogChange={setBlog}
+        image={image}
+        onImageChange={setImage}
       />
     </>
   );
@@ -126,6 +132,8 @@ interface PreviewProps {
   editId?: string;
   blog: string;
   onBlogChange: (v: string) => void;
+  image: string | undefined;
+  onImageChange: (v: string | undefined) => void;
 }
 
 function EditablePreview({
@@ -142,6 +150,8 @@ function EditablePreview({
   editId,
   blog,
   onBlogChange,
+  image,
+  onImageChange,
 }: PreviewProps) {
   // Edit mode is off by default: the recipe reads as a clean card until the
   // user clicks Edit, which reveals the inline editors, trash, and add
@@ -181,6 +191,17 @@ function EditablePreview({
         <span className="pill">{recipe.servings} serving{recipe.servings === 1 ? "" : "s"}</span>
       </div>
       {recipe.summary && <p className="summary">{recipe.summary}</p>}
+
+      <ImagePicker
+        value={image}
+        onChange={onImageChange}
+        label={chefMode ? "Blog header image" : "Recipe photo"}
+        hint={
+          chefMode
+            ? "Shown big at the top of your post, above the story. Optional."
+            : "A photo of the finished dish. Optional."
+        }
+      />
 
       <section>
         <h4>Ingredients</h4>

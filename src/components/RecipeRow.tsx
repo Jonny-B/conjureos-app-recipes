@@ -21,6 +21,11 @@ export function RecipeRow({
   const category = fi.kind === "catalog" ? fi.recipe.category : null;
   return (
     <div className="browse-item" onClick={onOpen}>
+      {r.imageUrl && (
+        <div className="browse-thumb">
+          <img src={r.imageUrl} alt="" loading="lazy" />
+        </div>
+      )}
       <div className="title-block">
         <div className="title">
           {r.title}
