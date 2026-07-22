@@ -342,14 +342,16 @@ function MoodStep(p: MoodProps) {
         or just describe it.
       </div>
 
-      <div className="mood-modes">
+      <div className="seg" role="tablist" aria-label="How to plan">
         {(["ingredients", "seed", "text"] as MoodMode[]).map((m) => (
           <button
             key={m}
-            className={`nav-btn${p.mode === m ? " active" : ""}`}
+            role="tab"
+            aria-selected={p.mode === m}
+            className={`seg-btn${p.mode === m ? " active" : ""}`}
             onClick={() => p.setMode(m)}
           >
-            {m === "ingredients" ? "Pick ingredients" : m === "seed" ? "From a recipe" : "Describe it"}
+            {m === "ingredients" ? "Ingredients" : m === "seed" ? "A recipe" : "Describe"}
           </button>
         ))}
       </div>
@@ -494,7 +496,6 @@ function ScanStep({
         <button className="btn ghost" onClick={onBack}>
           <Icon name="chevron-down" className="back-caret" /> Back
         </button>
-        <div style={{ flex: 1 }} />
         <button className="btn" onClick={onPlan}>
           <Icon name="calendar-days" /> Plan my week
         </button>
@@ -579,7 +580,6 @@ function ReviewStep({
         <button className="btn ghost" onClick={onBack}>
           <Icon name="chevron-down" className="back-caret" /> Back
         </button>
-        <div style={{ flex: 1 }} />
         <button className="btn" disabled={plan.picks.length === 0} onClick={onNext}>
           <Icon name="basket-shopping" /> See shopping list
         </button>
@@ -650,7 +650,6 @@ function ShoppingStep({
         <button className="btn ghost" onClick={onBack}>
           <Icon name="chevron-down" className="back-caret" /> Back
         </button>
-        <div style={{ flex: 1 }} />
         {savedPath ? (
           <span className="muted" style={{ fontSize: 13, display: "inline-flex", alignItems: "center", gap: 5 }}>
             <Icon name="check" /> Saved to your plans
