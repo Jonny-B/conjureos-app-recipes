@@ -1620,11 +1620,21 @@ select {
   height: 10px;
 }
 
+/* Step / detail footer: a compact Back on the left and the primary action
+   filling the rest — one row, never wraps. Single-button footers (just Back)
+   keep Back compact at the left. */
 .detail-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+.detail-actions > .btn.ghost {
+  flex: 0 0 auto;
+}
+.detail-actions > .btn:not(.ghost) {
+  flex: 1 1 auto;
+  justify-content: center;
 }
 
 .back-caret {
@@ -1712,17 +1722,6 @@ select {
 .plan-step.done .plan-step-dot .fa-icon {
   width: 10px;
   height: 10px;
-}
-
-.mood-modes {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.mood-modes .nav-btn {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--cui-border);
 }
 
 .token-chip {
