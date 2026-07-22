@@ -67,6 +67,7 @@ interface DbRecipe {
   nutrition: { calories: number; protein: number; fat: number; carbs: number } | null;
   summary: string | null;
   blog: string | null;
+  imageUrl: string | null;
   chefFeatured: boolean;
   favorite: boolean;
   tags: string[];
@@ -106,6 +107,7 @@ export function toCatalogRecipe(r: DbRecipe): CatalogRecipe {
     summary: r.summary ?? undefined,
     nutrition: toStrip(r.nutrition, r.ingredients.length),
     blog: r.blog ?? undefined,
+    imageUrl: r.imageUrl ?? undefined,
     chefFeatured: r.chefFeatured,
     tags: r.tags,
     sourceUrl: r.sourceUrl ?? "",
@@ -124,6 +126,7 @@ export function toSavedRecipe(r: DbRecipe): SavedRecipe {
     summary: r.summary ?? undefined,
     nutrition: toStrip(r.nutrition, r.ingredients.length),
     blog: r.blog ?? undefined,
+    imageUrl: r.imageUrl ?? undefined,
     chefFeatured: r.chefFeatured,
     path: `db:${r.id}`,
     slug: r.id,
@@ -159,6 +162,7 @@ function toPayload(
     instructions: recipe.instructions,
     summary: recipe.summary ?? null,
     blog: recipe.blog ?? null,
+    imageUrl: recipe.imageUrl ?? null,
     tokens: recipe.tokens ?? [],
     tags: recipe.tags ?? [],
     sourceUrl: recipe.sourceUrl ?? null,
@@ -281,6 +285,24 @@ export async function fetchChefLatest(limit = 12): Promise<CatalogRecipe[]> {
   if (!res.ok) throw new Error(`chefFeed ${res.status}`);
   const j = (await res.json()) as { recipes?: DbRecipe[] };
   return (j.recipes ?? []).map(toCatalogRecipe);
+}
+
+// ── image upload ──────────────────────────────────────────────────────────
+
+/**
+ * Upload one image (a recipe photo, or a chef post's blog header) and get back
+ * a public URL to store on the recipe. The app holds no Supabase session and
+ * has no storage capability, so the bytes ride as base64 over the minted-token
+ * `uploadImage` action, which service-role-uploads them to the public
+ * `recipe-images` bucket. `base64` is the raw payload (no `data:` prefix).
+ * Under `npm run dev` (no backend) we echo a local data URL so the picker +
+ * preview stay iterable without a live upload.
+ */
+export async function uploadRecipeImage(mediaType: string, base64: string): Promise<string> {
+  if (!isBackendAvailable()) return `data:${mediaType};base64,${base64}`;
+  const r = await invokeRaw<{ url?: string }>("uploadImage", { image: { mediaType, data: base64 } });
+  if (!r.url) throw new Error("image upload failed");
+  return r.url;
 }
 
 // ── roles + admin console ────────────────────────────────────────────────

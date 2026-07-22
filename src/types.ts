@@ -67,6 +67,13 @@ export interface Recipe {
    * recipe sites, with a "Jump to recipe" skip. Only chef posts set this today.
    */
   blog?: string;
+  /**
+   * Public URL of the recipe's image — a recipe photo, or (for a chef post) the
+   * blog header/hero. Uploaded via recipesApi.uploadRecipeImage → the recipes-db
+   * `uploadImage` action, which stores it in the public `recipe-images` bucket
+   * and returns this URL. Absent/empty means no image.
+   */
+  imageUrl?: string;
   /** True when this is a promoted "Chef Payson" recipe (server-set). */
   chefFeatured?: boolean;
 }

@@ -163,6 +163,11 @@ export function RecipeDetail({
         >
           <Icon name="heart" />
         </button>
+        {recipe.imageUrl && (
+          <div className="recipe-hero">
+            <img src={recipe.imageUrl} alt={recipe.title} loading="lazy" />
+          </div>
+        )}
         <h3 style={{ fontSize: 22, paddingRight: 40 }}>{recipe.title}</h3>
         <div>
           {isCatalog && <span className="pill">{feed.recipe.category}</span>}
