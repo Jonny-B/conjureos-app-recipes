@@ -25,8 +25,10 @@ interface Props {
   onNavigate: (tab: NavTab) => void;
   /** Open the Recipes tab pre-filtered to the user's favorites. */
   onViewFavorites: () => void;
-  /** Open the Cook tab's kitchen (scan/pantry) surface directly. */
+  /** Open the "from my kitchen" (scan/pantry) cook surface directly. */
   onOpenKitchen: () => void;
+  /** Open the "describe a dish" (AI) cook surface directly. */
+  onDescribe: () => void;
   /** Start the guided cook for a recipe (from a Home recommendation's detail). */
   onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
   /** Bumped by App when the catalog reloads from the DB, so the memo re-runs. */
@@ -44,7 +46,7 @@ function keyOf(fi: FeedRecipe): string {
   return fi.kind === "catalog" ? `c:${fi.id}` : `s:${fi.recipe.path}`;
 }
 
-export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen, onCook, catalogVersion = 0 }: Props) {
+export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen, onDescribe, onCook, catalogVersion = 0 }: Props) {
   const [saved, setSaved] = useState<SavedRecipe[]>([]);
   const [favs, setFavs] = useState<Set<string>>(new Set());
   const [loaded, setLoaded] = useState(false);
@@ -199,19 +201,8 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
           label={favoriteItems.length === 1 ? "favorite" : "favorites"}
           onClick={onViewFavorites}
         />
-        <StatTile
-          icon="bowl-food"
-          value={hasPantry ? readyToCook : "+"}
-          label={hasPantry ? "ready to cook" : "add a pantry"}
-          onClick={() => (hasPantry ? onNavigate("recipes") : onOpenKitchen())}
-          accent
-        />
-        <StatTile
-          icon="carrot"
-          value={pantry?.length ?? 0}
-          label={(pantry?.length ?? 0) === 1 ? "pantry item" : "pantry items"}
-          onClick={onOpenKitchen}
-        />
+        <ActionTile icon="carrot" title="From my kitchen" onClick={onOpenKitchen} accent />
+        <ActionTile icon="wand" title="Describe a dish" onClick={onDescribe} />
       </div>
 
       <section className="home-section">
@@ -271,8 +262,7 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
         <div className="home-section-head">
           <h3>Jump in</h3>
         </div>
-        <div className="quick-actions">
-          <QuickAction icon="camera" title="Scan your fridge" sub="Cook from what you have" onClick={onOpenKitchen} />
+        <div className="quick-actions quick-actions-2">
           <QuickAction icon="calendar-days" title="Plan my week" sub="One shopping list" onClick={() => onNavigate("plan")} />
           <QuickAction icon="magnifying-glass" title="Browse recipes" sub="~1,200 to explore" onClick={() => onNavigate("recipes")} />
         </div>
@@ -355,6 +345,26 @@ function StatTile({
       <Icon name={icon} className="stat-icon" />
       <span className="stat-value">{value}</span>
       <span className="stat-label">{label}</span>
+    </button>
+  );
+}
+
+/** An icon + title tile (a cooking action), sharing the stat-tile chrome. */
+function ActionTile({
+  icon,
+  title,
+  onClick,
+  accent,
+}: {
+  icon: IconName;
+  title: string;
+  onClick: () => void;
+  accent?: boolean;
+}) {
+  return (
+    <button className={`stat-tile action-tile${accent ? " accent" : ""}`} onClick={onClick}>
+      <Icon name={icon} className="stat-icon" />
+      <span className="action-title">{title}</span>
     </button>
   );
 }

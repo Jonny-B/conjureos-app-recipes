@@ -20,17 +20,19 @@ import type { IconName } from "./icons";
 import { APP_VERSION } from "./version";
 
 type Tab = "home" | "recipes" | "cook" | "plan" | "studio" | "admin";
-type CookMode = "launcher" | "kitchen" | "describe";
+type CookMode = "kitchen" | "describe";
 /** What's loaded into the guided cook. `saved` set when it's a library recipe. */
 interface CookTarget {
   recipe: Recipe;
   saved: SavedRecipe | null;
 }
 
+// "cook" is no longer a bottom-bar tab — the two cooking entry points (from my
+// kitchen / describe a dish) live on Home now, and the guided cook is reached by
+// tapping a recipe. It stays a routable screen (below), just off the nav.
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: "home", label: "Home", icon: "house" },
   { id: "recipes", label: "Recipes", icon: "utensils" },
-  { id: "cook", label: "Cook", icon: "bowl-food" },
   { id: "plan", label: "Plan", icon: "calendar-days" },
 ];
 
@@ -45,7 +47,7 @@ export function App() {
   if (role === "admin") tabs.push({ id: "admin" as Tab, label: "Admin", icon: "sliders" as IconName });
   const [tab, setTab] = useState<Tab>("home");
   const [recipeSource, setRecipeSource] = useState<RecipeSource>("all");
-  const [cookMode, setCookMode] = useState<CookMode>("launcher");
+  const [cookMode, setCookMode] = useState<CookMode>("kitchen");
   const [cookTarget, setCookTarget] = useState<CookTarget | null>(null);
   // The tab the guided cook was launched from, so Back returns there.
   const [cookOrigin, setCookOrigin] = useState<Tab>("cook");
@@ -78,6 +80,10 @@ export function App() {
     setCookMode("kitchen");
     setTab("cook");
   };
+  const openDescribe = () => {
+    setCookMode("describe");
+    setTab("cook");
+  };
 
   return (
     <div className="app">
@@ -98,6 +104,7 @@ export function App() {
               setTab("recipes");
             }}
             onOpenKitchen={openKitchen}
+            onDescribe={openDescribe}
             onCook={startCook}
             catalogVersion={catalogVersion}
           />
@@ -119,10 +126,10 @@ export function App() {
             <div hidden={!!cookTarget}>
               <CookTab
                 mode={cookMode}
-                onModeChange={setCookMode}
                 pantry={pantry}
                 onPantryChange={setPantry}
                 onCook={startCook}
+                onExit={() => setTab("home")}
                 catalogVersion={catalogVersion}
               />
             </div>
@@ -177,76 +184,34 @@ export function App() {
 }
 
 /**
- * Cook is the doing. Its launcher offers three ways in — cook from your kitchen
- * (the hero scan/pantry loop), describe a dish for the AI, or pick a saved
- * recipe — each leading to the guided, step-by-step cook.
+ * The two cooking flows, launched from Home: cook from your kitchen (scan /
+ * pantry loop) or describe a dish for the AI. Back exits to Home. The guided,
+ * step-by-step cook is layered over this by App when a recipe is chosen.
  */
 function CookTab({
   mode,
-  onModeChange,
   pantry,
   onPantryChange,
   onCook,
+  onExit,
   catalogVersion,
 }: {
   mode: CookMode;
-  onModeChange: (m: CookMode) => void;
   pantry: PantryItem[] | null;
   onPantryChange: (items: PantryItem[]) => void;
   onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
+  onExit: () => void;
   catalogVersion: number;
 }) {
-  const back = () => onModeChange("launcher");
-  if (mode === "kitchen")
-    return (
-      <PantryScreen
-        pantry={pantry}
-        onChange={onPantryChange}
-        onBack={back}
-        onCook={onCook}
-        catalogVersion={catalogVersion}
-      />
-    );
-  if (mode === "describe") return <DescribePane pantry={pantry} onBack={back} onCook={onCook} />;
-
+  if (mode === "describe") return <DescribePane pantry={pantry} onBack={onExit} onCook={onCook} />;
   return (
-    <div className="cook-launcher">
-      <LauncherCard
-        icon="carrot"
-        title="From my kitchen"
-        sub="Scan your fridge or use your pantry, then cook what you can make"
-        onClick={() => onModeChange("kitchen")}
-      />
-      <LauncherCard
-        icon="wand"
-        title="Describe a dish"
-        sub="Tell the AI what you fancy and it writes you a recipe"
-        onClick={() => onModeChange("describe")}
-      />
-    </div>
-  );
-}
-
-function LauncherCard({
-  icon,
-  title,
-  sub,
-  onClick,
-}: {
-  icon: Parameters<typeof Icon>[0]["name"];
-  title: string;
-  sub: string;
-  onClick: () => void;
-}) {
-  return (
-    <button className="launch-card" onClick={onClick}>
-      <span className="launch-icon"><Icon name={icon} /></span>
-      <span className="launch-text">
-        <span className="launch-title">{title}</span>
-        <span className="launch-sub">{sub}</span>
-      </span>
-      <Icon name="chevron-down" className="launch-caret" />
-    </button>
+    <PantryScreen
+      pantry={pantry}
+      onChange={onPantryChange}
+      onBack={onExit}
+      onCook={onCook}
+      catalogVersion={catalogVersion}
+    />
   );
 }
 
@@ -302,7 +267,7 @@ function DescribePane({
 
   return (
     <div className="describe-pane">
-      <BackBar label="Cook" onBack={onBack} />
+      <BackBar label="Home" onBack={onBack} />
       <h2>Describe a dish</h2>
       <p className="muted" style={{ marginTop: 0 }}>
         What are you in the mood for? An ingredient, a cuisine, a craving — I'll write a recipe for it.
