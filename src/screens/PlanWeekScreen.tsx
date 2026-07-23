@@ -42,10 +42,17 @@ function uniq(a: string[]): string[] {
 export function PlanWeekScreen({
   pantry,
   catalogVersion = 0,
+  onDone,
 }: {
   pantry: PantryItem[] | null;
   /** Bumped by App when the catalog reloads from the DB, so the memo re-runs. */
   catalogVersion?: number;
+  /**
+   * Called to leave the wizard — after a plan is saved, or when the user backs
+   * out. When present (launched from the Plans landing), the shell shows a
+   * "Plans" back bar and returns there on save. Absent = standalone wizard.
+   */
+  onDone?: () => void;
 }) {
   const [step, setStep] = useState<Step>("mood");
   const [moodMode, setMoodMode] = useState<MoodMode>("ingredients");
@@ -187,6 +194,9 @@ export function PlanWeekScreen({
     try {
       const { path } = await saveWeekPlan(plan);
       setSavedPath(path);
+      // Launched from the Plans landing: return there so the just-saved plan
+      // shows as the most-recent. A brief beat lets the "Saved" state flash.
+      if (onDone) setTimeout(onDone, 500);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -216,6 +226,13 @@ export function PlanWeekScreen({
 
   return (
     <div className="browse-screen">
+      {onDone && (
+        <div className="detail-actions">
+          <button className="btn ghost" onClick={onDone}>
+            <Icon name="chevron-down" className="back-caret" /> Plans
+          </button>
+        </div>
+      )}
       <div className="browse-header">
         <h2>Plan my week</h2>
       </div>

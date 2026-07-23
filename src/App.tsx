@@ -5,7 +5,7 @@ import { RecipesBrowseScreen } from "./screens/RecipesBrowseScreen";
 import { StudioScreen } from "./screens/StudioScreen";
 import { AdminScreen } from "./screens/AdminScreen";
 import { PantryScreen } from "./screens/PantryScreen";
-import { PlanWeekScreen } from "./screens/PlanWeekScreen";
+import { PlansScreen } from "./screens/PlansScreen";
 import { GuidedCook } from "./screens/GuidedCook";
 import { RecipesScreen } from "./screens/RecipesScreen";
 import { generateFromDescription } from "./features/recipes";
@@ -33,7 +33,7 @@ interface CookTarget {
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: "home", label: "Home", icon: "house" },
   { id: "recipes", label: "Recipes", icon: "utensils" },
-  { id: "plan", label: "Plan", icon: "calendar-days" },
+  { id: "plan", label: "Plans", icon: "calendar-days" },
 ];
 
 export function App() {
@@ -148,7 +148,7 @@ export function App() {
             )}
           </>
         )}
-        {tab === "plan" && <PlanWeekScreen pantry={pantry} catalogVersion={catalogVersion} />}
+        {tab === "plan" && <PlansScreen pantry={pantry} catalogVersion={catalogVersion} />}
         {tab === "studio" && <StudioScreen />}
         {tab === "admin" && <AdminScreen myEmail={myEmail} />}
       </main>
