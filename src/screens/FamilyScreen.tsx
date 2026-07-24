@@ -25,10 +25,13 @@ import { Icon } from "../icons";
 export function FamilyScreen({
   profile,
   onChanged,
+  onInvitesChanged,
   onBack,
 }: {
   profile: AppProfile | null;
   onChanged: () => Promise<AppProfile | null>;
+  /** Tell the app to refresh the Home invite banner after accept/decline. */
+  onInvitesChanged?: () => void;
   onBack: () => void;
 }) {
   const [open, setOpen] = useState<string | null>(null); // expanded family id
@@ -72,10 +75,12 @@ export function FamilyScreen({
                   await acceptInvite(inv.familyId).catch(() => {});
                   await onChanged();
                   loadInvites();
+                  onInvitesChanged?.();
                 }}
                 onDecline={async () => {
                   await declineInvite(inv.familyId).catch(() => {});
                   loadInvites();
+                  onInvitesChanged?.();
                 }}
               />
             ))}

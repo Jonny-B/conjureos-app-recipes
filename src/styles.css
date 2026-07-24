@@ -2737,6 +2737,42 @@ select {
 }
 .invite-actions { display: flex; gap: 8px; }
 
+/* Home: pending-invite banner */
+.invite-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  background: linear-gradient(135deg, rgba(124, 108, 255, 0.16), rgba(255, 178, 77, 0.12));
+  border: 1px solid var(--grape);
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+  box-shadow: var(--shadow-soft);
+  transition: transform 0.18s var(--bounce), box-shadow 0.18s;
+}
+.invite-banner:hover { transform: translateY(-1px); box-shadow: var(--shadow-glow); }
+.invite-banner-icon {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--grad-warm);
+  color: #2a1840;
+}
+.invite-banner-icon svg { width: 16px; height: 16px; }
+.invite-banner-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.invite-banner-text strong { font-size: 15px; }
+.invite-banner-sub { font-size: 12px; color: var(--fg-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.invite-banner-caret { width: 16px; height: 16px; color: var(--fg-faint); transform: rotate(-90deg); flex: 0 0 auto; }
+
 /* ── Image picker (recipe editor / chef Studio) ───────────────────────── */
 .image-picker { display: flex; flex-direction: column; gap: 8px; margin: 4px 0; }
 .image-picker-head h4 { margin: 0; }

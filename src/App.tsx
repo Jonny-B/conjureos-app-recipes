@@ -15,6 +15,7 @@ import { loadPantry, ingredientsFromPantry } from "./features/pantry";
 import { markMade, saveRecipe } from "./features/storage";
 import { useWhoami } from "./hooks/useWhoami";
 import { useRole } from "./hooks/useRole";
+import { useInvites } from "./hooks/useInvites";
 import { Icon } from "./icons";
 import type { IconName } from "./icons";
 import { APP_VERSION } from "./version";
@@ -42,6 +43,15 @@ export function App() {
   // server is authoritative; these tabs are just the reveal (Studio for
   // chef/admin, Admin for admin). Every write re-checks the role server-side.
   const { role, email: myEmail, loading: roleLoading, err: roleErr } = useRole();
+  // Pending family invites (app-level, live via the user's own channel) → the
+  // Home banner. "Review" jumps to Plans and opens the Family screen.
+  const { invites, reload: reloadInvites } = useInvites();
+  const [openFamilySignal, setOpenFamilySignal] = useState(0);
+  const reviewInvites = () => {
+    setCookTarget(null);
+    setOpenFamilySignal((n) => n + 1);
+    setTab("plan");
+  };
   const tabs = [...TABS];
   // Studio (chef blog authoring) is open to chefs AND admins — admins see all
   // role surfaces. The recipes-db chefUpsert re-verifies the role server-side.
@@ -110,6 +120,8 @@ export function App() {
             onDescribe={openDescribe}
             onCook={startCook}
             catalogVersion={catalogVersion}
+            invites={invites}
+            onReviewInvites={reviewInvites}
           />
         )}
         {tab === "recipes" && (
@@ -148,7 +160,14 @@ export function App() {
             )}
           </>
         )}
-        {tab === "plan" && <PlansScreen pantry={pantry} catalogVersion={catalogVersion} />}
+        {tab === "plan" && (
+          <PlansScreen
+            pantry={pantry}
+            catalogVersion={catalogVersion}
+            openFamilySignal={openFamilySignal}
+            onInvitesChanged={reloadInvites}
+          />
+        )}
         {tab === "studio" && <StudioScreen />}
         {tab === "admin" && <AdminScreen myEmail={myEmail} />}
       </main>
