@@ -204,6 +204,12 @@ export interface WeekPlan {
   shortfall: number;
   warnings: string[];
   createdAt: string;
+  /**
+   * Canonical keys (`ShoppingListItem.canonical`) the user has checked off
+   * while shopping. Persisted with the plan so the checklist survives closing
+   * the app. Absent/empty = nothing checked yet.
+   */
+  checked?: string[];
 }
 
 /**
