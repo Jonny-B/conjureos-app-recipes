@@ -2717,6 +2717,26 @@ select {
 .fam-error { color: #ffb0c0; font-size: 13px; margin-top: 6px; }
 .fam-note { color: var(--fg-dim); font-size: 13px; margin-top: 4px; }
 
+.fam-pending-tag {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--butter);
+  background: rgba(255, 178, 77, 0.18);
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.invite-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-color: var(--grape);
+}
+.invite-actions { display: flex; gap: 8px; }
+
 /* ── Image picker (recipe editor / chef Studio) ───────────────────────── */
 .image-picker { display: flex; flex-direction: column; gap: 8px; margin: 4px 0; }
 .image-picker-head h4 { margin: 0; }
