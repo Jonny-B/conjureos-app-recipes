@@ -1,12 +1,16 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
-  addFamilyMember,
+  acceptInvite,
   createFamily,
+  declineInvite,
   getFamilyInfo,
+  inviteFamilyMember,
   joinFamily,
+  myInvites,
   setUsername,
   type AppFamily,
   type AppProfile,
+  type FamilyInvite,
   type FamilyMember,
 } from "../bridge/recipesApi";
 import { Icon } from "../icons";
@@ -28,6 +32,14 @@ export function FamilyScreen({
   onBack: () => void;
 }) {
   const [open, setOpen] = useState<string | null>(null); // expanded family id
+  const [invites, setInvites] = useState<FamilyInvite[]>([]);
+
+  const loadInvites = useCallback(() => {
+    myInvites()
+      .then(setInvites)
+      .catch(() => setInvites([]));
+  }, []);
+  useEffect(() => loadInvites(), [loadInvites]);
 
   return (
     <div className="browse-screen">
@@ -46,6 +58,31 @@ export function FamilyScreen({
 
       <UsernameBlock profile={profile} onChanged={onChanged} />
 
+      {invites.length > 0 && (
+        <section className="home-section">
+          <div className="home-section-head">
+            <h3>Invitations</h3>
+          </div>
+          <div className="fam-list">
+            {invites.map((inv) => (
+              <InviteCard
+                key={inv.familyId}
+                invite={inv}
+                onAccept={async () => {
+                  await acceptInvite(inv.familyId).catch(() => {});
+                  await onChanged();
+                  loadInvites();
+                }}
+                onDecline={async () => {
+                  await declineInvite(inv.familyId).catch(() => {});
+                  loadInvites();
+                }}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="home-section">
         <div className="home-section-head">
           <h3>Your families</h3>
@@ -58,7 +95,6 @@ export function FamilyScreen({
                 family={f}
                 expanded={open === f.id}
                 onToggle={() => setOpen(open === f.id ? null : f.id)}
-                onChanged={onChanged}
               />
             ))}
           </div>
@@ -127,16 +163,52 @@ function UsernameBlock({ profile, onChanged }: { profile: AppProfile | null; onC
   );
 }
 
+function InviteCard({
+  invite,
+  onAccept,
+  onDecline,
+}: {
+  invite: FamilyInvite;
+  onAccept: () => Promise<void>;
+  onDecline: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const run = (fn: () => Promise<void>) => async () => {
+    setBusy(true);
+    try {
+      await fn();
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="fam-card invite-card">
+      <div>
+        <div className="fam-name">{invite.name}</div>
+        <div className="muted" style={{ fontSize: 13 }}>
+          {invite.invitedBy ? `@${invite.invitedBy} invited you` : "You've been invited"}
+        </div>
+      </div>
+      <div className="invite-actions">
+        <button className="btn" type="button" disabled={busy} onClick={run(onAccept)}>
+          Accept
+        </button>
+        <button className="btn ghost" type="button" disabled={busy} onClick={run(onDecline)}>
+          Decline
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function FamilyCard({
   family,
   expanded,
   onToggle,
-  onChanged,
 }: {
   family: AppFamily;
   expanded: boolean;
   onToggle: () => void;
-  onChanged: () => Promise<AppProfile | null>;
 }) {
   const [members, setMembers] = useState<FamilyMember[] | null>(null);
   const [addValue, setAddValue] = useState("");
@@ -170,15 +242,20 @@ function FamilyCard({
     setAddBusy(true);
     setMsg(null);
     try {
-      await addFamilyMember(family.id, u);
+      const status = await inviteFamilyMember(family.id, u);
       setAddValue("");
-      setMsg(`Added @${u}.`);
+      setMsg(
+        status === "already_member"
+          ? `@${u} is already in the family.`
+          : status === "already_invited"
+            ? `@${u} has already been invited.`
+            : `Invited @${u} — they'll need to accept.`,
+      );
       const r = await getFamilyInfo(family.id);
       setMembers(r.members);
-      await onChanged();
     } catch (e) {
       const m = e instanceof Error ? e.message : String(e);
-      setMsg(/user_not_found/i.test(m) ? "No one with that username." : m);
+      setMsg(/user_not_found/i.test(m) ? "No one with that username." : /invite_self/i.test(m) ? "That's you!" : m);
     } finally {
       setAddBusy(false);
     }
@@ -214,6 +291,7 @@ function FamilyCard({
                   <Icon name="user" />
                   <span>{m.username ? `@${m.username}` : m.displayName || m.email || "member"}</span>
                   {m.role === "owner" && <span className="fam-owner-tag">owner</span>}
+                  {m.status === "pending" && <span className="fam-pending-tag">pending</span>}
                 </div>
               ))}
             </div>
@@ -222,7 +300,7 @@ function FamilyCard({
           <div className="add-ing-form" style={{ marginTop: 8 }}>
             <input
               type="text"
-              placeholder="Add by @username"
+              placeholder="Invite by @username"
               value={addValue}
               onChange={(e) => setAddValue(e.target.value)}
               maxLength={20}
@@ -230,7 +308,7 @@ function FamilyCard({
               autoCorrect="off"
             />
             <button className="btn secondary" type="button" disabled={addBusy || !addValue.trim()} onClick={add}>
-              <Icon name="plus" /> Add
+              <Icon name="plus" /> Invite
             </button>
           </div>
           {msg && <div className="fam-note">{msg}</div>}

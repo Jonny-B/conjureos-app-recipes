@@ -391,10 +391,19 @@ export interface AppProfile {
 export interface FamilyMember {
   userId: string;
   role: string;
+  /** "active" or "pending" (an invited user who hasn't accepted yet). */
+  status: string;
   joinedAt: string;
   username: string | null;
   displayName: string | null;
   email: string | null;
+}
+
+/** A pending family invite awaiting the current user's accept/decline. */
+export interface FamilyInvite {
+  familyId: string;
+  name: string;
+  invitedBy: string | null; // inviter's @username
 }
 
 /** A stored week-plan row: the WeekPlan in `data`, plus its DB identity + scope. */
@@ -424,6 +433,8 @@ const devProfile: AppProfile = {
 let devPlans: PlanRecord[] = [];
 let devSeq = 1;
 const nowIso = () => new Date().toISOString();
+// Seed one pending invite so the accept/decline UI is iterable in dev.
+let devInvites: FamilyInvite[] = [{ familyId: "fam-demo", name: "The Joneses", invitedBy: "grandma" }];
 
 export async function getMyProfile(): Promise<AppProfile> {
   if (!isBackendAvailable()) return { ...devProfile, families: [...devProfile.families] };
@@ -471,14 +482,42 @@ export async function joinFamily(inviteCode: string): Promise<AppFamily> {
 export async function getFamilyInfo(familyId: string): Promise<{ family: AppFamily; members: FamilyMember[] }> {
   if (!isBackendAvailable()) {
     const fam = devProfile.families.find((f) => f.id === familyId)!;
-    return { family: fam, members: [{ userId: "u-1", role: fam?.role ?? "member", joinedAt: nowIso(), username: devProfile.username, displayName: "You", email: "dev@local" }] };
+    return { family: fam, members: [{ userId: "u-1", role: fam?.role ?? "member", status: "active", joinedAt: nowIso(), username: devProfile.username, displayName: "You", email: "dev@local" }] };
   }
   return invokeRaw<{ family: AppFamily; members: FamilyMember[] }>("familyInfo", { familyId });
 }
 
-export async function addFamilyMember(familyId: string, username: string): Promise<void> {
-  if (!isBackendAvailable()) return;
-  await invokeRaw<{ ok?: boolean }>("addFamilyMember", { familyId, username });
+/** Invite a user by @username. They must accept before they join. */
+export async function inviteFamilyMember(familyId: string, username: string): Promise<"invited" | "already_member" | "already_invited"> {
+  if (!isBackendAvailable()) return "invited";
+  const r = await invokeRaw<{ status?: string }>("addFamilyMember", { familyId, username });
+  return (r.status as "invited" | "already_member" | "already_invited") ?? "invited";
+}
+
+export async function myInvites(): Promise<FamilyInvite[]> {
+  if (!isBackendAvailable()) return [...devInvites];
+  const r = await invokeRaw<{ invites?: FamilyInvite[] }>("myInvites");
+  return r.invites ?? [];
+}
+
+export async function acceptInvite(familyId: string): Promise<void> {
+  if (!isBackendAvailable()) {
+    const inv = devInvites.find((i) => i.familyId === familyId);
+    if (inv) {
+      devProfile.families.push({ id: inv.familyId, name: inv.name, role: "member", inviteCode: "DEVJOIN", channelToken: "devtoken" });
+      devInvites = devInvites.filter((i) => i.familyId !== familyId);
+    }
+    return;
+  }
+  await invokeRaw<{ family?: AppFamily }>("acceptInvite", { familyId });
+}
+
+export async function declineInvite(familyId: string): Promise<void> {
+  if (!isBackendAvailable()) {
+    devInvites = devInvites.filter((i) => i.familyId !== familyId);
+    return;
+  }
+  await invokeRaw<{ ok?: boolean }>("declineInvite", { familyId });
 }
 
 export async function listPlans(): Promise<PlanRecord[]> {
