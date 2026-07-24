@@ -18,7 +18,6 @@ import {
   buildOnHand,
   type PlanCandidate,
 } from "../features/planWeek";
-import { saveWeekPlan } from "../features/planStorage";
 import { identifyIngredients } from "../features/vision";
 import { sanitizeName } from "../features/vision";
 import { prettyIngredient } from "../features/scaling";
@@ -43,6 +42,7 @@ export function PlanWeekScreen({
   pantry,
   catalogVersion = 0,
   onDone,
+  onPersist,
 }: {
   pantry: PantryItem[] | null;
   /** Bumped by App when the catalog reloads from the DB, so the memo re-runs. */
@@ -53,6 +53,8 @@ export function PlanWeekScreen({
    * "Plans" back bar and returns there on save. Absent = standalone wizard.
    */
   onDone?: () => void;
+  /** Persist the finished plan (DB, via the Plans landing). Required in-app. */
+  onPersist: (plan: WeekPlan) => Promise<void>;
 }) {
   const [step, setStep] = useState<Step>("mood");
   const [moodMode, setMoodMode] = useState<MoodMode>("ingredients");
@@ -192,8 +194,8 @@ export function PlanWeekScreen({
     if (!plan) return;
     setBusy("saving");
     try {
-      const { path } = await saveWeekPlan(plan);
-      setSavedPath(path);
+      await onPersist(plan);
+      setSavedPath("saved");
       // Launched from the Plans landing: return there so the just-saved plan
       // shows as the most-recent. A brief beat lets the "Saved" state flash.
       if (onDone) setTimeout(onDone, 500);

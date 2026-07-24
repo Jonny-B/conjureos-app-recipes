@@ -14,7 +14,7 @@
  * shapes so the screens barely change. A saved recipe's `path` is `db:<id>`
  * (the old VFS markdown path is gone); use recipeIdFromPath() to recover the id.
  */
-import type { CatalogRecipe, Difficulty, NutritionStrip, Recipe, SavedRecipe } from "../types";
+import type { CatalogRecipe, Difficulty, NutritionStrip, Recipe, SavedRecipe, WeekPlan } from "../types";
 
 /** Dev project recipes-db, used when the host has not injected a URL (conj-pack dev). */
 const DEV_RECIPES_URL = "https://mqpvjlsywrptefgwuztn.supabase.co/functions/v1/recipes-db";
@@ -367,3 +367,163 @@ const MOCK_USERS: AppUser[] = [
   { userId: "u-2", email: "uncle@dev.local", displayName: "Uncle (Chef)", role: "chef", createdAt: "2026-06-01T00:00:00Z", lastSeenAt: "2026-07-19T09:00:00Z" },
   { userId: "u-3", email: "tester@dev.local", displayName: "Tester", role: "user", createdAt: "2026-06-10T00:00:00Z", lastSeenAt: "2026-07-18T20:00:00Z" },
 ];
+
+// ── families + shared plans ────────────────────────────────────────────────
+
+export interface AppFamily {
+  id: string;
+  name: string;
+  role: "owner" | "member";
+  inviteCode: string;
+  channelToken: string;
+}
+
+export interface AppProfile {
+  role: AppRole;
+  email: string | null;
+  username: string | null;
+  /** Public anon key + project URL, so the app can open a Realtime websocket. */
+  anonKey: string;
+  realtimeUrl: string;
+  families: AppFamily[];
+}
+
+export interface FamilyMember {
+  userId: string;
+  role: string;
+  joinedAt: string;
+  username: string | null;
+  displayName: string | null;
+  email: string | null;
+}
+
+/** A stored week-plan row: the WeekPlan in `data`, plus its DB identity + scope. */
+export interface PlanRecord {
+  id: string;
+  ownerId: string;
+  /** null = personal ("My"); set = shared with that family. */
+  familyId: string | null;
+  title: string | null;
+  mine: boolean;
+  data: WeekPlan;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Dev mocks (no backend / `npm run dev`): an in-memory profile + plan store so
+// the family + plans UI is fully iterable standalone. Realtime is skipped in
+// dev (empty anonKey), but every CRUD path works.
+const devProfile: AppProfile = {
+  role: "admin",
+  email: "dev@local",
+  username: null,
+  anonKey: "",
+  realtimeUrl: "",
+  families: [],
+};
+let devPlans: PlanRecord[] = [];
+let devSeq = 1;
+const nowIso = () => new Date().toISOString();
+
+export async function getMyProfile(): Promise<AppProfile> {
+  if (!isBackendAvailable()) return { ...devProfile, families: [...devProfile.families] };
+  return invokeRaw<AppProfile>("myProfile");
+}
+
+export async function setUsername(username: string): Promise<string> {
+  if (!isBackendAvailable()) {
+    devProfile.username = username.toLowerCase().replace(/^@/, "");
+    return devProfile.username;
+  }
+  const r = await invokeRaw<{ username?: string }>("setUsername", { username });
+  if (!r.username) throw new Error("username not set");
+  return r.username;
+}
+
+export async function createFamily(name: string): Promise<AppFamily> {
+  if (!isBackendAvailable()) {
+    const fam: AppFamily = {
+      id: `fam-${devSeq++}`,
+      name: name || "My family",
+      role: "owner",
+      inviteCode: "DEV" + Math.floor(Math.random() * 900 + 100),
+      channelToken: "devtoken",
+    };
+    devProfile.families.push(fam);
+    return fam;
+  }
+  const r = await invokeRaw<{ family?: AppFamily }>("createFamily", { name });
+  if (!r.family) throw new Error("create failed");
+  return r.family;
+}
+
+export async function joinFamily(inviteCode: string): Promise<AppFamily> {
+  if (!isBackendAvailable()) {
+    const fam: AppFamily = { id: `fam-${devSeq++}`, name: "Joined family", role: "member", inviteCode, channelToken: "devtoken" };
+    devProfile.families.push(fam);
+    return fam;
+  }
+  const r = await invokeRaw<{ family?: AppFamily }>("joinFamily", { inviteCode });
+  if (!r.family) throw new Error("join failed");
+  return r.family;
+}
+
+export async function getFamilyInfo(familyId: string): Promise<{ family: AppFamily; members: FamilyMember[] }> {
+  if (!isBackendAvailable()) {
+    const fam = devProfile.families.find((f) => f.id === familyId)!;
+    return { family: fam, members: [{ userId: "u-1", role: fam?.role ?? "member", joinedAt: nowIso(), username: devProfile.username, displayName: "You", email: "dev@local" }] };
+  }
+  return invokeRaw<{ family: AppFamily; members: FamilyMember[] }>("familyInfo", { familyId });
+}
+
+export async function addFamilyMember(familyId: string, username: string): Promise<void> {
+  if (!isBackendAvailable()) return;
+  await invokeRaw<{ ok?: boolean }>("addFamilyMember", { familyId, username });
+}
+
+export async function listPlans(): Promise<PlanRecord[]> {
+  if (!isBackendAvailable()) return [...devPlans];
+  const r = await invokeRaw<{ plans?: PlanRecord[] }>("listPlans");
+  return r.plans ?? [];
+}
+
+/**
+ * Create or update a plan. `familyId` is sent only when explicitly setting the
+ * scope (a new plan, or moving a plan to/from a family) — a routine data update
+ * (a check-off toggle) omits it so the backend keeps the plan where it is.
+ */
+export async function savePlanRecord(args: {
+  id?: string;
+  plan: WeekPlan;
+  title?: string | null;
+  /** Present → set/change scope (null = personal). Absent → keep current scope. */
+  familyId?: string | null;
+}): Promise<PlanRecord> {
+  const setScope = "familyId" in args;
+  if (!isBackendAvailable()) {
+    if (args.id) {
+      const i = devPlans.findIndex((p) => p.id === args.id);
+      if (i >= 0) {
+        devPlans[i] = { ...devPlans[i]!, data: args.plan, title: args.title ?? devPlans[i]!.title, updatedAt: nowIso(), ...(setScope ? { familyId: args.familyId ?? null } : {}) };
+        return devPlans[i]!;
+      }
+    }
+    const rec: PlanRecord = { id: `plan-${devSeq++}`, ownerId: "u-1", familyId: setScope ? args.familyId ?? null : null, title: args.title ?? null, mine: true, data: args.plan, createdAt: nowIso(), updatedAt: nowIso() };
+    devPlans.unshift(rec);
+    return rec;
+  }
+  const params: Record<string, unknown> = { plan: args.plan, title: args.title ?? null };
+  if (args.id) params.id = args.id;
+  if (setScope || !args.id) params.familyId = args.familyId ?? null; // always set scope on create
+  const r = await invokeRaw<{ plan?: PlanRecord }>("savePlan", params);
+  if (!r.plan) throw new Error("save failed");
+  return r.plan;
+}
+
+export async function deletePlanRecord(id: string): Promise<void> {
+  if (!isBackendAvailable()) {
+    devPlans = devPlans.filter((p) => p.id !== id);
+    return;
+  }
+  await invokeRaw<{ ok?: boolean }>("deletePlan", { id });
+}
