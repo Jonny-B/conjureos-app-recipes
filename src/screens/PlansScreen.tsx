@@ -1,13 +1,29 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PantryItem, WeekPlan } from "../types";
-import { listWeekPlans, saveWeekPlan } from "../features/planStorage";
+import { importVfsPlansOnce, planTitle } from "../features/planStorage";
+import {
+  deletePlanRecord,
+  getMyProfile,
+  listPlans,
+  savePlanRecord,
+  type AppProfile,
+  type PlanRecord,
+} from "../bridge/recipesApi";
+import { subscribeFamilyChannels, type RealtimeHandle } from "../bridge/realtime";
 import { PlanWeekScreen } from "./PlanWeekScreen";
+import { FamilyScreen } from "./FamilyScreen";
 import { Icon } from "../icons";
 
+type Scope = "my" | "family";
+type Mode = "landing" | "new" | "family";
+
+const byUpdated = (a: PlanRecord, b: PlanRecord) => (b.updatedAt || "").localeCompare(a.updatedAt || "");
+
 /**
- * The "Plans" tab. Opens the most recent saved plan, lets you flip to any
- * previous one, and start a new plan (the wizard). Plans persist via
- * planStorage (VFS JSON, synced per-user), newest first.
+ * The "Plans" tab. Plans live in the DB (personal + family); the My/Family
+ * switch splits them. Family plans sync live: we subscribe (anon key) to each
+ * family's Realtime broadcast channel and refetch on any push, and every local
+ * edit persists through recipes-db, which broadcasts to the rest of the family.
  */
 export function PlansScreen({
   pantry,
@@ -16,33 +32,125 @@ export function PlansScreen({
   pantry: PantryItem[] | null;
   catalogVersion?: number;
 }) {
-  const [plans, setPlans] = useState<WeekPlan[] | null>(null);
-  const [mode, setMode] = useState<"landing" | "new">("landing");
-  // Index into `plans` of the plan currently shown (0 = most recent).
+  const [profile, setProfile] = useState<AppProfile | null>(null);
+  const [plans, setPlans] = useState<PlanRecord[] | null>(null);
+  const [scope, setScope] = useState<Scope>("my");
+  const [mode, setMode] = useState<Mode>("landing");
   const [viewing, setViewing] = useState(0);
+  const rt = useRef<RealtimeHandle | null>(null);
+  const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const refresh = useCallback(() => {
-    listWeekPlans()
-      .then((p) => {
-        setPlans(p);
-        setViewing(0);
-      })
-      .catch(() => setPlans([]));
+  const loadPlans = useCallback(async () => {
+    const list = await listPlans().catch(() => [] as PlanRecord[]);
+    setPlans(list);
   }, []);
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  const loadProfile = useCallback(async () => {
+    const p = await getMyProfile().catch(() => null);
+    setProfile(p);
+    return p;
+  }, []);
 
-  // The wizard, launched by "New plan" (or from the empty state). On done it
-  // returns here and reloads so the new plan is the most recent.
+  useEffect(() => {
+    (async () => {
+      await loadProfile();
+      await importVfsPlansOnce().catch(() => {});
+      await loadPlans();
+    })();
+  }, [loadProfile, loadPlans]);
+
+  // Realtime: (re)subscribe whenever my families change. Any push → debounced
+  // refetch (coalesces a burst of edits from another member).
+  useEffect(() => {
+    rt.current?.close();
+    rt.current = null;
+    if (!profile?.anonKey || !profile.realtimeUrl || profile.families.length === 0) return;
+    rt.current = subscribeFamilyChannels({
+      url: profile.realtimeUrl,
+      anonKey: profile.anonKey,
+      channels: profile.families.map((f) => `family-${f.channelToken}`),
+      onMessage: () => {
+        if (refetchTimer.current) clearTimeout(refetchTimer.current);
+        refetchTimer.current = setTimeout(() => void loadPlans(), 400);
+      },
+    });
+    return () => {
+      rt.current?.close();
+      rt.current = null;
+    };
+  }, [profile, loadPlans]);
+
+  const myPlans = useMemo(() => (plans ?? []).filter((p) => !p.familyId).sort(byUpdated), [plans]);
+  const familyPlans = useMemo(() => (plans ?? []).filter((p) => p.familyId).sort(byUpdated), [plans]);
+  const families = profile?.families ?? [];
+  const hasFamilies = families.length > 0;
+  const familyName = useCallback(
+    (id: string | null) => families.find((f) => f.id === id)?.name ?? "Family",
+    [families],
+  );
+
+  const active = scope === "my" ? myPlans : familyPlans;
+  useEffect(() => setViewing(0), [scope, plans]);
+
+  // ── mutations (optimistic where it helps) ──
+  const patchLocal = (rec: PlanRecord) =>
+    setPlans((prev) => (prev ? prev.map((p) => (p.id === rec.id ? rec : p)) : prev));
+
+  const persistNewPlan = async (plan: WeekPlan) => {
+    const familyId = scope === "family" && families.length === 1 ? families[0]!.id : null;
+    await savePlanRecord({ plan, title: planTitle(plan), familyId });
+    await loadPlans();
+  };
+
+  const saveData = async (rec: PlanRecord, data: WeekPlan) => {
+    patchLocal({ ...rec, data });
+    try {
+      const saved = await savePlanRecord({ id: rec.id, plan: data });
+      patchLocal(saved);
+    } catch {
+      await loadPlans();
+    }
+  };
+  const toggleChecked = (rec: PlanRecord, canonical: string) => {
+    const set = new Set(rec.data.checked ?? []);
+    set.has(canonical) ? set.delete(canonical) : set.add(canonical);
+    return saveData(rec, { ...rec.data, checked: [...set] });
+  };
+  const uncheckAll = (rec: PlanRecord) => saveData(rec, { ...rec.data, checked: [] });
+
+  const sharePlan = async (rec: PlanRecord, familyId: string | null) => {
+    await savePlanRecord({ id: rec.id, plan: rec.data, title: rec.title, familyId }).catch(() => {});
+    await loadPlans();
+    setScope(familyId ? "family" : "my");
+  };
+  const removePlan = async (rec: PlanRecord) => {
+    setPlans((prev) => (prev ? prev.filter((p) => p.id !== rec.id) : prev));
+    await deletePlanRecord(rec.id).catch(() => {});
+    await loadPlans();
+  };
+
+  // ── routed sub-screens ──
   if (mode === "new") {
     return (
       <PlanWeekScreen
         pantry={pantry}
         catalogVersion={catalogVersion}
+        onPersist={persistNewPlan}
         onDone={() => {
           setMode("landing");
-          refresh();
+          void loadPlans();
+        }}
+      />
+    );
+  }
+  if (mode === "family") {
+    return (
+      <FamilyScreen
+        profile={profile}
+        onChanged={loadProfile}
+        onBack={() => {
+          setMode("landing");
+          void loadProfile();
+          void loadPlans();
         }}
       />
     );
@@ -56,95 +164,120 @@ export function PlansScreen({
     );
   }
 
-  // No plans yet → invite the first one.
-  if (plans.length === 0) {
-    return (
-      <div className="browse-screen">
-        <div className="browse-header">
-          <h2>Plans</h2>
-        </div>
-        <div className="home-nudge">
-          <Icon name="calendar-days" />
-          <div>
-            <strong>No plans yet.</strong> Plan a week from photos or a craving and get one
-            deduped shopping list.
-          </div>
-          <button className="btn" onClick={() => setMode("new")}>
-            <Icon name="calendar-days" /> Plan my week
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const current = plans[viewing] ?? plans[0]!;
-
-  // Toggle / clear the check-off state on the shown plan, then persist it in
-  // place (saveWeekPlan re-derives the same file path from the plan's date +
-  // picks, so this overwrites the plan's JSON + companion shopping .md).
-  const writePlan = (next: WeekPlan) => {
-    setPlans((prev) => (prev ? prev.map((p) => (p === current ? next : p)) : prev));
-    saveWeekPlan(next).catch(() => {
-      /* best-effort: the optimistic UI already reflects the toggle */
-    });
-  };
-  const toggleChecked = (canonical: string) => {
-    const set = new Set(current.checked ?? []);
-    set.has(canonical) ? set.delete(canonical) : set.add(canonical);
-    writePlan({ ...current, checked: [...set] });
-  };
-  const uncheckAll = () => writePlan({ ...current, checked: [] });
+  const current = active[viewing] ?? active[0];
 
   return (
     <div className="browse-screen">
       <div className="browse-header plans-header">
         <h2>Plans</h2>
-        <button className="btn" onClick={() => setMode("new")}>
-          <Icon name="plus" /> New plan
+        <div className="plans-header-actions">
+          <button className="icon-btn" title="Family" aria-label="Family" onClick={() => setMode("family")}>
+            <Icon name="user" />
+          </button>
+          <button className="btn" onClick={() => setMode("new")}>
+            <Icon name="plus" /> New plan
+          </button>
+        </div>
+      </div>
+
+      <div className="seg" role="tablist" aria-label="Plan scope">
+        <button role="tab" aria-selected={scope === "my"} className={`seg-btn${scope === "my" ? " active" : ""}`} onClick={() => setScope("my")}>
+          My plans
+        </button>
+        <button role="tab" aria-selected={scope === "family"} className={`seg-btn${scope === "family" ? " active" : ""}`} onClick={() => setScope("family")}>
+          Family{familyPlans.length ? ` (${familyPlans.length})` : ""}
         </button>
       </div>
 
-      <PlanView
-        plan={current}
-        isLatest={viewing === 0}
-        onToggle={toggleChecked}
-        onUncheckAll={uncheckAll}
-      />
-
-      {plans.length > 1 && (
-        <section className="home-section">
-          <div className="home-section-head">
-            <h3>Previous plans</h3>
+      {scope === "family" && !hasFamilies ? (
+        <div className="home-nudge">
+          <Icon name="user" />
+          <div>
+            <strong>No family yet.</strong> Create one or join with a code, then share plans and
+            shopping lists that sync live to everyone.
           </div>
-          <div className="browse-list">
-            {plans.map((p, i) =>
-              i === viewing ? null : (
-                <PlanRow key={p.createdAt + i} plan={p} onOpen={() => setViewing(i)} />
-              ),
+          <button className="btn" onClick={() => setMode("family")}>
+            <Icon name="user" /> Set up a family
+          </button>
+        </div>
+      ) : active.length === 0 ? (
+        <div className="home-nudge">
+          <Icon name="calendar-days" />
+          <div>
+            {scope === "my" ? (
+              <><strong>No plans yet.</strong> Plan a week and get one deduped shopping list.</>
+            ) : (
+              <><strong>No family plans yet.</strong> Make a new plan here, or share one of yours to the family.</>
             )}
           </div>
-        </section>
+          <button className="btn" onClick={() => setMode("new")}>
+            <Icon name="calendar-days" /> Plan my week
+          </button>
+        </div>
+      ) : (
+        current && (
+          <>
+            <PlanView
+              rec={current}
+              isLatest={viewing === 0}
+              familyName={current.familyId ? familyName(current.familyId) : null}
+              families={families}
+              onToggle={(c) => toggleChecked(current, c)}
+              onUncheckAll={() => uncheckAll(current)}
+              onShare={(fid) => sharePlan(current, fid)}
+              onDelete={() => removePlan(current)}
+            />
+            {active.length > 1 && (
+              <section className="home-section">
+                <div className="home-section-head">
+                  <h3>{scope === "my" ? "Previous plans" : "Other family plans"}</h3>
+                </div>
+                <div className="browse-list">
+                  {active.map((p, i) =>
+                    i === viewing ? null : (
+                      <PlanRow
+                        key={p.id}
+                        rec={p}
+                        familyName={p.familyId ? familyName(p.familyId) : null}
+                        onOpen={() => setViewing(i)}
+                      />
+                    ),
+                  )}
+                </div>
+              </section>
+            )}
+          </>
+        )
       )}
     </div>
   );
 }
 
-// ── one saved plan, read-only ────────────────────────────────────────────
+// ── one saved plan, read-only + check-off ────────────────────────────────
 
 function PlanView({
-  plan,
+  rec,
   isLatest,
+  familyName,
+  families,
   onToggle,
   onUncheckAll,
+  onShare,
+  onDelete,
 }: {
-  plan: WeekPlan;
+  rec: PlanRecord;
   isLatest: boolean;
+  familyName: string | null;
+  families: AppProfile["families"];
   onToggle: (canonical: string) => void;
   onUncheckAll: () => void;
+  onShare: (familyId: string | null) => void;
+  onDelete: () => void;
 }) {
+  const plan = rec.data;
   const byAisle = useMemo(() => {
     const m = new Map<string, typeof plan.shoppingList>();
-    for (const item of plan.shoppingList) {
+    for (const item of plan.shoppingList ?? []) {
       const arr = m.get(item.aisle) ?? [];
       arr.push(item);
       m.set(item.aisle, arr);
@@ -153,21 +286,50 @@ function PlanView({
   }, [plan]);
 
   const checked = useMemo(() => new Set(plan.checked ?? []), [plan]);
-  const total = plan.shoppingList.length;
-  const doneCount = plan.shoppingList.filter((i) => checked.has(i.canonical)).length;
+  const total = (plan.shoppingList ?? []).length;
+  const doneCount = (plan.shoppingList ?? []).filter((i) => checked.has(i.canonical)).length;
   const allDone = total > 0 && doneCount === total;
+  const shared = !!rec.familyId;
 
   return (
     <div className="plan-view">
       <div className="plan-view-head">
         <span className="plan-view-when">
           {isLatest && <span className="plan-latest">Latest</span>}
+          {shared && <span className="plan-family-chip"><Icon name="user" /> {familyName}</span>}
           Planned {formatDate(plan.createdAt)}
         </span>
         <span className="muted" style={{ fontSize: 13 }}>
-          {plan.picks.length} meal{plan.picks.length === 1 ? "" : "s"} ·{" "}
-          {plan.shoppingList.length} to buy
+          {(plan.picks ?? []).length} meal{(plan.picks ?? []).length === 1 ? "" : "s"} · {total} to buy
         </span>
+      </div>
+
+      {/* Share / privacy + delete */}
+      <div className="plan-actions">
+        {shared ? (
+          <button className="btn ghost" onClick={() => onShare(null)}>
+            <Icon name="user" /> Make private
+          </button>
+        ) : families.length === 1 ? (
+          <button className="btn secondary" onClick={() => onShare(families[0]!.id)}>
+            <Icon name="user" /> Share with {families[0]!.name}
+          </button>
+        ) : families.length > 1 ? (
+          <select
+            className="plan-share-select"
+            defaultValue=""
+            onChange={(e) => e.target.value && onShare(e.target.value)}
+          >
+            <option value="" disabled>Share with…</option>
+            {families.map((f) => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+          </select>
+        ) : null}
+        <div style={{ flex: 1 }} />
+        <button className="btn ghost" onClick={onDelete} aria-label="Delete plan">
+          <Icon name="trash-can" /> Delete
+        </button>
       </div>
 
       <section className="home-section">
@@ -175,7 +337,7 @@ function PlanView({
           <h3>This week's meals</h3>
         </div>
         <div className="browse-list">
-          {plan.picks.map((pick) => (
+          {(plan.picks ?? []).map((pick) => (
             <div key={pick.id} className="browse-item" style={{ cursor: "default" }}>
               <div className="title-block">
                 <div className="title">{pick.title}</div>
@@ -201,15 +363,13 @@ function PlanView({
               ) : (
                 <>
                   {doneCount}/{total} in the cart ·{" "}
-                  <button className="link-btn" onClick={onUncheckAll}>
-                    Uncheck all
-                  </button>
+                  <button className="link-btn" onClick={onUncheckAll}>Uncheck all</button>
                 </>
               )}
             </span>
           )}
         </div>
-        {plan.shoppingList.length === 0 ? (
+        {total === 0 ? (
           <div className="empty-state">
             <Icon name="check" className="empty-icon" />
             <div>Nothing to buy — this week is fully covered by what you have.</div>
@@ -238,9 +398,7 @@ function PlanView({
                     </div>
                     <div className="shopping-for">
                       {item.recipes.map((r) => (
-                        <span key={r.id} className="pill">
-                          {r.title}
-                        </span>
+                        <span key={r.id} className="pill">{r.title}</span>
                       ))}
                     </div>
                   </button>
@@ -254,19 +412,20 @@ function PlanView({
   );
 }
 
-// ── a row in the "previous plans" list ───────────────────────────────────
-
-function PlanRow({ plan, onOpen }: { plan: WeekPlan; onOpen: () => void }) {
-  const titles = plan.picks.map((p) => p.title).join(", ");
+function PlanRow({ rec, familyName, onOpen }: { rec: PlanRecord; familyName: string | null; onOpen: () => void }) {
+  const titles = (rec.data.picks ?? []).map((p) => p.title).join(", ");
   return (
     <div className="browse-item" onClick={onOpen}>
       <div className="browse-thumb plan-row-icon">
         <Icon name="calendar-days" />
       </div>
       <div className="title-block">
-        <div className="title">{formatDate(plan.createdAt)}</div>
+        <div className="title">
+          {formatDate(rec.data.createdAt)}
+          {familyName && <span className="plan-family-chip inline"><Icon name="user" /> {familyName}</span>}
+        </div>
         <div className="meta">
-          {plan.picks.length} meal{plan.picks.length === 1 ? "" : "s"}
+          {(rec.data.picks ?? []).length} meal{(rec.data.picks ?? []).length === 1 ? "" : "s"}
           {titles ? ` · ${titles}` : ""}
         </div>
       </div>
@@ -274,7 +433,8 @@ function PlanRow({ plan, onOpen }: { plan: WeekPlan; onOpen: () => void }) {
   );
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string | undefined): string {
+  if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });

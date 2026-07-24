@@ -2625,6 +2625,98 @@ select {
   text-decoration-thickness: 1.5px;
 }
 
+/* ── Plans: scope switch, share, family chip ──────────────────────────── */
+.plans-header-actions { display: flex; align-items: center; gap: 8px; }
+
+.plan-actions { display: flex; align-items: center; gap: 8px; margin: 4px 0 8px; flex-wrap: wrap; }
+.plan-share-select {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--fg);
+  font: inherit;
+  font-weight: 600;
+  padding: 8px 12px;
+}
+.plan-family-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--accent-soft);
+  background: var(--bg-3);
+  padding: 2px 9px;
+  border-radius: 999px;
+}
+.plan-family-chip.inline { margin-left: 8px; text-transform: none; font-weight: 700; letter-spacing: 0; }
+.plan-family-chip svg { width: 10px; height: 10px; }
+
+/* ── Family screen ────────────────────────────────────────────────────── */
+.fam-list { display: flex; flex-direction: column; gap: 10px; }
+.fam-card {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+.fam-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.fam-name { font-weight: 700; font-size: 15px; }
+.fam-card-body { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.fam-invite { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fam-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  font-size: 16px;
+  color: var(--fg);
+  background: var(--bg-3);
+  padding: 4px 12px;
+  border-radius: 8px;
+}
+.fam-members { display: flex; flex-direction: column; gap: 6px; }
+.fam-member { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.fam-member svg { width: 13px; height: 13px; color: var(--fg-faint); }
+.fam-owner-tag {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-soft);
+  background: var(--bg-3);
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.username-claimed {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  color: var(--fg-dim);
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+}
+.username-claimed svg { width: 14px; height: 14px; color: #8af0dd; }
+.fam-error { color: #ffb0c0; font-size: 13px; margin-top: 6px; }
+.fam-note { color: var(--fg-dim); font-size: 13px; margin-top: 4px; }
+
 /* ── Image picker (recipe editor / chef Studio) ───────────────────────── */
 .image-picker { display: flex; flex-direction: column; gap: 8px; margin: 4px 0; }
 .image-picker-head h4 { margin: 0; }

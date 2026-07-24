@@ -7,9 +7,44 @@
  */
 
 import { vfs } from "../bridge/vfs";
+import * as api from "../bridge/recipesApi";
 import type { WeekPlan } from "../types";
 
 const PLANS_DIR = "/home/Documents/Recipes/Plans";
+/** Marker so the one-time VFS→DB plan import runs at most once per device. */
+const MIGRATED_PLANS_FLAG = `${PLANS_DIR}/.migrated-to-db`;
+
+/** A short human title for a plan, from its chosen meals. */
+export function planTitle(plan: WeekPlan): string {
+  const t = plan.picks.map((p) => p.title).slice(0, 3).join(", ");
+  return t || "Week plan";
+}
+
+/**
+ * One-time lift of plans saved by older versions (VFS JSON under Plans/) into
+ * the DB as personal plans, then a flag so it never repeats. Best-effort: any
+ * failure leaves the flag unset to retry, and never blocks the DB list.
+ */
+export async function importVfsPlansOnce(): Promise<void> {
+  try {
+    if (await vfs.exists(MIGRATED_PLANS_FLAG)) return;
+  } catch {
+    return;
+  }
+  try {
+    const plans = await listWeekPlans();
+    for (const plan of plans) {
+      try {
+        await api.savePlanRecord({ plan, title: planTitle(plan), familyId: null });
+      } catch {
+        /* skip one, keep going */
+      }
+    }
+    await vfs.write(MIGRATED_PLANS_FLAG, new Date().toISOString());
+  } catch {
+    /* leave flag unset → retry next launch */
+  }
+}
 
 export async function saveWeekPlan(plan: WeekPlan): Promise<{ path: string }> {
   await ensureDir();
