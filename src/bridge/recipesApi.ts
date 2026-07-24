@@ -379,6 +379,8 @@ export interface AppFamily {
 }
 
 export interface AppProfile {
+  /** The caller's user id — used to subscribe to their own realtime channel. */
+  userId: string | null;
   role: AppRole;
   email: string | null;
   username: string | null;
@@ -423,6 +425,7 @@ export interface PlanRecord {
 // the family + plans UI is fully iterable standalone. Realtime is skipped in
 // dev (empty anonKey), but every CRUD path works.
 const devProfile: AppProfile = {
+  userId: "u-1",
   role: "admin",
   email: "dev@local",
   username: null,

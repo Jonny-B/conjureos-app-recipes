@@ -28,9 +28,15 @@ const byUpdated = (a: PlanRecord, b: PlanRecord) => (b.updatedAt || "").localeCo
 export function PlansScreen({
   pantry,
   catalogVersion = 0,
+  openFamilySignal = 0,
+  onInvitesChanged,
 }: {
   pantry: PantryItem[] | null;
   catalogVersion?: number;
+  /** Bumped by App (Home "Review" banner) to jump straight to the Family screen. */
+  openFamilySignal?: number;
+  /** Notify App to refresh the Home invite banner after accept/decline. */
+  onInvitesChanged?: () => void;
 }) {
   const [profile, setProfile] = useState<AppProfile | null>(null);
   const [plans, setPlans] = useState<PlanRecord[] | null>(null);
@@ -91,6 +97,11 @@ export function PlansScreen({
   const active = scope === "my" ? myPlans : familyPlans;
   useEffect(() => setViewing(0), [scope, plans]);
 
+  // Home "Review invites" banner → open the Family screen (skip the initial 0).
+  useEffect(() => {
+    if (openFamilySignal > 0) setMode("family");
+  }, [openFamilySignal]);
+
   // ── mutations (optimistic where it helps) ──
   const patchLocal = (rec: PlanRecord) =>
     setPlans((prev) => (prev ? prev.map((p) => (p.id === rec.id ? rec : p)) : prev));
@@ -147,6 +158,7 @@ export function PlansScreen({
       <FamilyScreen
         profile={profile}
         onChanged={loadProfile}
+        onInvitesChanged={onInvitesChanged}
         onBack={() => {
           setMode("landing");
           void loadProfile();
