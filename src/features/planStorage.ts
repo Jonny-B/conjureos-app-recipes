@@ -41,6 +41,7 @@ export async function listWeekPlans(): Promise<WeekPlan[]> {
 }
 
 function toShoppingMarkdown(plan: WeekPlan): string {
+  const checked = new Set(plan.checked ?? []);
   const byAisle = new Map<string, typeof plan.shoppingList>();
   for (const item of plan.shoppingList) {
     const arr = byAisle.get(item.aisle) ?? [];
@@ -52,7 +53,8 @@ function toShoppingMarkdown(plan: WeekPlan): string {
     const lines = items.map((i) => {
       const amount = i.quantity ? ` (${i.quantity})` : "";
       const serves = i.recipes.length > 1 ? `, enough for ${i.recipes.length} recipes` : "";
-      return `- [ ] ${i.name}${amount}${serves}`;
+      const box = checked.has(i.canonical) ? "x" : " ";
+      return `- [${box}] ${i.name}${amount}${serves}`;
     });
     sections.push(`## ${aisle}\n\n${lines.join("\n")}`);
   }

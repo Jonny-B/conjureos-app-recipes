@@ -2565,6 +2565,66 @@ select {
 }
 .plan-row-icon svg { width: 22px; height: 22px; }
 
+/* Shopping list as a checklist (saved plan). Each line is a button: a
+   checkbox on the left, the item + its recipes stacked on the right. */
+.shopping-progress {
+  font-size: 12px;
+  color: var(--fg-faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.shopping-progress .all-done {
+  color: #8af0dd;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.shopping-progress .link-btn { font-size: 12px; }
+
+.check-line {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 12px;
+  row-gap: 6px;
+  align-items: start;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.check-line:hover { border-color: var(--grape); }
+.check-line .shopping-check {
+  grid-row: 1 / span 2;
+  align-self: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border-strong, var(--border));
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #2a1840;
+  flex: 0 0 auto;
+  transition: background 0.15s, border-color 0.15s;
+}
+.check-line .shopping-check svg { width: 15px; height: 15px; }
+.check-line .shopping-line-main { grid-column: 2; }
+.check-line .shopping-for { grid-column: 2; }
+
+.check-line.checked { opacity: 0.6; }
+.check-line.checked .shopping-check {
+  background: var(--grad-warm);
+  border-color: transparent;
+}
+.check-line.checked .shopping-name {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+
 /* ── Image picker (recipe editor / chef Studio) ───────────────────────── */
 .image-picker { display: flex; flex-direction: column; gap: 8px; margin: 4px 0; }
 .image-picker-head h4 { margin: 0; }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PantryItem, WeekPlan } from "../types";
-import { listWeekPlans } from "../features/planStorage";
+import { listWeekPlans, saveWeekPlan } from "../features/planStorage";
 import { PlanWeekScreen } from "./PlanWeekScreen";
 import { Icon } from "../icons";
 
@@ -79,6 +79,22 @@ export function PlansScreen({
 
   const current = plans[viewing] ?? plans[0]!;
 
+  // Toggle / clear the check-off state on the shown plan, then persist it in
+  // place (saveWeekPlan re-derives the same file path from the plan's date +
+  // picks, so this overwrites the plan's JSON + companion shopping .md).
+  const writePlan = (next: WeekPlan) => {
+    setPlans((prev) => (prev ? prev.map((p) => (p === current ? next : p)) : prev));
+    saveWeekPlan(next).catch(() => {
+      /* best-effort: the optimistic UI already reflects the toggle */
+    });
+  };
+  const toggleChecked = (canonical: string) => {
+    const set = new Set(current.checked ?? []);
+    set.has(canonical) ? set.delete(canonical) : set.add(canonical);
+    writePlan({ ...current, checked: [...set] });
+  };
+  const uncheckAll = () => writePlan({ ...current, checked: [] });
+
   return (
     <div className="browse-screen">
       <div className="browse-header plans-header">
@@ -88,7 +104,12 @@ export function PlansScreen({
         </button>
       </div>
 
-      <PlanView plan={current} isLatest={viewing === 0} />
+      <PlanView
+        plan={current}
+        isLatest={viewing === 0}
+        onToggle={toggleChecked}
+        onUncheckAll={uncheckAll}
+      />
 
       {plans.length > 1 && (
         <section className="home-section">
@@ -110,7 +131,17 @@ export function PlansScreen({
 
 // ── one saved plan, read-only ────────────────────────────────────────────
 
-function PlanView({ plan, isLatest }: { plan: WeekPlan; isLatest: boolean }) {
+function PlanView({
+  plan,
+  isLatest,
+  onToggle,
+  onUncheckAll,
+}: {
+  plan: WeekPlan;
+  isLatest: boolean;
+  onToggle: (canonical: string) => void;
+  onUncheckAll: () => void;
+}) {
   const byAisle = useMemo(() => {
     const m = new Map<string, typeof plan.shoppingList>();
     for (const item of plan.shoppingList) {
@@ -120,6 +151,11 @@ function PlanView({ plan, isLatest }: { plan: WeekPlan; isLatest: boolean }) {
     }
     return [...m.entries()];
   }, [plan]);
+
+  const checked = useMemo(() => new Set(plan.checked ?? []), [plan]);
+  const total = plan.shoppingList.length;
+  const doneCount = plan.shoppingList.filter((i) => checked.has(i.canonical)).length;
+  const allDone = total > 0 && doneCount === total;
 
   return (
     <div className="plan-view">
@@ -156,6 +192,22 @@ function PlanView({ plan, isLatest }: { plan: WeekPlan; isLatest: boolean }) {
       <section className="home-section">
         <div className="home-section-head">
           <h3>Shopping list</h3>
+          {total > 0 && (
+            <span className="shopping-progress">
+              {doneCount === 0 ? (
+                `${total} to buy`
+              ) : allDone ? (
+                <span className="all-done"><Icon name="check" /> All {total} in the cart</span>
+              ) : (
+                <>
+                  {doneCount}/{total} in the cart ·{" "}
+                  <button className="link-btn" onClick={onUncheckAll}>
+                    Uncheck all
+                  </button>
+                </>
+              )}
+            </span>
+          )}
         </div>
         {plan.shoppingList.length === 0 ? (
           <div className="empty-state">
@@ -166,22 +218,34 @@ function PlanView({ plan, isLatest }: { plan: WeekPlan; isLatest: boolean }) {
           byAisle.map(([aisle, items]) => (
             <div key={aisle} className="shopping-group">
               <div className="ing-group-label">{aisle}</div>
-              {items.map((item) => (
-                <div key={item.canonical} className="shopping-line">
-                  <div className="shopping-line-main">
-                    <span className="shopping-name">{item.name}</span>
-                    {item.quantity && <span className="shopping-qty">{item.quantity}</span>}
-                    {item.quantityNote && <span className="serves">{item.quantityNote}</span>}
-                  </div>
-                  <div className="shopping-for">
-                    {item.recipes.map((r) => (
-                      <span key={r.id} className="pill">
-                        {r.title}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
+              {items.map((item) => {
+                const isChecked = checked.has(item.canonical);
+                return (
+                  <button
+                    key={item.canonical}
+                    type="button"
+                    className={`shopping-line check-line${isChecked ? " checked" : ""}`}
+                    onClick={() => onToggle(item.canonical)}
+                    aria-pressed={isChecked}
+                  >
+                    <span className="shopping-check" aria-hidden="true">
+                      {isChecked && <Icon name="check" />}
+                    </span>
+                    <div className="shopping-line-main">
+                      <span className="shopping-name">{item.name}</span>
+                      {item.quantity && <span className="shopping-qty">{item.quantity}</span>}
+                      {item.quantityNote && <span className="serves">{item.quantityNote}</span>}
+                    </div>
+                    <div className="shopping-for">
+                      {item.recipes.map((r) => (
+                        <span key={r.id} className="pill">
+                          {r.title}
+                        </span>
+                      ))}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           ))
         )}
