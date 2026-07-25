@@ -2688,6 +2688,18 @@ select {
   padding: 4px 12px;
   border-radius: 8px;
 }
+.fam-link {
+  flex: 1 1 100%;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--accent-soft);
+  background: var(--bg-3);
+  padding: 8px 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
 .fam-members { display: flex; flex-direction: column; gap: 6px; }
 .fam-member { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 .fam-member svg { width: 13px; height: 13px; color: var(--fg-faint); }
