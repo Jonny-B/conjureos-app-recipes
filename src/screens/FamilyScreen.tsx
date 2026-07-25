@@ -122,6 +122,7 @@ function UsernameBlock({ profile, onChanged }: { profile: AppProfile | null; onC
     return (
       <div className="username-claimed">
         <Icon name="check" /> You are <strong>@{profile.username}</strong>
+        <span className="muted" style={{ fontSize: 12 }}>· your ConjureOS name</span>
       </div>
     );
   }
@@ -147,7 +148,8 @@ function UsernameBlock({ profile, onChanged }: { profile: AppProfile | null; onC
     <div className="fam-card">
       <h4 style={{ margin: "0 0 4px" }}>Pick a username</h4>
       <p className="muted" style={{ fontSize: 13, margin: "0 0 8px" }}>
-        So family members can add you by @name.
+        You don't have a ConjureOS username yet — pick one so family members can add
+        you by @name. (Setting one in ConjureOS will use that instead.)
       </p>
       <div className="add-ing-form">
         <input
