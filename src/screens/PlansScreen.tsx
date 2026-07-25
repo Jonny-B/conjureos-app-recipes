@@ -19,6 +19,26 @@ type Mode = "landing" | "new" | "family";
 
 const byUpdated = (a: PlanRecord, b: PlanRecord) => (b.updatedAt || "").localeCompare(a.updatedAt || "");
 
+// Remember the last plan + scope the user viewed, so opening the Plans tab
+// reopens exactly where they left off (local-only, per device).
+const LAST_VIEW_KEY = "recipes.plans.lastView";
+function readLastView(): { scope: Scope; planId: string | null } | null {
+  try {
+    const s = localStorage.getItem(LAST_VIEW_KEY);
+    const v = s ? JSON.parse(s) : null;
+    return v && (v.scope === "my" || v.scope === "family") ? v : null;
+  } catch {
+    return null;
+  }
+}
+function writeLastView(v: { scope: Scope; planId: string | null }): void {
+  try {
+    localStorage.setItem(LAST_VIEW_KEY, JSON.stringify(v));
+  } catch {
+    /* private mode / no storage — non-fatal */
+  }
+}
+
 /**
  * The "Plans" tab. Plans live in the DB (personal + family); the My/Family
  * switch splits them. Family plans sync live: we subscribe (anon key) to each
@@ -28,21 +48,17 @@ const byUpdated = (a: PlanRecord, b: PlanRecord) => (b.updatedAt || "").localeCo
 export function PlansScreen({
   pantry,
   catalogVersion = 0,
-  openFamilySignal = 0,
-  onInvitesChanged,
 }: {
   pantry: PantryItem[] | null;
   catalogVersion?: number;
-  /** Bumped by App (Home "Review" banner) to jump straight to the Family screen. */
-  openFamilySignal?: number;
-  /** Notify App to refresh the Home invite banner after accept/decline. */
-  onInvitesChanged?: () => void;
 }) {
   const [profile, setProfile] = useState<AppProfile | null>(null);
   const [plans, setPlans] = useState<PlanRecord[] | null>(null);
-  const [scope, setScope] = useState<Scope>("my");
+  const [scope, setScope] = useState<Scope>(() => readLastView()?.scope ?? "my");
   const [mode, setMode] = useState<Mode>("landing");
   const [viewing, setViewing] = useState(0);
+  // The last-viewed plan id to restore once, after the first plans load.
+  const restoreRef = useRef<string | null>(readLastView()?.planId ?? null);
   const rt = useRef<RealtimeHandle | null>(null);
   const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -95,12 +111,25 @@ export function PlansScreen({
   );
 
   const active = scope === "my" ? myPlans : familyPlans;
-  useEffect(() => setViewing(0), [scope, plans]);
-
-  // Home "Review invites" banner → open the Family screen (skip the initial 0).
+  // When plans/scope change: restore the last-viewed plan once (on first load),
+  // otherwise snap to the most recent.
   useEffect(() => {
-    if (openFamilySignal > 0) setMode("family");
-  }, [openFamilySignal]);
+    if (restoreRef.current && plans) {
+      const idx = active.findIndex((p) => p.id === restoreRef.current);
+      restoreRef.current = null;
+      setViewing(idx >= 0 ? idx : 0);
+    } else {
+      setViewing(0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope, plans]);
+
+  // Persist where the user is, so the next visit reopens here.
+  const currentId = (active[viewing] ?? active[0])?.id ?? null;
+  useEffect(() => {
+    if (currentId) writeLastView({ scope, planId: currentId });
+  }, [currentId, scope]);
+
 
   // ── mutations (optimistic where it helps) ──
   const patchLocal = (rec: PlanRecord) =>
@@ -158,7 +187,6 @@ export function PlansScreen({
       <FamilyScreen
         profile={profile}
         onChanged={loadProfile}
-        onInvitesChanged={onInvitesChanged}
         onBack={() => {
           setMode("landing");
           void loadProfile();

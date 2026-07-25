@@ -15,7 +15,7 @@ import { computeCoverage, prettyIngredient } from "../features/scaling";
 import { RecipeRow } from "../components/RecipeRow";
 import { RecipeDetail } from "./RecipeDetail";
 import { CHEF_NAME } from "./StudioScreen";
-import { fetchChefLatest, type FamilyInvite } from "../bridge/recipesApi";
+import { fetchChefLatest } from "../bridge/recipesApi";
 import { Icon, type IconName } from "../icons";
 
 type NavTab = "cook" | "recipes" | "plan";
@@ -33,10 +33,6 @@ interface Props {
   onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
   /** Bumped by App when the catalog reloads from the DB, so the memo re-runs. */
   catalogVersion?: number;
-  /** Pending family invites (live, app-level) → the banner. */
-  invites?: FamilyInvite[];
-  /** Open the Family screen to review invites. */
-  onReviewInvites?: () => void;
 }
 
 interface Scored {
@@ -50,7 +46,7 @@ function keyOf(fi: FeedRecipe): string {
   return fi.kind === "catalog" ? `c:${fi.id}` : `s:${fi.recipe.path}`;
 }
 
-export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen, onDescribe, onCook, catalogVersion = 0, invites = [], onReviewInvites }: Props) {
+export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen, onDescribe, onCook, catalogVersion = 0 }: Props) {
   const [saved, setSaved] = useState<SavedRecipe[]>([]);
   const [favs, setFavs] = useState<Set<string>>(new Set());
   const [loaded, setLoaded] = useState(false);
@@ -169,23 +165,6 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
 
   return (
     <div className="home-screen">
-      {invites.length > 0 && (
-        <button className="invite-banner" onClick={onReviewInvites}>
-          <span className="invite-banner-icon"><Icon name="user" /></span>
-          <span className="invite-banner-text">
-            <strong>
-              {invites.length === 1 ? "You've been invited to a family" : `${invites.length} family invitations`}
-            </strong>
-            <span className="invite-banner-sub">
-              {invites.length === 1
-                ? `${invites[0]!.invitedBy ? `@${invites[0]!.invitedBy} · ` : ""}${invites[0]!.name} — tap to review`
-                : "Tap to review"}
-            </span>
-          </span>
-          <Icon name="chevron-down" className="invite-banner-caret" />
-        </button>
-      )}
-
       <div className="home-greeting">
         <h2>{greeting()}</h2>
         <div className="muted">{tagline(favoriteItems.length, readyToCook, hasPantry)}</div>

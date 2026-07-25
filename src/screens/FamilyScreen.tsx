@@ -1,48 +1,36 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  acceptInvite,
   createFamily,
-  declineInvite,
   getFamilyInfo,
-  inviteFamilyMember,
   joinFamily,
-  myInvites,
-  setUsername,
   type AppFamily,
   type AppProfile,
-  type FamilyInvite,
   type FamilyMember,
 } from "../bridge/recipesApi";
+import { familyInviteLink, parseInvite } from "../features/familyLink";
 import { Icon } from "../icons";
 
+const FAMILY_LIMIT = 3;
+
 /**
- * Family management: claim a username, create or join a family (invite code),
- * see members, add someone by @username, and share the invite code. Reached
- * from the Plans tab. On any change it calls onChanged so the parent reloads
- * the profile (families drive the realtime subscription + the Family plans
- * view).
+ * Family management: create a family (name it → get a shareable invite link),
+ * join one by pasting an invite link/code, and see members. Family plans + their
+ * history are a shared, all-can-edit view (in the Plans tab). Username comes from
+ * the ConjureOS account (via the minted token) — there's nothing to pick here.
+ * A user can be in at most three families.
  */
 export function FamilyScreen({
   profile,
   onChanged,
-  onInvitesChanged,
   onBack,
 }: {
   profile: AppProfile | null;
   onChanged: () => Promise<AppProfile | null>;
-  /** Tell the app to refresh the Home invite banner after accept/decline. */
-  onInvitesChanged?: () => void;
   onBack: () => void;
 }) {
   const [open, setOpen] = useState<string | null>(null); // expanded family id
-  const [invites, setInvites] = useState<FamilyInvite[]>([]);
-
-  const loadInvites = useCallback(() => {
-    myInvites()
-      .then(setInvites)
-      .catch(() => setInvites([]));
-  }, []);
-  useEffect(() => loadInvites(), [loadInvites]);
+  const families = profile?.families ?? [];
+  const atLimit = families.length >= FAMILY_LIMIT;
 
   return (
     <div className="browse-screen">
@@ -56,51 +44,25 @@ export function FamilyScreen({
       </div>
       <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
         Share plans and shopping lists with your household. Family plans sync to
-        everyone in the family live.
+        everyone live and anyone in the family can edit them.
       </p>
 
-      <UsernameBlock profile={profile} onChanged={onChanged} />
-
-      {invites.length > 0 && (
-        <section className="home-section">
-          <div className="home-section-head">
-            <h3>Invitations</h3>
-          </div>
-          <div className="fam-list">
-            {invites.map((inv) => (
-              <InviteCard
-                key={inv.familyId}
-                invite={inv}
-                onAccept={async () => {
-                  await acceptInvite(inv.familyId).catch(() => {});
-                  await onChanged();
-                  loadInvites();
-                  onInvitesChanged?.();
-                }}
-                onDecline={async () => {
-                  await declineInvite(inv.familyId).catch(() => {});
-                  loadInvites();
-                  onInvitesChanged?.();
-                }}
-              />
-            ))}
-          </div>
-        </section>
+      {profile?.username && (
+        <div className="username-claimed">
+          <Icon name="check" /> You are <strong>@{profile.username}</strong>
+          <span className="muted" style={{ fontSize: 12 }}>· your ConjureOS name</span>
+        </div>
       )}
 
       <section className="home-section">
         <div className="home-section-head">
           <h3>Your families</h3>
+          <span className="muted" style={{ fontSize: 12 }}>{families.length} of {FAMILY_LIMIT}</span>
         </div>
-        {profile && profile.families.length > 0 ? (
+        {families.length > 0 ? (
           <div className="fam-list">
-            {profile.families.map((f) => (
-              <FamilyCard
-                key={f.id}
-                family={f}
-                expanded={open === f.id}
-                onToggle={() => setOpen(open === f.id ? null : f.id)}
-              />
+            {families.map((f) => (
+              <FamilyCard key={f.id} family={f} expanded={open === f.id} onToggle={() => setOpen(open === f.id ? null : f.id)} />
             ))}
           </div>
         ) : (
@@ -108,102 +70,8 @@ export function FamilyScreen({
         )}
       </section>
 
-      <CreateJoin onChanged={onChanged} />
-    </div>
-  );
-}
-
-function UsernameBlock({ profile, onChanged }: { profile: AppProfile | null; onChanged: () => Promise<AppProfile | null> }) {
-  const [value, setValue] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  if (profile?.username) {
-    return (
-      <div className="username-claimed">
-        <Icon name="check" /> You are <strong>@{profile.username}</strong>
-        <span className="muted" style={{ fontSize: 12 }}>· your ConjureOS name</span>
-      </div>
-    );
-  }
-  const save = async () => {
-    const u = value.trim().toLowerCase().replace(/^@/, "");
-    if (!/^[a-z0-9_]{3,20}$/.test(u)) {
-      setError("3–20 chars: letters, numbers, underscore.");
-      return;
-    }
-    setError(null);
-    setBusy(true);
-    try {
-      await setUsername(u);
-      await onChanged();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(/taken/i.test(msg) ? "That username is taken." : msg);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <div className="fam-card">
-      <h4 style={{ margin: "0 0 4px" }}>Pick a username</h4>
-      <p className="muted" style={{ fontSize: 13, margin: "0 0 8px" }}>
-        You don't have a ConjureOS username yet — pick one so family members can add
-        you by @name. (Setting one in ConjureOS will use that instead.)
-      </p>
-      <div className="add-ing-form">
-        <input
-          type="text"
-          placeholder="@username"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          maxLength={20}
-          autoCapitalize="none"
-          autoCorrect="off"
-        />
-        <button className="btn" type="button" disabled={busy || !value.trim()} onClick={save}>
-          {busy ? "Saving…" : "Save"}
-        </button>
-      </div>
-      {error && <div className="fam-error">{error}</div>}
-    </div>
-  );
-}
-
-function InviteCard({
-  invite,
-  onAccept,
-  onDecline,
-}: {
-  invite: FamilyInvite;
-  onAccept: () => Promise<void>;
-  onDecline: () => Promise<void>;
-}) {
-  const [busy, setBusy] = useState(false);
-  const run = (fn: () => Promise<void>) => async () => {
-    setBusy(true);
-    try {
-      await fn();
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <div className="fam-card invite-card">
-      <div>
-        <div className="fam-name">{invite.name}</div>
-        <div className="muted" style={{ fontSize: 13 }}>
-          {invite.invitedBy ? `@${invite.invitedBy} invited you` : "You've been invited"}
-        </div>
-      </div>
-      <div className="invite-actions">
-        <button className="btn" type="button" disabled={busy} onClick={run(onAccept)}>
-          Accept
-        </button>
-        <button className="btn ghost" type="button" disabled={busy} onClick={run(onDecline)}>
-          Decline
-        </button>
-      </div>
+      <JoinBox atLimit={atLimit} onChanged={onChanged} />
+      <CreateBox atLimit={atLimit} onChanged={onChanged} />
     </div>
   );
 }
@@ -218,53 +86,21 @@ function FamilyCard({
   onToggle: () => void;
 }) {
   const [members, setMembers] = useState<FamilyMember[] | null>(null);
-  const [addValue, setAddValue] = useState("");
-  const [addBusy, setAddBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const link = familyInviteLink(family.inviteCode);
 
   useEffect(() => {
     if (!expanded) return;
-    getFamilyInfo(family.id)
-      .then((r) => setMembers(r.members))
-      .catch(() => setMembers([]));
+    getFamilyInfo(family.id).then((r) => setMembers(r.members)).catch(() => setMembers([]));
   }, [expanded, family.id]);
 
-  const copyInvite = async () => {
+  const copy = async () => {
     try {
-      await navigator.clipboard.writeText(family.inviteCode);
+      await navigator.clipboard.writeText(link);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      setTimeout(() => setCopied(false), 1600);
     } catch {
-      /* clipboard blocked — the code is shown regardless */
-    }
-  };
-
-  const add = async () => {
-    const u = addValue.trim().toLowerCase().replace(/^@/, "");
-    if (!/^[a-z0-9_]{3,20}$/.test(u)) {
-      setMsg("Enter a valid @username.");
-      return;
-    }
-    setAddBusy(true);
-    setMsg(null);
-    try {
-      const status = await inviteFamilyMember(family.id, u);
-      setAddValue("");
-      setMsg(
-        status === "already_member"
-          ? `@${u} is already in the family.`
-          : status === "already_invited"
-            ? `@${u} has already been invited.`
-            : `Invited @${u} — they'll need to accept.`,
-      );
-      const r = await getFamilyInfo(family.id);
-      setMembers(r.members);
-    } catch (e) {
-      const m = e instanceof Error ? e.message : String(e);
-      setMsg(/user_not_found/i.test(m) ? "No one with that username." : /invite_self/i.test(m) ? "That's you!" : m);
-    } finally {
-      setAddBusy(false);
+      /* clipboard blocked — the link is shown to copy by hand */
     }
   };
 
@@ -280,15 +116,18 @@ function FamilyCard({
 
       {expanded && (
         <div className="fam-card-body">
+          <div className="ing-group-label">Invite link</div>
+          <p className="muted" style={{ fontSize: 12, margin: "0 0 6px" }}>
+            Send this to family. They open it, then in Recipes → Family → Join, paste it to join.
+          </p>
           <div className="fam-invite">
-            <span className="muted" style={{ fontSize: 12 }}>Invite code</span>
-            <code className="fam-code">{family.inviteCode}</code>
-            <button className="btn secondary" type="button" onClick={copyInvite}>
-              <Icon name={copied ? "check" : "copy"} /> {copied ? "Copied" : "Copy"}
+            <code className="fam-link">{link}</code>
+            <button className="btn secondary" type="button" onClick={copy}>
+              <Icon name={copied ? "check" : "copy"} /> {copied ? "Copied" : "Copy link"}
             </button>
           </div>
 
-          <div className="ing-group-label">Members</div>
+          <div className="ing-group-label" style={{ marginTop: 10 }}>Members</div>
           {members === null ? (
             <div className="muted" style={{ fontSize: 13 }}>Loading…</div>
           ) : (
@@ -298,91 +137,122 @@ function FamilyCard({
                   <Icon name="user" />
                   <span>{m.username ? `@${m.username}` : m.displayName || m.email || "member"}</span>
                   {m.role === "owner" && <span className="fam-owner-tag">owner</span>}
-                  {m.status === "pending" && <span className="fam-pending-tag">pending</span>}
                 </div>
               ))}
             </div>
           )}
-
-          <div className="add-ing-form" style={{ marginTop: 8 }}>
-            <input
-              type="text"
-              placeholder="Invite by @username"
-              value={addValue}
-              onChange={(e) => setAddValue(e.target.value)}
-              maxLength={20}
-              autoCapitalize="none"
-              autoCorrect="off"
-            />
-            <button className="btn secondary" type="button" disabled={addBusy || !addValue.trim()} onClick={add}>
-              <Icon name="plus" /> Invite
-            </button>
-          </div>
-          {msg && <div className="fam-note">{msg}</div>}
         </div>
       )}
     </div>
   );
 }
 
-function CreateJoin({ onChanged }: { onChanged: () => Promise<AppProfile | null> }) {
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [busy, setBusy] = useState<null | "create" | "join">(null);
-  const [error, setError] = useState<string | null>(null);
+function JoinBox({ atLimit, onChanged }: { atLimit: boolean; onChanged: () => Promise<AppProfile | null> }) {
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
 
-  const doCreate = async () => {
-    setBusy("create");
-    setError(null);
-    try {
-      await createFamily(name.trim() || "My family");
-      setName("");
-      await onChanged();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(null);
+  const join = async () => {
+    const code = parseInvite(value);
+    if (!code) {
+      setMsg("Paste an invite link or code.");
+      return;
     }
-  };
-  const doJoin = async () => {
-    setBusy("join");
-    setError(null);
+    setBusy(true);
+    setMsg(null);
     try {
-      await joinFamily(code.trim());
-      setCode("");
+      await joinFamily(code);
+      setValue("");
       await onChanged();
+      setMsg("Joined!");
     } catch (e) {
       const m = e instanceof Error ? e.message : String(e);
-      setError(/not_found/i.test(m) ? "No family with that code." : m);
+      setMsg(
+        /family_limit/i.test(m)
+          ? `You're already in ${FAMILY_LIMIT} families.`
+          : /not_found/i.test(m)
+            ? "That invite link isn't valid."
+            : m,
+      );
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   };
 
   return (
     <section className="home-section">
       <div className="home-section-head">
-        <h3>Start or join</h3>
+        <h3>Join a family</h3>
       </div>
       <div className="fam-card">
-        <h4 style={{ margin: "0 0 6px" }}>Create a family</h4>
+        <p className="muted" style={{ fontSize: 13, margin: "0 0 8px" }}>
+          Paste an invite link someone shared with you.
+        </p>
         <div className="add-ing-form">
-          <input type="text" placeholder="Family name (e.g. The Smiths)" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
-          <button className="btn" type="button" disabled={busy !== null} onClick={doCreate}>
-            {busy === "create" ? "Creating…" : "Create"}
+          <input
+            type="text"
+            placeholder="Paste invite link or code"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            autoCapitalize="none"
+            autoCorrect="off"
+          />
+          <button className="btn" type="button" disabled={busy || !value.trim() || atLimit} onClick={join}>
+            {busy ? "Joining…" : "Join"}
           </button>
         </div>
+        {atLimit && <div className="fam-note">You're in {FAMILY_LIMIT} families already — the max.</div>}
+        {msg && <div className={/Joined/.test(msg) ? "fam-note" : "fam-error"}>{msg}</div>}
+      </div>
+    </section>
+  );
+}
+
+function CreateBox({ atLimit, onChanged }: { atLimit: boolean; onChanged: () => Promise<AppProfile | null> }) {
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const create = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await createFamily(name.trim() || "My family");
+      setName("");
+      await onChanged();
+    } catch (e) {
+      const m = e instanceof Error ? e.message : String(e);
+      setError(/family_limit/i.test(m) ? `You're in ${FAMILY_LIMIT} families already — the max.` : m);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="home-section">
+      <div className="home-section-head">
+        <h3>Create a family</h3>
       </div>
       <div className="fam-card">
-        <h4 style={{ margin: "0 0 6px" }}>Join with a code</h4>
+        <p className="muted" style={{ fontSize: 13, margin: "0 0 8px" }}>
+          Name it, then share its invite link.
+        </p>
         <div className="add-ing-form">
-          <input type="text" placeholder="Invite code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={20} autoCapitalize="characters" autoCorrect="off" />
-          <button className="btn secondary" type="button" disabled={busy !== null || !code.trim()} onClick={doJoin}>
-            {busy === "join" ? "Joining…" : "Join"}
+          <input
+            type="text"
+            placeholder="Family name (e.g. The Smiths)"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={60}
+            disabled={atLimit}
+          />
+          <button className="btn" type="button" disabled={busy || atLimit} onClick={create}>
+            {busy ? "Creating…" : "Create"}
           </button>
         </div>
+        {atLimit && <div className="fam-note">You're in {FAMILY_LIMIT} families already — the max.</div>}
+        {error && <div className="fam-error">{error}</div>}
       </div>
-      {error && <div className="fam-error">{error}</div>}
     </section>
   );
 }
