@@ -2749,6 +2749,44 @@ select {
 }
 .invite-actions { display: flex; gap: 8px; }
 
+/* Family-invite join prompt (handed over by the shell from a ?joinFamily link) */
+.join-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+}
+.join-card {
+  background: var(--bg-1);
+  border: 1px solid var(--grape);
+  border-radius: 20px;
+  padding: 24px 22px;
+  max-width: 340px;
+  width: 100%;
+  text-align: center;
+  box-shadow: var(--shadow-glow);
+}
+.join-card h3 { margin: 12px 0 6px; }
+.join-card .muted { font-size: 14px; }
+.join-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--grad-warm);
+  color: #2a1840;
+}
+.join-badge svg { width: 22px; height: 22px; }
+.join-actions { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
+.join-actions .btn { min-width: 96px; justify-content: center; }
+
 /* Home: pending-invite banner */
 .invite-banner {
   display: flex;
