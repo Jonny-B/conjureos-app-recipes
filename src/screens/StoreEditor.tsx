@@ -5,6 +5,8 @@ import {
   newStore,
   newId,
   unassignedCategories,
+  aiSortEnabled,
+  setAiSortEnabled,
   STORE_CATEGORIES,
   type StoresState,
   type StoreLayout,
@@ -20,6 +22,7 @@ import { Icon } from "../icons";
 export function StoreEditor({ onBack }: { onBack: () => void }) {
   const [state, setState] = useState<StoresState | null>(null);
   const [editingId, setEditingId] = useState<string>("");
+  const [aiOn, setAiOn] = useState<boolean>(aiSortEnabled());
 
   useEffect(() => {
     loadStores().then((s) => {
@@ -76,6 +79,20 @@ export function StoreEditor({ onBack }: { onBack: () => void }) {
         and sort to match — switch stores anytime.
       </p>
 
+      <label className="ai-toggle">
+        <input
+          type="checkbox"
+          checked={aiOn}
+          onChange={(e) => {
+            setAiOn(e.target.checked);
+            setAiSortEnabled(e.target.checked);
+          }}
+        />
+        <span>
+          <Icon name="wand" /> Let AI place items your layout doesn't cover
+        </span>
+      </label>
+
       {/* Store switcher */}
       {state.stores.length > 1 && (
         <div className="store-switch">
@@ -113,6 +130,15 @@ export function StoreEditor({ onBack }: { onBack: () => void }) {
             </span>
           ) : (
             <button className="link-btn" onClick={setDefault} type="button">Make default</button>
+          )}
+          {Object.keys(store.learned ?? {}).length > 0 && (
+            <button
+              className="link-btn"
+              type="button"
+              onClick={() => patchStore((s) => ({ ...s, learned: {} }))}
+            >
+              Clear {Object.keys(store.learned ?? {}).length} AI-learned
+            </button>
           )}
           <div style={{ flex: 1 }} />
           {state.stores.length > 1 && (

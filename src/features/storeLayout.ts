@@ -46,6 +46,13 @@ export interface StoreLayout {
   /** Ordered = the order you walk the store. */
   aisles: StoreAisle[];
   itemOverrides: ItemException[];
+  /**
+   * AI-learned item placements: canonical ingredient name → aisle id. Filled in
+   * when the model places an item the deterministic layout didn't cover, then
+   * remembered so the same item is instant (and free) next time. User exceptions
+   * always win over these; the user can clear them in the editor.
+   */
+  learned?: Record<string, string>;
 }
 
 export interface StoresState {
@@ -55,7 +62,8 @@ export interface StoresState {
 
 const STORES_PATH = "/home/Documents/Recipes/stores.json";
 const LAST_STORE_KEY = "recipes.stores.lastStoreId";
-const UNSORTED = "__unsorted__";
+/** Aisle id for items no rule placed — rendered as a trailing "Unsorted" group. */
+export const UNSORTED = "__unsorted__";
 
 let idSeq = 0;
 export function newId(prefix = "a"): string {
@@ -103,6 +111,28 @@ export async function saveStores(state: StoresState): Promise<void> {
   await vfs.write(STORES_PATH, JSON.stringify(state, null, 2));
 }
 
+const AI_SORT_KEY = "recipes.stores.aiSort";
+/** Whether the model may place items the layout doesn't cover. Default on. */
+export function aiSortEnabled(): boolean {
+  try {
+    return localStorage.getItem(AI_SORT_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+export function setAiSortEnabled(on: boolean): void {
+  try {
+    localStorage.setItem(AI_SORT_KEY, on ? "on" : "off");
+  } catch {
+    /* private mode — non-fatal */
+  }
+}
+
+/** Merge AI-learned placements (canonical → aisleId) into a store, immutably. */
+export function withLearned(store: StoreLayout, placements: Record<string, string>): StoreLayout {
+  return { ...store, learned: { ...(store.learned ?? {}), ...placements } };
+}
+
 export function readLastStoreId(): string | null {
   try {
     return localStorage.getItem(LAST_STORE_KEY);
@@ -138,9 +168,13 @@ export function groupByStore<T extends { name: string; canonical: string; aisle:
     .map((o) => ({ kw: o.keyword.trim().toLowerCase(), aisleId: o.aisleId }))
     .filter((o) => o.kw && store.aisles.some((a) => a.id === o.aisleId));
 
+  const learned = store.learned ?? {};
+  const validAisle = new Set(store.aisles.map((a) => a.id));
   const aisleForItem = (it: T): string => {
     const hay = `${it.name} ${it.canonical}`.toLowerCase();
-    for (const o of overrides) if (hay.includes(o.kw)) return o.aisleId;
+    for (const o of overrides) if (hay.includes(o.kw)) return o.aisleId; // explicit user exceptions win
+    const l = learned[it.canonical]; // then an AI-learned placement (exact canonical)
+    if (l && validAisle.has(l)) return l;
     return catToAisle.get(it.aisle) ?? UNSORTED;
   };
 

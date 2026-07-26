@@ -15,11 +15,16 @@ import { FamilyScreen } from "./FamilyScreen";
 import { StoreEditor } from "./StoreEditor";
 import {
   loadStores,
+  saveStores,
   groupByStore,
   readLastStoreId,
   writeLastStoreId,
+  aiSortEnabled,
+  withLearned,
+  UNSORTED,
   type StoreLayout,
 } from "../features/storeLayout";
+import { inferAislePlacements } from "../features/aiStoreSort";
 import { Icon } from "../icons";
 
 type Scope = "my" | "family";
@@ -340,11 +345,15 @@ function PlanView({
   // Group the shopping list by the user's selected store layout (personal, VFS).
   const [stores, setStores] = useState<StoreLayout[]>([]);
   const [storeId, setStoreId] = useState<string>("");
+  const [defaultId, setDefaultId] = useState<string>("");
+  const [aiNote, setAiNote] = useState<string | null>(null);
+  const askedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    loadStores().then(({ stores: st, defaultId }) => {
+    loadStores().then(({ stores: st, defaultId: d }) => {
       setStores(st);
+      setDefaultId(d);
       const last = readLastStoreId();
-      setStoreId(st.some((s) => s.id === last) ? last! : defaultId);
+      setStoreId(st.some((s) => s.id === last) ? last! : d);
     });
   }, []);
   const store = stores.find((s) => s.id === storeId) ?? stores[0] ?? null;
@@ -356,6 +365,36 @@ function PlanView({
     () => (store ? groupByStore(plan.shoppingList ?? [], store) : []),
     [plan, store],
   );
+  const unsorted = useMemo(() => groups.find((g) => g.aisleId === UNSORTED)?.items ?? [], [groups]);
+
+  // Whenever a list has items the store layout doesn't cover, hand the layout to
+  // the model and let it place them by analogy to what's already in each aisle.
+  // Placements are learned onto the store, so the same items are instant + free
+  // next time. Each (store, item) is asked at most once.
+  useEffect(() => {
+    if (!store || !aiSortEnabled() || unsorted.length === 0) return;
+    const toAsk = unsorted.filter((i) => !askedRef.current.has(`${store.id}:${i.canonical}`));
+    if (toAsk.length === 0) return;
+    toAsk.forEach((i) => askedRef.current.add(`${store.id}:${i.canonical}`));
+    let cancelled = false;
+    void (async () => {
+      const placements = await inferAislePlacements(
+        toAsk.map((i) => ({ name: i.name, canonical: i.canonical })),
+        store,
+      );
+      if (cancelled || Object.keys(placements).length === 0) return;
+      setStores((prev) => {
+        const next = prev.map((s) => (s.id === store.id ? withLearned(s, placements) : s));
+        void saveStores({ stores: next, defaultId });
+        return next;
+      });
+      const n = Object.keys(placements).length;
+      setAiNote(`Placed ${n} item${n === 1 ? "" : "s"} using your store layout`);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [store, unsorted, defaultId]);
 
   const checked = useMemo(() => new Set(plan.checked ?? []), [plan]);
   const total = (plan.shoppingList ?? []).length;
@@ -460,6 +499,12 @@ function PlanView({
             )}
             <div style={{ flex: 1 }} />
             <button className="link-btn" onClick={onManageStores}>Edit store</button>
+          </div>
+        )}
+
+        {aiNote && (
+          <div className="store-ai-note">
+            <Icon name="wand" /> {aiNote}
           </div>
         )}
 
