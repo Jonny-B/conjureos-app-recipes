@@ -23,6 +23,25 @@ import { APP_VERSION } from "./version";
 
 type Tab = "home" | "recipes" | "cook" | "plan" | "studio" | "admin";
 type CookMode = "kitchen" | "describe";
+/** A plans sub-screen to open from the header cog (available on any tab). */
+export type PlansIntent = "family" | "stores" | "new";
+/** An action a screen contributes to the header settings sheet. */
+export interface CogItem {
+  key: string;
+  label: string;
+  icon: IconName;
+  onClick: () => void;
+  danger?: boolean;
+}
+
+const TAB_TITLE: Record<Tab, string> = {
+  home: "Home",
+  recipes: "Recipes",
+  cook: "Cook",
+  plan: "Plans",
+  studio: "Studio",
+  admin: "Admin",
+};
 /** What's loaded into the guided cook. `saved` set when it's a library recipe. */
 interface CookTarget {
   recipe: Recipe;
@@ -61,6 +80,17 @@ export function App() {
   // A family invite code handed over by the ConjureOS shell (from a
   // `?joinFamily=` link) via a VFS file → prompt to join.
   const [pendingJoin, setPendingJoin] = useState<string | null>(null);
+  // Header settings cog: a sheet with Family + Stores (any tab), plus whatever
+  // plan actions the Plans screen contributes for the plan in view.
+  const [cogOpen, setCogOpen] = useState(false);
+  const [plansIntent, setPlansIntent] = useState<PlansIntent | null>(null);
+  const [cogExtras, setCogExtras] = useState<CogItem[]>([]);
+  const goPlans = (intent: PlansIntent) => {
+    setCookTarget(null);
+    setTab("plan");
+    setPlansIntent(intent);
+    setCogOpen(false);
+  };
 
   useEffect(() => {
     const HANDOFF = "/home/Documents/Recipes/.family-invite.json";
@@ -123,8 +153,10 @@ export function App() {
         <span className="brand-mark">
           <Icon name="utensils" />
         </span>
-        <span className="topbar-title">Recipes</span>
-        <span className="topbar-slot" />
+        <span className="topbar-title">{TAB_TITLE[tab]}</span>
+        <button className="topbar-cog" aria-label="Settings" onClick={() => setCogOpen(true)}>
+          <Icon name="gear" />
+        </button>
       </header>
       <main className="app-body">
         {tab === "home" && (
@@ -177,7 +209,15 @@ export function App() {
             )}
           </>
         )}
-        {tab === "plan" && <PlansScreen pantry={pantry} catalogVersion={catalogVersion} />}
+        {tab === "plan" && (
+          <PlansScreen
+            pantry={pantry}
+            catalogVersion={catalogVersion}
+            intent={plansIntent}
+            onIntentConsumed={() => setPlansIntent(null)}
+            onCogItems={setCogExtras}
+          />
+        )}
         {tab === "studio" && <StudioScreen />}
         {tab === "admin" && <AdminScreen myEmail={myEmail} />}
       </main>
@@ -211,6 +251,35 @@ export function App() {
                 roleErr ? `backend: ${roleErr.slice(0, 60)}` : "not signed in"
               }`)}
       </footer>
+      {cogOpen && (
+        <div className="sheet-overlay" onClick={() => setCogOpen(false)}>
+          <div className="settings-sheet" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-handle" />
+            <button className="sheet-item" onClick={() => goPlans("family")}>
+              <Icon name="user" /> Family
+            </button>
+            <button className="sheet-item" onClick={() => goPlans("stores")}>
+              <Icon name="store" /> Grocery stores
+            </button>
+            {cogExtras.length > 0 && <div className="sheet-sep" />}
+            {cogExtras.map((it) => (
+              <button
+                key={it.key}
+                className={`sheet-item${it.danger ? " danger" : ""}`}
+                onClick={() => {
+                  it.onClick();
+                  setCogOpen(false);
+                }}
+              >
+                <Icon name={it.icon} /> {it.label}
+              </button>
+            ))}
+            <button className="sheet-item sheet-cancel" onClick={() => setCogOpen(false)}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
       {pendingJoin && (
         <FamilyJoinPrompt
           code={pendingJoin}
