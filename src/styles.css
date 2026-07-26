@@ -2795,6 +2795,29 @@ button.plan-family-chip:hover { border-color: var(--grape); background: var(--bg
 }
 .store-bar-name { font-weight: 700; font-size: 14px; }
 .store-bar .link-btn { font-size: 13px; }
+.store-ai-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--accent-soft);
+  margin: -2px 0 10px 2px;
+}
+.store-ai-note svg { width: 12px; height: 12px; }
+
+/* AI-sort toggle (store editor) */
+.ai-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  color: var(--fg-dim, var(--cui-fg-mute));
+  margin: 0 0 14px;
+  cursor: pointer;
+}
+.ai-toggle input { width: 17px; height: 17px; accent-color: var(--grape, #7c6af7); flex: 0 0 auto; }
+.ai-toggle span { display: inline-flex; align-items: center; gap: 6px; }
+.ai-toggle svg { width: 13px; height: 13px; color: var(--accent-soft); }
 
 /* ── Store editor ─────────────────────────────────────────────────────── */
 .store-switch { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }

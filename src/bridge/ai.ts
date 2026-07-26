@@ -72,6 +72,17 @@ export async function complete(req: CompleteRequest): Promise<string> {
  */
 async function mockComplete(req: CompleteRequest): Promise<string> {
   await new Promise((r) => setTimeout(r, 600));
+  // Grocery aisle mapper (store layout → item placements). Extracts the aisle
+  // ids + item names from the prompt and round-robins them so the store-sort
+  // flow is demonstrable under `npm run dev`. Real placements come from the model.
+  if (req.system.includes("map grocery items to the aisles")) {
+    const body = req.messages.map((m) => m.content).join("\n");
+    const aisleIds = [...body.matchAll(/id="([^"]+)"/g)].map((m) => m[1]);
+    const items = [...body.matchAll(/^- (.+)$/gm)].map((m) => m[1]!.trim());
+    const out: Record<string, string> = {};
+    if (aisleIds.length) items.forEach((it, i) => (out[it] = aisleIds[i % aisleIds.length]!));
+    return JSON.stringify(out);
+  }
   // Plan My Week mood interpreter. Returns deterministic structured
   // constraints so the planner is iterable under `npm run dev`.
   if (req.system.includes("meal-plan mood interpreter")) {
