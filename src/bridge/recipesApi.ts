@@ -471,6 +471,18 @@ export async function createFamily(name: string): Promise<AppFamily> {
   return r.family;
 }
 
+/** Rename a family (owner-only server-side). Duplicate names are allowed. */
+export async function renameFamily(familyId: string, name: string): Promise<AppFamily> {
+  if (!isBackendAvailable()) {
+    const fam = devProfile.families.find((f) => f.id === familyId);
+    if (fam) fam.name = name.trim() || fam.name;
+    return fam!;
+  }
+  const r = await invokeRaw<{ family?: AppFamily }>("renameFamily", { familyId, name });
+  if (!r.family) throw new Error("rename failed");
+  return r.family;
+}
+
 export async function joinFamily(inviteCode: string): Promise<AppFamily> {
   if (!isBackendAvailable()) {
     const fam: AppFamily = { id: `fam-${devSeq++}`, name: "Joined family", role: "member", inviteCode, channelToken: "devtoken" };

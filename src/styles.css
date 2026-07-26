@@ -2615,18 +2615,19 @@ select {
 .plan-view { display: flex; flex-direction: column; }
 .plan-view-head {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin: 4px 0 4px;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 8px;
 }
-.plan-view-when {
-  font-weight: 700;
-  font-size: 15px;
-  display: inline-flex;
+.plan-view-tags {
+  display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+.plan-view-tags:empty { display: none; }
+.plan-view-meta {
+  font-size: 13px;
 }
 .plan-latest {
   font-size: 11px;
@@ -2711,7 +2712,8 @@ select {
 /* ── Plans: scope switch, share, family chip ──────────────────────────── */
 .plans-header-actions { display: flex; align-items: center; gap: 8px; }
 
-.plan-actions { display: flex; align-items: center; gap: 8px; margin: 4px 0 8px; flex-wrap: wrap; }
+.plan-actions { display: flex; align-items: center; gap: 8px; margin: 4px 0 8px; flex-wrap: nowrap; }
+.plan-actions .btn { white-space: nowrap; }
 .plan-share-select {
   background: var(--bg-2);
   border: 1px solid var(--border);
@@ -2724,18 +2726,173 @@ select {
 .plan-family-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--accent-soft);
   background: var(--bg-3);
-  padding: 2px 9px;
+  border: 1px solid var(--cui-border);
+  padding: 4px 10px;
   border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s;
 }
-.plan-family-chip.inline { margin-left: 8px; text-transform: none; font-weight: 700; letter-spacing: 0; }
-.plan-family-chip svg { width: 10px; height: 10px; }
+button.plan-family-chip:hover { border-color: var(--grape); background: var(--bg-2); }
+.plan-family-chip.inline { margin-left: 8px; text-transform: none; font-weight: 700; letter-spacing: 0; border: none; padding: 0; background: none; cursor: default; }
+.plan-family-chip svg { width: 11px; height: 11px; }
+/* the trailing gear reads a touch dimmer than the name */
+.plan-family-chip svg:last-child { opacity: 0.7; }
+
+/* ── Plans: manage row (Family / Stores entries) ──────────────────────── */
+.plans-manage-row {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-dim, var(--cui-fg-mute));
+  background: var(--bg-3);
+  border: 1px solid var(--cui-border);
+  border-radius: 999px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.chip-btn:hover { border-color: var(--grape); color: var(--fg); }
+.chip-btn svg { width: 13px; height: 13px; }
+
+/* ── Shopping: store selector bar ─────────────────────────────────────── */
+.store-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  background: var(--bg-2);
+  border: 1px solid var(--cui-border);
+  border-radius: 12px;
+}
+.store-bar > svg { width: 15px; height: 15px; color: var(--accent-soft); flex: 0 0 auto; }
+.store-bar-select {
+  background: transparent;
+  border: none;
+  color: var(--fg);
+  font: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 2px 4px;
+  cursor: pointer;
+  max-width: 55%;
+}
+.store-bar-name { font-weight: 700; font-size: 14px; }
+.store-bar .link-btn { font-size: 13px; }
+
+/* ── Store editor ─────────────────────────────────────────────────────── */
+.store-switch { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.chip-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-dim, var(--cui-fg-mute));
+  background: var(--bg-3);
+  border: 1px solid var(--cui-border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.chip-tab.active { color: #fff; background: var(--grad-primary); border-color: transparent; }
+.chip-default {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+.store-card {
+  background: var(--bg-2);
+  border: 1px solid var(--cui-border);
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.store-card-actions { display: flex; align-items: center; gap: 10px; }
+
+.aisle-card {
+  background: var(--bg-2);
+  border: 1px solid var(--cui-border);
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.aisle-head { display: flex; align-items: center; gap: 8px; }
+.aisle-reorder { display: flex; flex-direction: column; gap: 2px; flex: 0 0 auto; }
+.aisle-reorder .icon-btn { width: 26px; height: 22px; padding: 0; }
+.aisle-reorder .icon-btn svg { width: 12px; height: 12px; }
+.aisle-name {
+  flex: 1;
+  background: var(--bg-3);
+  border: 1px solid var(--cui-border);
+  border-radius: 10px;
+  color: var(--fg);
+  font: inherit;
+  font-weight: 700;
+  padding: 9px 11px;
+  min-width: 0;
+}
+.aisle-cats { display: flex; flex-wrap: wrap; gap: 6px; }
+.cat-chip {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-dim, var(--cui-fg-mute));
+  background: var(--bg-3);
+  border: 1px solid var(--cui-border);
+  border-radius: 999px;
+  padding: 5px 11px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.cat-chip.on { color: #fff; background: var(--grad-primary); border-color: transparent; }
+
+.exception-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.exception-kw {
+  flex: 1;
+  background: var(--bg-3);
+  border: 1px solid var(--cui-border);
+  border-radius: 10px;
+  color: var(--fg);
+  font: inherit;
+  padding: 9px 11px;
+  min-width: 0;
+}
+.exception-aisle {
+  background: var(--bg-3);
+  border: 1px solid var(--cui-border);
+  border-radius: 10px;
+  color: var(--fg);
+  font: inherit;
+  padding: 9px 8px;
+  max-width: 38%;
+}
 
 /* ── Family screen ────────────────────────────────────────────────────── */
 .fam-list { display: flex; flex-direction: column; gap: 10px; }

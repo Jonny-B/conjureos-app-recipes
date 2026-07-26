@@ -12,10 +12,18 @@ import {
 import { subscribeFamilyChannels, type RealtimeHandle } from "../bridge/realtime";
 import { PlanWeekScreen } from "./PlanWeekScreen";
 import { FamilyScreen } from "./FamilyScreen";
+import { StoreEditor } from "./StoreEditor";
+import {
+  loadStores,
+  groupByStore,
+  readLastStoreId,
+  writeLastStoreId,
+  type StoreLayout,
+} from "../features/storeLayout";
 import { Icon } from "../icons";
 
 type Scope = "my" | "family";
-type Mode = "landing" | "new" | "family";
+type Mode = "landing" | "new" | "family" | "stores";
 
 const byUpdated = (a: PlanRecord, b: PlanRecord) => (b.updatedAt || "").localeCompare(a.updatedAt || "");
 
@@ -195,6 +203,9 @@ export function PlansScreen({
       />
     );
   }
+  if (mode === "stores") {
+    return <StoreEditor onBack={() => setMode("landing")} />;
+  }
 
   if (plans === null) {
     return (
@@ -210,14 +221,18 @@ export function PlansScreen({
     <div className="browse-screen">
       <div className="browse-header plans-header">
         <h2>Plans</h2>
-        <div className="plans-header-actions">
-          <button className="icon-btn" title="Family" aria-label="Family" onClick={() => setMode("family")}>
-            <Icon name="user" />
-          </button>
-          <button className="btn" onClick={() => setMode("new")}>
-            <Icon name="plus" /> New plan
-          </button>
-        </div>
+        <button className="btn" onClick={() => setMode("new")}>
+          <Icon name="plus" /> New plan
+        </button>
+      </div>
+
+      <div className="plans-manage-row">
+        <button className="chip-btn" onClick={() => setMode("family")}>
+          <Icon name="user" /> Family
+        </button>
+        <button className="chip-btn" onClick={() => setMode("stores")}>
+          <Icon name="store" /> Stores
+        </button>
       </div>
 
       <div className="seg" role="tablist" aria-label="Plan scope">
@@ -266,6 +281,8 @@ export function PlansScreen({
               onUncheckAll={() => uncheckAll(current)}
               onShare={(fid) => sharePlan(current, fid)}
               onDelete={() => removePlan(current)}
+              onManageStores={() => setMode("stores")}
+              onManageFamily={() => setMode("family")}
             />
             {active.length > 1 && (
               <section className="home-section">
@@ -304,6 +321,8 @@ function PlanView({
   onUncheckAll,
   onShare,
   onDelete,
+  onManageStores,
+  onManageFamily,
 }: {
   rec: PlanRecord;
   isLatest: boolean;
@@ -313,17 +332,30 @@ function PlanView({
   onUncheckAll: () => void;
   onShare: (familyId: string | null) => void;
   onDelete: () => void;
+  onManageStores: () => void;
+  onManageFamily: () => void;
 }) {
   const plan = rec.data;
-  const byAisle = useMemo(() => {
-    const m = new Map<string, typeof plan.shoppingList>();
-    for (const item of plan.shoppingList ?? []) {
-      const arr = m.get(item.aisle) ?? [];
-      arr.push(item);
-      m.set(item.aisle, arr);
-    }
-    return [...m.entries()];
-  }, [plan]);
+
+  // Group the shopping list by the user's selected store layout (personal, VFS).
+  const [stores, setStores] = useState<StoreLayout[]>([]);
+  const [storeId, setStoreId] = useState<string>("");
+  useEffect(() => {
+    loadStores().then(({ stores: st, defaultId }) => {
+      setStores(st);
+      const last = readLastStoreId();
+      setStoreId(st.some((s) => s.id === last) ? last! : defaultId);
+    });
+  }, []);
+  const store = stores.find((s) => s.id === storeId) ?? stores[0] ?? null;
+  const pickStore = (id: string) => {
+    setStoreId(id);
+    writeLastStoreId(id);
+  };
+  const groups = useMemo(
+    () => (store ? groupByStore(plan.shoppingList ?? [], store) : []),
+    [plan, store],
+  );
 
   const checked = useMemo(() => new Set(plan.checked ?? []), [plan]);
   const total = (plan.shoppingList ?? []).length;
@@ -334,14 +366,18 @@ function PlanView({
   return (
     <div className="plan-view">
       <div className="plan-view-head">
-        <span className="plan-view-when">
+        <div className="plan-view-tags">
           {isLatest && <span className="plan-latest">Latest</span>}
-          {shared && <span className="plan-family-chip"><Icon name="user" /> {familyName}</span>}
-          Planned {formatDate(plan.createdAt)}
-        </span>
-        <span className="muted" style={{ fontSize: 13 }}>
-          {(plan.picks ?? []).length} meal{(plan.picks ?? []).length === 1 ? "" : "s"} · {total} to buy
-        </span>
+          {shared && (
+            <button className="plan-family-chip" onClick={onManageFamily} title="Family settings">
+              <Icon name="user" /> {familyName} <Icon name="gear" />
+            </button>
+          )}
+        </div>
+        <div className="plan-view-meta muted">
+          Planned {formatDate(plan.createdAt)} · {(plan.picks ?? []).length} meal
+          {(plan.picks ?? []).length === 1 ? "" : "s"} · {total} to buy
+        </div>
       </div>
 
       {/* Share / privacy + delete */}
@@ -351,8 +387,8 @@ function PlanView({
             <Icon name="user" /> Make private
           </button>
         ) : families.length === 1 ? (
-          <button className="btn secondary" onClick={() => onShare(families[0]!.id)}>
-            <Icon name="user" /> Share with {families[0]!.name}
+          <button className="btn secondary" onClick={() => onShare(families[0]!.id)} title={`Share with ${families[0]!.name}`}>
+            <Icon name="user" /> Share
           </button>
         ) : families.length > 1 ? (
           <select
@@ -409,16 +445,34 @@ function PlanView({
             </span>
           )}
         </div>
+
+        {total > 0 && (
+          <div className="store-bar">
+            <Icon name="store" />
+            {stores.length > 1 ? (
+              <select className="store-bar-select" value={store?.id ?? ""} onChange={(e) => pickStore(e.target.value)}>
+                {stores.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            ) : (
+              <span className="store-bar-name">{store?.name ?? "My store"}</span>
+            )}
+            <div style={{ flex: 1 }} />
+            <button className="link-btn" onClick={onManageStores}>Edit store</button>
+          </div>
+        )}
+
         {total === 0 ? (
           <div className="empty-state">
             <Icon name="check" className="empty-icon" />
             <div>Nothing to buy — this week is fully covered by what you have.</div>
           </div>
         ) : (
-          byAisle.map(([aisle, items]) => (
-            <div key={aisle} className="shopping-group">
-              <div className="ing-group-label">{aisle}</div>
-              {items.map((item) => {
+          groups.map((g) => (
+            <div key={g.aisleId} className="shopping-group">
+              <div className="ing-group-label">{g.aisleName}</div>
+              {g.items.map((item) => {
                 const isChecked = checked.has(item.canonical);
                 return (
                   <button
@@ -435,11 +489,6 @@ function PlanView({
                       <span className="shopping-name">{item.name}</span>
                       {item.quantity && <span className="shopping-qty">{item.quantity}</span>}
                       {item.quantityNote && <span className="serves">{item.quantityNote}</span>}
-                    </div>
-                    <div className="shopping-for">
-                      {item.recipes.map((r) => (
-                        <span key={r.id} className="pill">{r.title}</span>
-                      ))}
                     </div>
                   </button>
                 );
