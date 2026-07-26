@@ -10,6 +10,8 @@ import { GuidedCook } from "./screens/GuidedCook";
 import { RecipesScreen } from "./screens/RecipesScreen";
 import { generateFromDescription } from "./features/recipes";
 import { registerActions } from "./bridge/actions";
+import { vfs } from "./bridge/vfs";
+import { joinFamily } from "./bridge/recipesApi";
 import { ensureCatalogLoaded } from "./features/catalog";
 import { loadPantry, ingredientsFromPantry } from "./features/pantry";
 import { markMade, saveRecipe } from "./features/storage";
@@ -56,6 +58,33 @@ export function App() {
   const [cookOrigin, setCookOrigin] = useState<Tab>("cook");
   const [pantry, setPantry] = useState<PantryItem[] | null>(null);
   const [catalogVersion, setCatalogVersion] = useState(0);
+  // A family invite code handed over by the ConjureOS shell (from a
+  // `?joinFamily=` link) via a VFS file → prompt to join.
+  const [pendingJoin, setPendingJoin] = useState<string | null>(null);
+
+  useEffect(() => {
+    const HANDOFF = "/home/Documents/Recipes/.family-invite.json";
+    const check = async () => {
+      try {
+        if (!(await vfs.exists(HANDOFF))) return;
+        const raw = await vfs.read(HANDOFF);
+        await vfs.rm(HANDOFF).catch(() => {});
+        const parsed = JSON.parse(raw) as { code?: string; ts?: number };
+        const code = (parsed.code ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+        // Ignore a stale handoff (>10 min) — the shell writes it right before it
+        // opens us, so a fresh one is seconds old.
+        if (code && (!parsed.ts || Date.now() - parsed.ts < 10 * 60 * 1000)) setPendingJoin(code);
+      } catch {
+        /* no handoff / unreadable — nothing to redeem */
+      }
+    };
+    void check();
+    // Also re-check when the app regains focus, in case it was already open when
+    // the shell wrote the handoff.
+    const onVis = () => document.visibilityState === "visible" && void check();
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
 
   useEffect(() => {
     registerActions().catch((err) => {
@@ -182,6 +211,83 @@ export function App() {
                 roleErr ? `backend: ${roleErr.slice(0, 60)}` : "not signed in"
               }`)}
       </footer>
+      {pendingJoin && (
+        <FamilyJoinPrompt
+          code={pendingJoin}
+          onClose={() => setPendingJoin(null)}
+          onJoined={() => {
+            setPendingJoin(null);
+            setCookTarget(null);
+            setTab("plan");
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Shown when the shell hands over a family invite code (from a `?joinFamily=`
+ * link). Confirm → join → land on the Plans tab with the new family.
+ */
+function FamilyJoinPrompt({
+  code,
+  onClose,
+  onJoined,
+}: {
+  code: string;
+  onClose: () => void;
+  onJoined: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [joinedName, setJoinedName] = useState<string | null>(null);
+
+  const join = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const fam = await joinFamily(code);
+      setJoinedName(fam.name);
+      setTimeout(onJoined, 1100);
+    } catch (e) {
+      const m = e instanceof Error ? e.message : String(e);
+      setError(
+        /family_limit/i.test(m)
+          ? "You're already in 3 families — the max."
+          : /not_found/i.test(m)
+            ? "That invite link isn't valid anymore."
+            : "Couldn't join. Try again.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="join-overlay" role="dialog" aria-modal="true">
+      <div className="join-card">
+        {joinedName ? (
+          <>
+            <span className="join-badge"><Icon name="check" /></span>
+            <h3>Joined {joinedName}!</h3>
+            <p className="muted">Opening your family plans…</p>
+          </>
+        ) : (
+          <>
+            <span className="join-badge"><Icon name="user" /></span>
+            <h3>Join a family?</h3>
+            <p className="muted">
+              You've been invited. Join to share plans and shopping lists that sync live.
+            </p>
+            {error && <div className="fam-error" style={{ textAlign: "center" }}>{error}</div>}
+            <div className="join-actions">
+              <button className="btn ghost" onClick={onClose} disabled={busy}>Not now</button>
+              <button className="btn" onClick={join} disabled={busy}>{busy ? "Joining…" : "Join"}</button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
