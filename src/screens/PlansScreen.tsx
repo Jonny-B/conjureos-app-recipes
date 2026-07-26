@@ -25,6 +25,7 @@ import {
   type StoreLayout,
 } from "../features/storeLayout";
 import { inferAislePlacements } from "../features/aiStoreSort";
+import type { PlansIntent, CogItem } from "../App";
 import { Icon } from "../icons";
 
 type Scope = "my" | "family";
@@ -61,9 +62,17 @@ function writeLastView(v: { scope: Scope; planId: string | null }): void {
 export function PlansScreen({
   pantry,
   catalogVersion = 0,
+  intent = null,
+  onIntentConsumed,
+  onCogItems,
 }: {
   pantry: PantryItem[] | null;
   catalogVersion?: number;
+  /** A sub-screen to open, requested from the app-header cog. */
+  intent?: PlansIntent | null;
+  onIntentConsumed?: () => void;
+  /** Contribute plan actions (share / delete) to the header settings sheet. */
+  onCogItems?: (items: CogItem[]) => void;
 }) {
   const [profile, setProfile] = useState<AppProfile | null>(null);
   const [plans, setPlans] = useState<PlanRecord[] | null>(null);
@@ -181,6 +190,42 @@ export function PlansScreen({
     await loadPlans();
   };
 
+  // A header-cog intent (Family / Stores / New) opens that sub-screen.
+  useEffect(() => {
+    if (!intent) return;
+    setMode(intent);
+    onIntentConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intent]);
+
+  // Contribute the in-view plan's actions (share / make private / delete) to the
+  // app-header settings sheet. Cleared when no plan is shown or on unmount.
+  const cogPlan = mode === "landing" ? active[viewing] ?? active[0] : undefined;
+  useEffect(() => {
+    if (!onCogItems) return;
+    if (!cogPlan) {
+      onCogItems([]);
+      return;
+    }
+    const items: CogItem[] = [];
+    if (cogPlan.familyId) {
+      items.push({ key: "private", label: "Make private", icon: "user", onClick: () => void sharePlan(cogPlan, null) });
+    } else {
+      for (const f of families) {
+        items.push({
+          key: `share-${f.id}`,
+          label: families.length > 1 ? `Share with ${f.name}` : "Share with family",
+          icon: "user",
+          onClick: () => void sharePlan(cogPlan, f.id),
+        });
+      }
+    }
+    items.push({ key: "delete", label: "Delete plan", icon: "trash-can", danger: true, onClick: () => void removePlan(cogPlan) });
+    onCogItems(items);
+    return () => onCogItems([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cogPlan?.id, cogPlan?.familyId, mode, families.length]);
+
   // ── routed sub-screens ──
   if (mode === "new") {
     return (
@@ -224,28 +269,17 @@ export function PlansScreen({
 
   return (
     <div className="browse-screen">
-      <div className="browse-header plans-header">
-        <h2>Plans</h2>
-        <button className="btn" onClick={() => setMode("new")}>
-          <Icon name="plus" /> New plan
-        </button>
-      </div>
-
-      <div className="plans-manage-row">
-        <button className="chip-btn" onClick={() => setMode("family")}>
-          <Icon name="user" /> Family
-        </button>
-        <button className="chip-btn" onClick={() => setMode("stores")}>
-          <Icon name="store" /> Stores
-        </button>
-      </div>
-
-      <div className="seg" role="tablist" aria-label="Plan scope">
-        <button role="tab" aria-selected={scope === "my"} className={`seg-btn${scope === "my" ? " active" : ""}`} onClick={() => setScope("my")}>
-          My plans
-        </button>
-        <button role="tab" aria-selected={scope === "family"} className={`seg-btn${scope === "family" ? " active" : ""}`} onClick={() => setScope("family")}>
-          Family{familyPlans.length ? ` (${familyPlans.length})` : ""}
+      <div className="plans-tabs-row">
+        <div className="seg" role="tablist" aria-label="Plan scope">
+          <button role="tab" aria-selected={scope === "my"} className={`seg-btn${scope === "my" ? " active" : ""}`} onClick={() => setScope("my")}>
+            My plans
+          </button>
+          <button role="tab" aria-selected={scope === "family"} className={`seg-btn${scope === "family" ? " active" : ""}`} onClick={() => setScope("family")}>
+            Family{familyPlans.length ? ` (${familyPlans.length})` : ""}
+          </button>
+        </div>
+        <button className="btn plans-new" onClick={() => setMode("new")} aria-label="New plan">
+          <Icon name="plus" /> New
         </button>
       </div>
 
@@ -281,13 +315,9 @@ export function PlansScreen({
               rec={current}
               isLatest={viewing === 0}
               familyName={current.familyId ? familyName(current.familyId) : null}
-              families={families}
               onToggle={(c) => toggleChecked(current, c)}
               onUncheckAll={() => uncheckAll(current)}
-              onShare={(fid) => sharePlan(current, fid)}
-              onDelete={() => removePlan(current)}
               onManageStores={() => setMode("stores")}
-              onManageFamily={() => setMode("family")}
             />
             {active.length > 1 && (
               <section className="home-section">
@@ -321,24 +351,16 @@ function PlanView({
   rec,
   isLatest,
   familyName,
-  families,
   onToggle,
   onUncheckAll,
-  onShare,
-  onDelete,
   onManageStores,
-  onManageFamily,
 }: {
   rec: PlanRecord;
   isLatest: boolean;
   familyName: string | null;
-  families: AppProfile["families"];
   onToggle: (canonical: string) => void;
   onUncheckAll: () => void;
-  onShare: (familyId: string | null) => void;
-  onDelete: () => void;
   onManageStores: () => void;
-  onManageFamily: () => void;
 }) {
   const plan = rec.data;
 
@@ -408,43 +430,15 @@ function PlanView({
         <div className="plan-view-tags">
           {isLatest && <span className="plan-latest">Latest</span>}
           {shared && (
-            <button className="plan-family-chip" onClick={onManageFamily} title="Family settings">
-              <Icon name="user" /> {familyName} <Icon name="gear" />
-            </button>
+            <span className="plan-family-chip">
+              <Icon name="user" /> {familyName}
+            </span>
           )}
         </div>
         <div className="plan-view-meta muted">
           Planned {formatDate(plan.createdAt)} · {(plan.picks ?? []).length} meal
           {(plan.picks ?? []).length === 1 ? "" : "s"} · {total} to buy
         </div>
-      </div>
-
-      {/* Share / privacy + delete */}
-      <div className="plan-actions">
-        {shared ? (
-          <button className="btn ghost" onClick={() => onShare(null)}>
-            <Icon name="user" /> Make private
-          </button>
-        ) : families.length === 1 ? (
-          <button className="btn secondary" onClick={() => onShare(families[0]!.id)} title={`Share with ${families[0]!.name}`}>
-            <Icon name="user" /> Share
-          </button>
-        ) : families.length > 1 ? (
-          <select
-            className="plan-share-select"
-            defaultValue=""
-            onChange={(e) => e.target.value && onShare(e.target.value)}
-          >
-            <option value="" disabled>Share with…</option>
-            {families.map((f) => (
-              <option key={f.id} value={f.id}>{f.name}</option>
-            ))}
-          </select>
-        ) : null}
-        <div style={{ flex: 1 }} />
-        <button className="btn ghost" onClick={onDelete} aria-label="Delete plan">
-          <Icon name="trash-can" /> Delete
-        </button>
       </div>
 
       <section className="home-section">
