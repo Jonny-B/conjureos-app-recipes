@@ -43,16 +43,9 @@ export function FamilyScreen({
         <h2>Family</h2>
       </div>
       <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
-        Share plans and shopping lists with your household. Family plans sync to
-        everyone live and anyone in the family can edit them.
+        Share plans and shopping lists — everything syncs live to everyone.
+        {profile?.username && <> Signed in as <strong>@{profile.username}</strong>.</>}
       </p>
-
-      {profile?.username && (
-        <div className="username-claimed">
-          <Icon name="check" /> You are <strong>@{profile.username}</strong>
-          <span className="muted" style={{ fontSize: 12 }}>· your ConjureOS name</span>
-        </div>
-      )}
 
       <section className="home-section">
         <div className="home-section-head">
@@ -118,7 +111,7 @@ function FamilyCard({
         <div className="fam-card-body">
           <div className="ing-group-label">Invite link</div>
           <p className="muted" style={{ fontSize: 12, margin: "0 0 6px" }}>
-            Send this to family. They open it, then in Recipes → Family → Join, paste it to join.
+            Share this link — opening it drops them straight into this family.
           </p>
           <div className="fam-invite">
             <code className="fam-link">{link}</code>
@@ -185,9 +178,6 @@ function JoinBox({ atLimit, onChanged }: { atLimit: boolean; onChanged: () => Pr
         <h3>Join a family</h3>
       </div>
       <div className="fam-card">
-        <p className="muted" style={{ fontSize: 13, margin: "0 0 8px" }}>
-          Paste an invite link someone shared with you.
-        </p>
         <div className="add-ing-form">
           <input
             type="text"
@@ -234,9 +224,6 @@ function CreateBox({ atLimit, onChanged }: { atLimit: boolean; onChanged: () => 
         <h3>Create a family</h3>
       </div>
       <div className="fam-card">
-        <p className="muted" style={{ fontSize: 13, margin: "0 0 8px" }}>
-          Name it, then share its invite link.
-        </p>
         <div className="add-ing-form">
           <input
             type="text"

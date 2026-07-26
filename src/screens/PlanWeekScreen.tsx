@@ -238,7 +238,7 @@ export function PlanWeekScreen({
       <div className="browse-header">
         <h2>Plan my week</h2>
       </div>
-      <StepDots step={step} />
+      <WizardProgress step={step} />
 
       {error && (
         <div className="status-banner error">
@@ -273,7 +273,6 @@ export function PlanWeekScreen({
       {step === "scan" && (
         <ScanStep
           onHand={onHand}
-          pantryCount={pantry?.length ?? 0}
           onScan={() => {
             setError(null);
             setScanMode("capture");
@@ -308,18 +307,21 @@ export function PlanWeekScreen({
   );
 }
 
-// ── Step dots ──────────────────────────────────────────────────────────
+// ── Progress ───────────────────────────────────────────────────────────
 
-function StepDots({ step }: { step: Step }) {
+function WizardProgress({ step }: { step: Step }) {
   const idx = STEPS.findIndex((s) => s.id === step);
   return (
-    <div className="plan-steps">
-      {STEPS.map((s, i) => (
-        <div key={s.id} className={`plan-step${i === idx ? " active" : ""}${i < idx ? " done" : ""}`}>
-          <span className="plan-step-dot">{i < idx ? <Icon name="check" /> : i + 1}</span>
-          {s.label}
-        </div>
-      ))}
+    <div className="wiz-progress">
+      <div className="wiz-track" role="progressbar" aria-valuenow={idx + 1} aria-valuemin={1} aria-valuemax={STEPS.length}>
+        {STEPS.map((s, i) => (
+          <span key={s.id} className={`wiz-seg${i <= idx ? " on" : ""}`} />
+        ))}
+      </div>
+      <div className="wiz-cap">
+        <span className="wiz-step-name">{STEPS[idx]?.label}</span>
+        <span className="muted">Step {idx + 1} of {STEPS.length}</span>
+      </div>
     </div>
   );
 }
@@ -356,11 +358,6 @@ function MoodStep(p: MoodProps) {
       : p.freeText.trim().length > 0;
   return (
     <>
-      <div className="muted" style={{ fontSize: 13 }}>
-        What are you in the mood for this week? Pick a few ingredients, start from a recipe you love,
-        or just describe it.
-      </div>
-
       <div className="seg" role="tablist" aria-label="How to plan">
         {(["ingredients", "seed", "text"] as MoodMode[]).map((m) => (
           <button
@@ -474,13 +471,11 @@ function MoodStep(p: MoodProps) {
 
 function ScanStep({
   onHand,
-  pantryCount,
   onScan,
   onBack,
   onPlan,
 }: {
   onHand: Ingredient[];
-  pantryCount: number;
   onScan: () => void;
   onBack: () => void;
   onPlan: () => void;
@@ -488,8 +483,7 @@ function ScanStep({
   return (
     <>
       <div className="muted" style={{ fontSize: 13 }}>
-        I'll build the week around what you already have. Your pantry has {pantryCount} item
-        {pantryCount === 1 ? "" : "s"}. Add a fresh fridge scan if you like.
+        I'll plan around what you already have. Scan your fridge to add more.
       </div>
 
       <div className="capture-buttons" style={{ justifyContent: "flex-start" }}>
@@ -498,18 +492,23 @@ function ScanStep({
         </button>
       </div>
 
-      <div className="ing-group">
-        <div className="ing-group-label">On hand · {onHand.length}</div>
-        <div className="cov-strip">
-          {onHand.map((i) => (
-            <span key={i.name} className="token-chip on-hand">
-              {i.name}
-              {i.quantity ? ` · ${i.quantity}` : ""}
-            </span>
-          ))}
-          {onHand.length === 0 && <span className="muted" style={{ fontSize: 13 }}>Nothing yet. Add pantry items or scan.</span>}
+      {onHand.length > 0 ? (
+        <div className="ing-group">
+          <div className="ing-group-label">On hand · {onHand.length}</div>
+          <div className="cov-strip">
+            {onHand.map((i) => (
+              <span key={i.name} className="token-chip on-hand">
+                {i.name}
+                {i.quantity ? ` · ${i.quantity}` : ""}
+              </span>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="muted" style={{ fontSize: 13 }}>
+          Nothing on hand yet — that's fine, I'll build the full list.
+        </div>
+      )}
 
       <div className="detail-actions">
         <button className="btn ghost" onClick={onBack}>
@@ -554,43 +553,30 @@ function ReviewStep({
         </div>
       )}
 
-      <div className="recipes-grid">
+      <div className="meal-list">
         {plan.picks.map((pick) => (
-          <article key={pick.id} className="recipe-card recipe-card--static">
-            <div className="row">
+          <article key={pick.id} className="meal-card">
+            <div className="meal-card-head">
               <h3>{pick.title}</h3>
+              <button className="icon-btn meal-swap" onClick={() => onRemove(pick.id)} title="Swap out" aria-label={`Swap out ${pick.title}`}>
+                <Icon name="xmark" />
+              </button>
             </div>
-            <div className="cov-strip">
+            <div className="meal-card-meta">
               <span className={`cov-chip${pick.totalCount === pick.haveCount ? " complete" : ""}`}>
                 {pick.haveCount}/{pick.totalCount} on hand
               </span>
+              {pick.marginalNew.length > 0 && (
+                <span className="muted meal-adds-count">· adds {pick.marginalNew.length} to list</span>
+              )}
             </div>
-            {pick.pantryCovered.length > 0 && (
-              <div>
-                <h4>From your pantry</h4>
-                <div className="cov-strip">
-                  {pick.pantryCovered.map((t) => (
-                    <span key={t} className="token-chip on-hand">{prettyIngredient(t)}</span>
-                  ))}
-                </div>
-              </div>
-            )}
             {pick.marginalNew.length > 0 && (
-              <div>
-                <h4>Adds to the list</h4>
-                <div className="cov-strip">
-                  {pick.marginalNew.map((t) => (
-                    <span key={t} className="token-chip to-buy">{prettyIngredient(t)}</span>
-                  ))}
-                </div>
+              <div className="cov-strip meal-adds">
+                {pick.marginalNew.map((t) => (
+                  <span key={t} className="token-chip to-buy">{prettyIngredient(t)}</span>
+                ))}
               </div>
             )}
-            <div className="row" style={{ marginTop: "auto" }}>
-              <span />
-              <button className="btn ghost" onClick={() => onRemove(pick.id)}>
-                <Icon name="xmark" /> Swap out
-              </button>
-            </div>
           </article>
         ))}
       </div>
@@ -652,12 +638,11 @@ function ShoppingStep({
                 <div className="shopping-line-main">
                   <span className="shopping-name">{item.name}</span>
                   {item.quantity && <span className="shopping-qty">{item.quantity}</span>}
-                  {item.quantityNote && <span className="serves">{item.quantityNote}</span>}
-                </div>
-                <div className="shopping-for">
-                  {item.recipes.map((r) => (
-                    <span key={r.id} className="pill">{r.title}</span>
-                  ))}
+                  {item.quantityNote ? (
+                    <span className="serves">{item.quantityNote}</span>
+                  ) : (
+                    item.recipes.length > 1 && <span className="serves">shared by {item.recipes.length} meals</span>
+                  )}
                 </div>
               </div>
             ))}

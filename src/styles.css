@@ -1724,6 +1724,89 @@ select {
   height: 10px;
 }
 
+/* ── Wizard progress (slim bar, replaces the numbered dot row) ────────── */
+.wiz-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 2px 0 2px;
+}
+.wiz-track {
+  display: flex;
+  gap: 5px;
+}
+.wiz-seg {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--bg-3);
+  transition: background var(--cui-duration-fast, 0.15s) var(--cui-ease, ease);
+}
+.wiz-seg.on {
+  background: var(--grad-primary);
+}
+.wiz-cap {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.wiz-step-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.wiz-cap .muted {
+  font-size: 12px;
+}
+
+/* ── Meals review (slimmer cards, single "adds" line) ────────────────── */
+.meal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.meal-card {
+  background: var(--bg-2, var(--cui-bg-2));
+  border: 1px solid var(--cui-border);
+  border-radius: var(--cui-radius, 14px);
+  padding: 13px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.meal-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.meal-card-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.meal-swap {
+  flex: 0 0 auto;
+  opacity: 0.55;
+}
+.meal-swap:hover {
+  opacity: 1;
+}
+.meal-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.meal-adds-count {
+  font-size: 12px;
+}
+.meal-adds {
+  margin-top: 1px;
+}
+
 .token-chip {
   display: inline-flex;
   align-items: center;
