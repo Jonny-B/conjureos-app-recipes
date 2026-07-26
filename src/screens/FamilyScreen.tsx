@@ -3,6 +3,7 @@ import {
   createFamily,
   getFamilyInfo,
   joinFamily,
+  renameFamily,
   type AppFamily,
   type AppProfile,
   type FamilyMember,
@@ -55,7 +56,7 @@ export function FamilyScreen({
         {families.length > 0 ? (
           <div className="fam-list">
             {families.map((f) => (
-              <FamilyCard key={f.id} family={f} expanded={open === f.id} onToggle={() => setOpen(open === f.id ? null : f.id)} />
+              <FamilyCard key={f.id} family={f} expanded={open === f.id} onToggle={() => setOpen(open === f.id ? null : f.id)} onChanged={onChanged} />
             ))}
           </div>
         ) : (
@@ -73,14 +74,37 @@ function FamilyCard({
   family,
   expanded,
   onToggle,
+  onChanged,
 }: {
   family: AppFamily;
   expanded: boolean;
   onToggle: () => void;
+  onChanged: () => Promise<AppProfile | null>;
 }) {
   const [members, setMembers] = useState<FamilyMember[] | null>(null);
   const [copied, setCopied] = useState(false);
+  const [rename, setRename] = useState(family.name);
+  const [savingName, setSavingName] = useState(false);
   const link = familyInviteLink(family.inviteCode);
+  const isOwner = family.role === "owner";
+
+  useEffect(() => {
+    setRename(family.name);
+  }, [family.name]);
+
+  const saveName = async () => {
+    const next = rename.trim();
+    if (!next || next === family.name) return;
+    setSavingName(true);
+    try {
+      await renameFamily(family.id, next);
+      await onChanged();
+    } catch {
+      setRename(family.name);
+    } finally {
+      setSavingName(false);
+    }
+  };
 
   useEffect(() => {
     if (!expanded) return;
@@ -109,6 +133,28 @@ function FamilyCard({
 
       {expanded && (
         <div className="fam-card-body">
+          {isOwner && (
+            <>
+              <div className="ing-group-label">Family name</div>
+              <div className="add-ing-form" style={{ marginBottom: 10 }}>
+                <input
+                  type="text"
+                  value={rename}
+                  onChange={(e) => setRename(e.target.value)}
+                  maxLength={60}
+                  aria-label="Family name"
+                />
+                <button
+                  className="btn secondary"
+                  type="button"
+                  disabled={savingName || !rename.trim() || rename.trim() === family.name}
+                  onClick={saveName}
+                >
+                  <Icon name="pen" /> {savingName ? "Saving…" : "Rename"}
+                </button>
+              </div>
+            </>
+          )}
           <div className="ing-group-label">Invite link</div>
           <p className="muted" style={{ fontSize: 12, margin: "0 0 6px" }}>
             Share this link — opening it drops them straight into this family.
