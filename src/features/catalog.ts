@@ -94,9 +94,19 @@ export async function ensureCatalogLoaded(force = false): Promise<boolean> {
   if (override && !force) return false;
   try {
     const fromDb = await fetchCatalog();
-    if (fromDb.length > 0) {
+    // Only let the DB copy take over if it's at least as big as what we already
+    // ship. A truncated fetch (server-side limit clamp, partial page, a half-
+    // seeded project) must never SHRINK the catalog — that's exactly how the
+    // browse tab ended up showing 200 recipes instead of the bundled ~1.2k.
+    if (fromDb.length >= raw.r.length) {
       override = fromDb;
       return true;
+    }
+    if (fromDb.length > 0) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[recipes] catalog fetch returned ${fromDb.length} < ${raw.r.length} bundled — keeping the bundled catalog`,
+      );
     }
   } catch {
     /* keep the bundled catalog */

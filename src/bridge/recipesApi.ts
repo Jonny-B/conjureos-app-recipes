@@ -180,15 +180,40 @@ function toPayload(
 
 // ── public reads (no auth) ──────────────────────────────────────────────
 
+/**
+ * The whole public catalog, PAGED. recipes-db clamps `limit` server-side (it
+ * was 200 for a long time, and older deploys still are), so a single big
+ * request silently truncates — which used to leave the app showing 200 recipes
+ * while REPLACING the ~1.2k bundled ones. We page until a short page comes back
+ * instead of trusting one call, so the client is correct against any cap.
+ */
+const CATALOG_PAGE = 500;
+const CATALOG_MAX_PAGES = 100; // hard stop (50k) so a misbehaving server can't spin us
+
 export async function fetchCatalog(): Promise<CatalogRecipe[]> {
-  const res = await fetch(apiUrl(), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "catalog", limit: 2000 }),
-  });
-  if (!res.ok) throw new Error(`catalog ${res.status}`);
-  const j = (await res.json()) as { recipes?: DbRecipe[] };
-  return (j.recipes ?? []).map(toCatalogRecipe);
+  const out: DbRecipe[] = [];
+  let offset = 0;
+  // The server's effective page size — it may clamp our `limit` down, so we
+  // learn it from the first full page rather than assuming CATALOG_PAGE.
+  let pageSize = 0;
+  for (let page = 0; page < CATALOG_MAX_PAGES; page++) {
+    const res = await fetch(apiUrl(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "catalog", limit: CATALOG_PAGE, offset }),
+    });
+    if (!res.ok) {
+      if (out.length > 0) break; // keep whatever we already paged in
+      throw new Error(`catalog ${res.status}`);
+    }
+    const batch = ((await res.json()) as { recipes?: DbRecipe[] }).recipes ?? [];
+    out.push(...batch);
+    if (batch.length === 0) break;
+    pageSize = Math.max(pageSize, batch.length);
+    if (batch.length < pageSize) break; // short page = last page
+    offset += batch.length;
+  }
+  return out.map(toCatalogRecipe);
 }
 
 export async function fetchShared(shareToken: string): Promise<CatalogRecipe | null> {
