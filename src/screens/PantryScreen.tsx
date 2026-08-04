@@ -9,7 +9,7 @@ import {
 } from "../features/pantry";
 import { identifyIngredients } from "../features/vision";
 import { generateRecipes } from "../features/recipes";
-import { getCatalog, toRecipe } from "../features/catalog";
+import { getCatalog, toRecipe, loadRecipeBody } from "../features/catalog";
 import { computeCoverage } from "../features/scaling";
 import { CaptureScreen } from "./CaptureScreen";
 import { RecipesScreen } from "./RecipesScreen";
@@ -311,7 +311,7 @@ function KitchenList({
                       key={c.id}
                       fi={{ kind: "catalog", id: c.id, recipe: c, favorite: false }}
                       cov={cov}
-                      onOpen={() => onCook?.(toRecipe(c), null)}
+                      onOpen={async () => onCook?.(toRecipe(await loadRecipeBody(c)), null)}
                     />
                   ))}
                 </div>

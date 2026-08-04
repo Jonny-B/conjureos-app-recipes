@@ -216,6 +216,57 @@ export async function fetchCatalog(): Promise<CatalogRecipe[]> {
   return out.map(toCatalogRecipe);
 }
 
+/** One full catalog recipe (ingredients + instructions), fetched when opened. */
+export async function fetchCatalogRecipe(id: string): Promise<CatalogRecipe | null> {
+  const res = await fetch(apiUrl(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "catalogGet", id }),
+  });
+  if (!res.ok) return null;
+  const j = (await res.json()) as { recipe?: DbRecipe };
+  return j.recipe ? toCatalogRecipe(j.recipe) : null;
+}
+
+/** Category + tag counts for the browse filters (computed server-side). */
+export async function fetchCatalogFacets(): Promise<{
+  total: number;
+  categories: { name: string; count: number }[];
+  tags: { name: string; count: number }[];
+}> {
+  const res = await fetch(apiUrl(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "catalogFacets" }),
+  });
+  if (!res.ok) throw new Error(`facets ${res.status}`);
+  return res.json();
+}
+
+/**
+ * Run the week planner SERVER-side over the whole catalog. The optimizer needs
+ * every candidate to pick a good week, so it lives in recipes-db now — the
+ * client no longer has to hold the corpus. Returns the chosen recipes; the
+ * caller still builds the shopping list from them locally.
+ */
+export async function planWeekRemote(args: {
+  constraints: Record<string, unknown>;
+  onHand: string[];
+  excludeIds?: string[];
+  favoriteIds?: string[];
+  pinnedId?: string;
+}): Promise<{ recipes: CatalogRecipe[]; warnings: string[]; shortfall: number }> {
+  const r = await invokeRaw<{ recipes?: DbRecipe[]; warnings?: string[]; shortfall?: number }>(
+    "planWeek",
+    args as unknown as Record<string, unknown>,
+  );
+  return {
+    recipes: (r.recipes ?? []).map(toCatalogRecipe),
+    warnings: r.warnings ?? [],
+    shortfall: r.shortfall ?? 0,
+  };
+}
+
 export async function fetchShared(shareToken: string): Promise<CatalogRecipe | null> {
   const res = await fetch(apiUrl(), {
     method: "POST",

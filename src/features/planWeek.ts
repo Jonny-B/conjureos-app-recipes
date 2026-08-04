@@ -237,6 +237,54 @@ export function planWeek(input: PlanWeekInput): WeekPlan {
 }
 
 /**
+ * Build the finished WeekPlan from an already-CHOSEN set of recipes.
+ *
+ * Selection now happens server-side (recipes-db `planWeek`), because picking a
+ * good week requires scanning the whole catalog and we no longer ship that to
+ * the device. The server returns the ~5-7 picks fully hydrated; this reuses the
+ * existing, tested pantry-coverage + shopping-list code on just those picks, so
+ * the resulting plan is byte-identical in shape to the old local path.
+ */
+export function planFromChosen(
+  chosen: PlanCandidate[],
+  onHand: Ingredient[],
+  constraints: MoodConstraints,
+  warnings: string[] = [],
+  shortfall = 0,
+): WeekPlan {
+  const onHandSet = new Set(
+    onHand.map((i) => canonOf(parseIngredient(i.name)?.name ?? i.name)).filter(Boolean),
+  );
+  const scored: Scored[] = chosen.map((c) => ({
+    c,
+    tokens: new Set(canonicalTokens(c.recipe)),
+    moodFit: 0,
+  }));
+  const picks: PlannedRecipe[] = scored.map((s) => {
+    const covered: string[] = [];
+    for (const t of s.tokens) if (onHandSet.has(t)) covered.push(t);
+    return {
+      id: s.c.id,
+      title: s.c.title,
+      recipe: s.c.recipe,
+      pantryCovered: covered,
+      marginalNew: [],
+      haveCount: covered.length,
+      totalCount: s.tokens.size,
+    };
+  });
+  fillMarginal(scored, onHandSet, picks);
+  return {
+    picks,
+    shoppingList: buildShoppingList(scored, onHandSet),
+    constraints,
+    shortfall,
+    warnings,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/**
  * Consolidate the chosen recipes' missing ingredients into one deduped list,
  * grouped by canonical name and aisle. An item not in the pantry that 3 recipes
  * need becomes ONE line ("enough for 3 recipes").

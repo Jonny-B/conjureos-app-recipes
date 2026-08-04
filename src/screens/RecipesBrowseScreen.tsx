@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FeedRecipe, PantryItem, Recipe, RecipeSource, SavedRecipe } from "../types";
-import { getCatalog, categories, toRecipe } from "../features/catalog";
+import { getCatalog, categories, toRecipe, loadRecipeBody } from "../features/catalog";
 import {
   listSavedRecipes,
   saveRecipe,
@@ -120,7 +120,7 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
   };
   const onSaveToLibrary = async (fi: FeedRecipe) => {
     if (fi.kind !== "catalog") return;
-    await saveRecipe(toRecipe(fi.recipe));
+    await saveRecipe(toRecipe(await loadRecipeBody(fi.recipe)));
     await refresh();
   };
   const onMade = async (fi: FeedRecipe) => {
@@ -277,7 +277,7 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
         <>
           <div className="browse-list">
             {visible.map((fi) => (
-              <RecipeRow key={keyOf(fi)} fi={fi} onOpen={() => setSelected(fi)} />
+              <RecipeRow key={keyOf(fi)} fi={fi} onOpen={async () => { await loadRecipeBody(fi.recipe); setSelected(fi); }} />
             ))}
           </div>
           {visible.length < ranked.length && (
