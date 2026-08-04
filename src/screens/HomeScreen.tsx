@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CoverageResult } from "../features/scaling";
 import type { CatalogRecipe, FeedRecipe, PantryItem, Recipe, SavedRecipe } from "../types";
-import { getCatalog, toRecipe } from "../features/catalog";
+import { getCatalog, toRecipe, loadRecipeBody } from "../features/catalog";
 import {
   listSavedRecipes,
   saveRecipe,
@@ -112,7 +112,7 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
   };
   const onSaveToLibrary = async (fi: FeedRecipe) => {
     if (fi.kind !== "catalog") return;
-    await saveRecipe(toRecipe(fi.recipe));
+    await saveRecipe(toRecipe(await loadRecipeBody(fi.recipe)));
     await refresh();
   };
   const onMade = async (fi: FeedRecipe) => {

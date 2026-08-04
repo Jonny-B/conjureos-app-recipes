@@ -1,128 +1,97 @@
 /**
- * In-app recipe catalog.
+ * In-app recipe catalog — fetched, never bundled, never persisted.
  *
- * The bundled `src/data/catalog.json` (produced by scripts/build-catalog.ts
- * from the user's scraped AllRecipes corpus) is imported once at build time
- * and inlined into the app bundle (resolveJsonModule + esbuild). No runtime
- * fetch, no VFS. This module decodes the compact short-key form into typed
- * CatalogRecipe objects and exposes the read API the Recipes / Favorites /
- * match-ranking / Plan-My-Week surfaces call.
+ * The catalog used to ship inside the app bundle (~1.4 MB of the 1.78 MB
+ * download) AND be re-fetched from the DB, which meant two sources of truth
+ * that silently drifted. It's now fetched from recipes-db on load and held in
+ * memory only: closing the app drops it. Nothing recipe-shaped is written to
+ * the device.
+ *
+ * What we fetch is the SLIM projection — id/title/category/time/servings/
+ * nutrition/tags/tokens. `ingredients` + `instructions` are ~66% of the bytes
+ * and are pulled per-recipe (fetchCatalogRecipe) only when one is opened.
+ * `tokens` rides along because pantry-matching ranks the whole corpus.
  */
+import { fetchCatalog, fetchCatalogRecipe } from "../bridge/recipesApi";
+import type { CatalogRecipe, Recipe } from "../types";
 
-import { CATALOG } from "../data/catalog";
-import { fetchCatalog } from "../bridge/recipesApi";
-import type { CatalogRecipe, Difficulty, NutritionStrip, Recipe } from "../types";
+let catalog: CatalogRecipe[] = [];
+let loaded = false;
+let inflight: Promise<boolean> | null = null;
 
-/** Compact on-disk record. Keys are short to keep the bundled JSON small. */
-interface RawRecord {
-  i: string;          // id
-  t: string;          // title
-  c: number;          // category index
-  d: string;          // difficulty
-  m: number;          // cookTime minutes
-  s: number;          // servings
-  g: string[];        // ingredients (display strings)
-  n: string[];        // instructions
-  u: string;          // sourceUrl
-  k: string[];        // precomputed canonical tokens
-  z?: number[];       // [cal, protein, fat, carbs] (omitted if absent)
-  a?: string[];       // tags (omitted if empty)
-}
+/** Full recipe bodies, filled lazily as recipes are opened. Memory only. */
+const bodies = new Map<string, { ingredients: string[]; instructions: string[] }>();
 
-interface RawCatalog {
-  v: number;
-  generatedAt: string;
-  count: number;
-  categories: string[];
-  r: RawRecord[];
-}
-
-const raw = CATALOG as unknown as RawCatalog;
-
-let memo: CatalogRecipe[] | null = null;
-/** DB-loaded catalog (recipes-db). When set, it supersedes the bundled copy. */
-let override: CatalogRecipe[] | null = null;
-
-function decodeRecord(x: RawRecord): CatalogRecipe {
-  const nutrition: NutritionStrip | null = x.z
-    ? {
-        calories: x.z[0] ?? 0,
-        protein: x.z[1] ?? 0,
-        fat: x.z[2] ?? 0,
-        carbs: x.z[3] ?? 0,
-        // Scrape-sourced per-serving values; treat as full-coverage "est."
-        matched: x.g.length,
-        total: x.g.length,
-        est: true,
-      }
-    : null;
-  return {
-    id: x.i,
-    title: x.t,
-    category: raw.categories[x.c] ?? "Dinner",
-    difficulty: x.d as Difficulty,
-    cookTime: x.m,
-    servings: x.s,
-    ingredients: x.g,
-    instructions: x.n,
-    sourceUrl: x.u,
-    tokens: x.k,
-    tags: x.a ?? [],
-    nutrition,
-  };
-}
-
-/**
- * The full catalog: the DB copy once ensureCatalogLoaded() has run, otherwise
- * the bundled copy decoded on first use (the instant + offline baseline).
- */
+/** Everything loaded so far. Empty until ensureCatalogLoaded() resolves. */
 export function getCatalog(): CatalogRecipe[] {
-  if (override) return override;
-  if (!memo) memo = raw.r.map(decodeRecord);
-  return memo;
+  return catalog;
+}
+
+export function isCatalogLoaded(): boolean {
+  return loaded;
 }
 
 /**
- * Load the catalog from the recipes-db backend, replacing the bundled copy.
- * The bundled data stays the instant + offline fallback: if the fetch fails
- * (offline, not deployed yet, signed out) or returns nothing, getCatalog()
- * keeps serving whatever it served before. Returns true when the in-memory
- * catalog actually changed, so the caller can trigger a re-render. Only
- * fetches once unless `force` is set.
+ * Load the catalog from recipes-db. Pages until a short page comes back, so
+ * it's correct against any server-side page cap. Concurrent callers share one
+ * in-flight request. Returns true when the in-memory catalog changed.
  */
 export async function ensureCatalogLoaded(force = false): Promise<boolean> {
-  if (override && !force) return false;
-  try {
-    const fromDb = await fetchCatalog();
-    // Only let the DB copy take over if it's at least as big as what we already
-    // ship. A truncated fetch (server-side limit clamp, partial page, a half-
-    // seeded project) must never SHRINK the catalog — that's exactly how the
-    // browse tab ended up showing 200 recipes instead of the bundled ~1.2k.
-    if (fromDb.length >= raw.r.length) {
-      override = fromDb;
-      return true;
+  if (loaded && !force) return false;
+  if (inflight) return inflight;
+  inflight = (async () => {
+    try {
+      const rows = await fetchCatalog();
+      if (rows.length > 0) {
+        catalog = rows;
+        loaded = true;
+        return true;
+      }
+    } catch {
+      /* offline / backend down — keep whatever we have (possibly nothing) */
+    } finally {
+      inflight = null;
     }
-    if (fromDb.length > 0) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[recipes] catalog fetch returned ${fromDb.length} < ${raw.r.length} bundled — keeping the bundled catalog`,
-      );
+    return false;
+  })();
+  return inflight;
+}
+
+/**
+ * A recipe with its full body. The list payload omits ingredients/instructions,
+ * so this fetches them on first open and memoizes for the session.
+ */
+export async function loadRecipeBody<T extends { id?: string; ingredients: string[]; instructions: string[] }>(
+  c: T,
+): Promise<T> {
+  // Saved/AI recipes already carry their body; only slim catalog rows are empty.
+  if (!c.id || (c.ingredients.length > 0 && c.instructions.length > 0)) return c;
+  const cached = bodies.get(c.id);
+  if (cached) return { ...c, ...cached };
+  try {
+    const full = await fetchCatalogRecipe(c.id);
+    if (full) {
+      bodies.set(c.id, { ingredients: full.ingredients, instructions: full.instructions });
+      // Patch the in-memory row so subsequent reads are already complete.
+      const i = catalog.findIndex((r) => r.id === c.id);
+      if (i >= 0) catalog[i] = { ...catalog[i]!, ingredients: full.ingredients, instructions: full.instructions };
+      return { ...c, ingredients: full.ingredients, instructions: full.instructions };
     }
   } catch {
-    /* keep the bundled catalog */
+    /* leave the row as-is; the detail screen renders what it has */
   }
-  return false;
+  return c;
 }
 
 export function getCatalogRecipe(id: string): CatalogRecipe | undefined {
-  return getCatalog().find((r) => r.id === id);
+  return catalog.find((r) => r.id === id);
 }
 
 /** Case-insensitive search over title, category, tokens, and tags. Empty -> all. */
 export function searchCatalog(q: string): CatalogRecipe[] {
   const s = q.trim().toLowerCase();
-  if (!s) return getCatalog();
-  return getCatalog().filter(
+  if (!s) return catalog;
+  return catalog.filter(
     (r) =>
       r.title.toLowerCase().includes(s) ||
       r.category.toLowerCase().includes(s) ||
@@ -132,14 +101,13 @@ export function searchCatalog(q: string): CatalogRecipe[] {
 }
 
 export function byCategory(category: string): CatalogRecipe[] {
-  return getCatalog().filter((r) => r.category === category);
+  return catalog.filter((r) => r.category === category);
 }
 
 /** Category names that actually appear, with counts, in first-seen order. */
 export function categories(): { name: string; count: number }[] {
   const counts = new Map<string, number>();
-  for (const r of getCatalog()) counts.set(r.category, (counts.get(r.category) ?? 0) + 1);
-  // First-seen order works for both the bundled short-key form and DB rows.
+  for (const r of catalog) counts.set(r.category, (counts.get(r.category) ?? 0) + 1);
   return [...counts.entries()].map(([name, count]) => ({ name, count }));
 }
 

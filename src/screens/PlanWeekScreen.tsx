@@ -12,12 +12,13 @@ import { listSavedRecipes } from "../features/storage";
 import { loadFavorites } from "../features/favorites";
 import { ingredientsFromPantry } from "../features/pantry";
 import {
-  planWeek,
+  planFromChosen,
   interpretMood,
   seedConstraintsFromRecipe,
   buildOnHand,
   type PlanCandidate,
 } from "../features/planWeek";
+import { planWeekRemote } from "../bridge/recipesApi";
 import { identifyIngredients } from "../features/vision";
 import { sanitizeName } from "../features/vision";
 import { prettyIngredient } from "../features/scaling";
@@ -75,6 +76,7 @@ export function PlanWeekScreen({
   const [plan, setPlan] = useState<WeekPlan | null>(null);
   const [excludeIds, setExcludeIds] = useState<string[]>([]);
   const [busy, setBusy] = useState<null | "mood" | "saving">(null);
+  const [planning, setPlanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedPath, setSavedPath] = useState<string | null>(null);
 
@@ -163,17 +165,38 @@ export function PlanWeekScreen({
     setStep("scan");
   };
 
-  const runPlan = (exclude: string[], c = constraints) => {
+  /**
+   * Selection runs SERVER-side over the whole catalog (the client no longer
+   * holds it). The server returns the picks hydrated; we build the shopping
+   * list locally from just those, with the same tested code as before.
+   */
+  const runPlan = async (exclude: string[], c = constraints) => {
     if (!c) return;
-    const p = planWeek({
-      constraints: c,
-      onHand,
-      candidates,
-      pinnedId: moodMode === "seed" ? seed?.id : undefined,
-      excludeIds: exclude,
-    });
-    setPlan(p);
-    setExcludeIds(exclude);
+    setPlanning(true);
+    setError(null);
+    try {
+      const res = await planWeekRemote({
+        constraints: c as unknown as Record<string, unknown>,
+        onHand: onHand.map((i) => i.name),
+        excludeIds: exclude,
+        favoriteIds: [...favs],
+        ...(moodMode === "seed" && seed?.id ? { pinnedId: seed.id } : {}),
+      });
+      const chosen: PlanCandidate[] = res.recipes.map((r) => ({
+        id: r.id,
+        title: r.title,
+        recipe: r,
+        category: r.category,
+        tags: r.tags,
+        isFavorite: favs.has(r.id),
+      }));
+      setPlan(planFromChosen(chosen, onHand, c, res.warnings, res.shortfall));
+      setExcludeIds(exclude);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPlanning(false);
+    }
   };
 
   const onScanned = async (photos: CapturedPhoto[]) => {
@@ -188,7 +211,7 @@ export function PlanWeekScreen({
     }
   };
 
-  const removePick = (id: string) => runPlan([...excludeIds, id]);
+  const removePick = (id: string) => { void runPlan([...excludeIds, id]); };
 
   const onSave = async () => {
     if (!plan) return;
@@ -273,13 +296,14 @@ export function PlanWeekScreen({
       {step === "scan" && (
         <ScanStep
           onHand={onHand}
+          planning={planning}
           onScan={() => {
             setError(null);
             setScanMode("capture");
           }}
           onBack={() => setStep("mood")}
-          onPlan={() => {
-            runPlan([]);
+          onPlan={async () => {
+            await runPlan([]);
             setStep("review");
           }}
         />
@@ -471,11 +495,13 @@ function MoodStep(p: MoodProps) {
 
 function ScanStep({
   onHand,
+  planning,
   onScan,
   onBack,
   onPlan,
 }: {
   onHand: Ingredient[];
+  planning: boolean;
   onScan: () => void;
   onBack: () => void;
   onPlan: () => void;
@@ -514,8 +540,8 @@ function ScanStep({
         <button className="btn ghost" onClick={onBack}>
           <Icon name="chevron-down" className="back-caret" /> Back
         </button>
-        <button className="btn" onClick={onPlan}>
-          <Icon name="calendar-days" /> Plan my week
+        <button className="btn" onClick={onPlan} disabled={planning}>
+          <Icon name="calendar-days" /> {planning ? "Planning…" : "Plan my week"}
         </button>
       </div>
     </>
