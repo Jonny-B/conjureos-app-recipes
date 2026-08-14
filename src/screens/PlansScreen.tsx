@@ -158,7 +158,14 @@ export function PlansScreen({
     setPlans((prev) => (prev ? prev.map((p) => (p.id === rec.id ? rec : p)) : prev));
 
   const persistNewPlan = async (plan: WeekPlan) => {
-    const familyId = scope === "family" && families.length === 1 ? families[0]!.id : null;
+    // On the Family tab a new plan must land in a FAMILY, not silently become
+    // private. Prefer the family whose plan is currently open, else the first
+    // one. (The old code only did this when you had exactly one family, so
+    // anyone in 2+ families got a private plan without being told.)
+    const familyId =
+      scope === "family"
+        ? (active[viewing] ?? active[0])?.familyId ?? families[0]?.id ?? null
+        : null;
     await savePlanRecord({ plan, title: planTitle(plan), familyId });
     await loadPlans();
   };
@@ -425,7 +432,10 @@ function PlanView({
   const shared = !!rec.familyId;
 
   return (
-    <div className="plan-view">
+    <div className="plan-view print-area">
+      <div className="print-only print-title">
+        Shopping list — {formatDate(plan.createdAt)}
+      </div>
       <div className="plan-view-head">
         <div className="plan-view-tags">
           {isLatest && <span className="plan-latest">Latest</span>}
@@ -463,6 +473,11 @@ function PlanView({
       <section className="home-section">
         <div className="home-section-head">
           <h3>Shopping list</h3>
+          {total > 0 && (
+            <button className="link-btn no-print" onClick={() => window.print()} title="Print this list">
+              <Icon name="print" /> Print
+            </button>
+          )}
           {total > 0 && (
             <span className="shopping-progress">
               {doneCount === 0 ? (
