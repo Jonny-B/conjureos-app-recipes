@@ -3286,3 +3286,79 @@ select {
 .admin-email { font-size: 12px; color: var(--fg-dim); margin-top: 2px; }
 .admin-seen { font-size: 11px; color: var(--fg-faint); margin-top: 2px; }
 .admin-role { flex: 0 0 auto; }
+
+
+/* ── Printing the shopping list ────────────────────────────────────────
+ * Classic isolate-one-region pattern: hide everything, re-show the plan
+ * view. Runs inside the ConjureOS app iframe, which carries `allow-modals`
+ * so window.print() is permitted. */
+.print-only { display: none; }
+
+@media print {
+  /* Ink-friendly: the app is dark-themed, printing it would flood the page. */
+  :root, body, .app, .app-body, .plan-view, .home-section, .shopping-group,
+  .shopping-line, .check-line, .browse-item {
+    background: #fff !important;
+    color: #000 !important;
+    box-shadow: none !important;
+  }
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+  }
+  /* Chrome the printed page doesn't need. */
+  .topbar, .tabbar, .app-version, .plans-manage-row, .plans-tabs-row,
+  .store-bar, .shopping-progress, .no-print, .plan-view-head, .empty-state {
+    display: none !important;
+  }
+  .print-only { display: block; }
+  .print-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1.5px solid #000;
+  }
+  .home-section-head h3 {
+    font-size: 14px;
+    margin: 14px 0 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .ing-group-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #000 !important;
+    margin-top: 10px;
+    border-bottom: 1px solid #bbb;
+  }
+  /* Each line becomes a tickable row: an empty box you can pen-check. */
+  .check-line {
+    border: none !important;
+    padding: 3px 0 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .check-line .shopping-check {
+    border: 1.5px solid #000 !important;
+    background: #fff !important;
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+  }
+  /* Already-in-the-cart items still print, just struck through. */
+  .check-line.checked { opacity: 1; }
+  .check-line.checked .shopping-name { text-decoration: line-through; }
+  .shopping-name { font-size: 13px; }
+  .shopping-qty, .serves { font-size: 11px; color: #444 !important; }
+  /* Keep the meals list — handy reference while shopping. */
+  .browse-item { border: none !important; padding: 2px 0 !important; }
+  .browse-item .meta { font-size: 11px; color: #444 !important; }
+  @page { margin: 14mm; }
+}
