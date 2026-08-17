@@ -12,18 +12,28 @@ interface Env {
 }
 const api = (): string => ((globalThis as { __conjureos?: Env }).__conjureos?.env?.recipesApiUrl ?? "");
 
-/** The ConjureOS web origin for the current environment. */
+/**
+ * The ConjureOS web origin for the current environment.
+ *
+ * This must be the KERNEL shell (`conjureos.com`), not the app host
+ * (`<slug>.conjureos.app`). An invite link has to open ConjureOS itself so the
+ * shell can route the recipient into Recipes; `conjureos.app` only ever serves
+ * sandboxed app iframes, so a link there is a dead end. Our own hostname ending
+ * in `.conjureos.app` is what tells us we're running under the PROD shell.
+ */
+const PROD_WEB = "https://conjureos.com";
+
 export function webBase(): string {
   const a = api();
-  if (a.includes("ntgelbtepecqsqloxmct")) return "https://conjureos.app"; // prod project
+  if (a.includes("ntgelbtepecqsqloxmct")) return PROD_WEB; // prod project
   if (a.includes("mqpvjlsywrptefgwuztn")) return "https://dev.conjureos.pages.dev"; // dev project
   try {
     const h = (globalThis as { location?: { hostname?: string } }).location?.hostname ?? "";
-    if (h.endsWith(".conjureos.app")) return "https://conjureos.app";
+    if (h.endsWith(".conjureos.app")) return PROD_WEB;
   } catch {
     /* ignore */
   }
-  return "https://conjureos.app";
+  return PROD_WEB;
 }
 
 export function familyInviteLink(code: string): string {

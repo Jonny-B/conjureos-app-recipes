@@ -82,10 +82,18 @@ jobs:
 
       # The manifest's remoteActions.recipesDb.url (per-user DB reads/writes via
       # the minted-token flow) must point at the SAME project we're publishing
-      # to. The committed default is dev; rewrite it from the per-env project-ref
-      # secret so a prod release talks to the prod recipes-db, not dev. (Catalog
-      # browse uses the kernel-injected env.recipesApiUrl, which is already
-      # per-env, so only this static manifest URL needs stamping.)
+      # to. Rewrite it from the per-env project-ref secret. (Catalog browse uses
+      # the kernel-injected env.recipesApiUrl, which is already per-env, so only
+      # this static manifest URL needs stamping.)
+      #
+      # The COMMITTED default is PROD, deliberately. It used to be dev, on the
+      # assumption every publish came through here — but 0.10.0..0.31.0 were all
+      # published outside this workflow, so the stamp never ran and prod shipped
+      # pointing at the dev project. Every per-user call (myRole, myProfile,
+      # createFamily, planWeek, markCooked) then failed with a bare "Load
+      # failed" while public catalog browse kept working. Defaulting to prod
+      # means an unstamped publish is at worst correct for real users; dev
+      # publishes still come through this workflow and get stamped to dev.
       - name: Stamp recipes-db backend URL into manifest
         run: |
           if [ "${{ github.event_name }}" = "release" ]; then

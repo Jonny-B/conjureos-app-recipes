@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.31.0",
+  "version": "0.31.1",
   "description": "Recipes for ConjureOS: browse a catalog, keep a pantry, get suggestions ranked by what you have, and plan a week of meals that shares a shopping list.",
   "type": "module",
   "license": "MIT",
@@ -24,8 +24,17 @@
         "params": {
           "type": "object",
           "properties": {
-            "filter": { "type": "string", "maxLength": 100, "description": "Case-insensitive substring matched against title, summary, and ingredients." },
-            "limit": { "type": "integer", "minimum": 0, "maximum": 500, "description": "Max recipes to return (default 50)." }
+            "filter": {
+              "type": "string",
+              "maxLength": 100,
+              "description": "Case-insensitive substring matched against title, summary, and ingredients."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 500,
+              "description": "Max recipes to return (default 50)."
+            }
           }
         },
         "returns": {
@@ -36,35 +45,111 @@
               "items": {
                 "type": "object",
                 "properties": {
-                  "slug": { "type": "string" },
-                  "title": { "type": "string" },
-                  "difficulty": { "type": "string", "enum": ["easy", "medium", "hard"] },
-                  "cookTime": { "type": "integer", "description": "Minutes." },
-                  "servings": { "type": "integer" },
-                  "ingredients": { "type": "array", "items": { "type": "string" } },
-                  "savedAt": { "type": "string", "description": "ISO timestamp." },
-                  "madeCount": { "type": "integer" },
-                  "lastMadeAt": { "type": ["string", "null"], "description": "ISO timestamp of the last cook, or null." },
+                  "slug": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "difficulty": {
+                    "type": "string",
+                    "enum": [
+                      "easy",
+                      "medium",
+                      "hard"
+                    ]
+                  },
+                  "cookTime": {
+                    "type": "integer",
+                    "description": "Minutes."
+                  },
+                  "servings": {
+                    "type": "integer"
+                  },
+                  "ingredients": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "savedAt": {
+                    "type": "string",
+                    "description": "ISO timestamp."
+                  },
+                  "madeCount": {
+                    "type": "integer"
+                  },
+                  "lastMadeAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "ISO timestamp of the last cook, or null."
+                  },
                   "nutrition": {
-                    "type": ["object", "null"],
+                    "type": [
+                      "object",
+                      "null"
+                    ],
                     "description": "Per-serving estimate, or null when the lookup hasn't run or failed.",
                     "properties": {
-                      "calories": { "type": "integer" },
-                      "protein": { "type": "integer", "description": "Grams." },
-                      "fat": { "type": "integer", "description": "Grams." },
-                      "carbs": { "type": "integer", "description": "Grams." },
-                      "matched": { "type": "integer", "description": "Ingredients matched to USDA entries." },
-                      "total": { "type": "integer", "description": "Total ingredient count." },
-                      "est": { "type": "boolean", "description": "Always true: estimated, not measured." }
+                      "calories": {
+                        "type": "integer"
+                      },
+                      "protein": {
+                        "type": "integer",
+                        "description": "Grams."
+                      },
+                      "fat": {
+                        "type": "integer",
+                        "description": "Grams."
+                      },
+                      "carbs": {
+                        "type": "integer",
+                        "description": "Grams."
+                      },
+                      "matched": {
+                        "type": "integer",
+                        "description": "Ingredients matched to USDA entries."
+                      },
+                      "total": {
+                        "type": "integer",
+                        "description": "Total ingredient count."
+                      },
+                      "est": {
+                        "type": "boolean",
+                        "description": "Always true: estimated, not measured."
+                      }
                     },
-                    "required": ["calories", "protein", "fat", "carbs", "matched", "total", "est"]
+                    "required": [
+                      "calories",
+                      "protein",
+                      "fat",
+                      "carbs",
+                      "matched",
+                      "total",
+                      "est"
+                    ]
                   }
                 },
-                "required": ["slug", "title", "difficulty", "cookTime", "servings", "ingredients", "savedAt", "madeCount", "lastMadeAt", "nutrition"]
+                "required": [
+                  "slug",
+                  "title",
+                  "difficulty",
+                  "cookTime",
+                  "servings",
+                  "ingredients",
+                  "savedAt",
+                  "madeCount",
+                  "lastMadeAt",
+                  "nutrition"
+                ]
               }
             }
           },
-          "required": ["recipes"]
+          "required": [
+            "recipes"
+          ]
         }
       },
       "getRecipe": {
@@ -73,16 +158,30 @@
         "params": {
           "type": "object",
           "properties": {
-            "slug": { "type": "string", "maxLength": 80, "description": "URL-safe recipe id (lowercase letters, digits, hyphens)." }
+            "slug": {
+              "type": "string",
+              "maxLength": 80,
+              "description": "URL-safe recipe id (lowercase letters, digits, hyphens)."
+            }
           },
-          "required": ["slug"]
+          "required": [
+            "slug"
+          ]
         },
         "returns": {
           "type": "object",
           "properties": {
-            "recipe": { "type": ["object", "null"], "description": "Full saved recipe (title, ingredients, instructions, summary, servings, nutrition), or null if no match." }
+            "recipe": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "description": "Full saved recipe (title, ingredients, instructions, summary, servings, nutrition), or null if no match."
+            }
           },
-          "required": ["recipe"]
+          "required": [
+            "recipe"
+          ]
         }
       },
       "addRecipe": {
@@ -94,36 +193,103 @@
             "recipe": {
               "type": "object",
               "properties": {
-                "title": { "type": "string", "maxLength": 80 },
-                "difficulty": { "type": "string", "enum": ["easy", "medium", "hard"] },
-                "cookTime": { "type": "integer", "minimum": 0, "maximum": 720, "description": "Minutes." },
-                "servings": { "type": "integer", "minimum": 1, "maximum": 24, "description": "Defaults to 2 when omitted." },
-                "ingredients": { "type": "array", "items": { "type": "string", "maxLength": 80 } },
-                "instructions": { "type": "array", "items": { "type": "string", "maxLength": 400 } },
-                "summary": { "type": "string", "maxLength": 400 },
+                "title": {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                "difficulty": {
+                  "type": "string",
+                  "enum": [
+                    "easy",
+                    "medium",
+                    "hard"
+                  ]
+                },
+                "cookTime": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 720,
+                  "description": "Minutes."
+                },
+                "servings": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 24,
+                  "description": "Defaults to 2 when omitted."
+                },
+                "ingredients": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 80
+                  }
+                },
+                "instructions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 400
+                  }
+                },
+                "summary": {
+                  "type": "string",
+                  "maxLength": 400
+                },
                 "nutrition": {
                   "type": "object",
                   "description": "Per-serving estimate (optional).",
                   "properties": {
-                    "calories": { "type": "integer", "minimum": 0, "maximum": 10000 },
-                    "protein": { "type": "integer", "minimum": 0, "maximum": 1000 },
-                    "fat": { "type": "integer", "minimum": 0, "maximum": 1000 },
-                    "carbs": { "type": "integer", "minimum": 0, "maximum": 1000 }
+                    "calories": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10000
+                    },
+                    "protein": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 1000
+                    },
+                    "fat": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 1000
+                    },
+                    "carbs": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 1000
+                    }
                   }
                 }
               },
-              "required": ["title", "difficulty", "cookTime", "ingredients", "instructions"]
+              "required": [
+                "title",
+                "difficulty",
+                "cookTime",
+                "ingredients",
+                "instructions"
+              ]
             }
           },
-          "required": ["recipe"]
+          "required": [
+            "recipe"
+          ]
         },
         "returns": {
           "type": "object",
           "properties": {
-            "slug": { "type": "string" },
-            "path": { "type": "string", "description": "VFS path the recipe was saved to." }
+            "slug": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string",
+              "description": "VFS path the recipe was saved to."
+            }
           },
-          "required": ["slug", "path"]
+          "required": [
+            "slug",
+            "path"
+          ]
         }
       },
       "importRecipeFromImage": {
@@ -136,23 +302,37 @@
         "params": {
           "type": "object",
           "properties": {
-            "slug": { "type": "string", "maxLength": 80, "description": "URL-safe recipe id." }
+            "slug": {
+              "type": "string",
+              "maxLength": 80,
+              "description": "URL-safe recipe id."
+            }
           },
-          "required": ["slug"]
+          "required": [
+            "slug"
+          ]
         },
         "returns": {
           "type": "object",
           "properties": {
-            "madeCount": { "type": "integer" },
-            "lastMadeAt": { "type": "string", "description": "ISO timestamp of this cook." }
+            "madeCount": {
+              "type": "integer"
+            },
+            "lastMadeAt": {
+              "type": "string",
+              "description": "ISO timestamp of this cook."
+            }
           },
-          "required": ["madeCount", "lastMadeAt"]
+          "required": [
+            "madeCount",
+            "lastMadeAt"
+          ]
         }
       }
     },
     "remoteActions": {
       "recipesDb": {
-        "url": "https://mqpvjlsywrptefgwuztn.supabase.co/functions/v1/recipes-db",
+        "url": "https://ntgelbtepecqsqloxmct.supabase.co/functions/v1/recipes-db",
         "method": "POST"
       }
     },
