@@ -102,26 +102,52 @@ export function PlansScreen({
     })();
   }, [loadProfile, loadPlans]);
 
-  // Realtime: (re)subscribe whenever my families change. Any push → debounced
-  // refetch (coalesces a burst of edits from another member).
+  // The exact channel set, as a stable string. Keying the effect on `profile`
+  // tore the websocket down and rebuilt it on EVERY profile refresh (each
+  // getMyProfile returns a fresh object), so renaming a family or any
+  // incidental reload caused a needless reconnect. What actually matters is
+  // whether the channel list changed.
+  const realtimeUrl = profile?.realtimeUrl ?? "";
+  const anonKey = profile?.anonKey ?? "";
+  const channelKey = (profile?.families ?? [])
+    .map((f) => `family-${f.channelToken}`)
+    .sort()
+    .join(",");
+
+  // Realtime: subscribe to my families' channels. Any push → debounced refetch
+  // (coalesces a burst of edits from another member).
   useEffect(() => {
-    rt.current?.close();
-    rt.current = null;
-    if (!profile?.anonKey || !profile.realtimeUrl || profile.families.length === 0) return;
+    if (!anonKey || !realtimeUrl || channelKey === "") {
+      rt.current?.close();
+      rt.current = null;
+      return;
+    }
+    const channels = channelKey.split(",");
+    if (rt.current) {
+      rt.current.setChannels(channels); // reconcile in place, keep the socket
+      return;
+    }
     rt.current = subscribeFamilyChannels({
-      url: profile.realtimeUrl,
-      anonKey: profile.anonKey,
-      channels: profile.families.map((f) => `family-${f.channelToken}`),
+      url: realtimeUrl,
+      anonKey,
+      channels,
       onMessage: () => {
         if (refetchTimer.current) clearTimeout(refetchTimer.current);
         refetchTimer.current = setTimeout(() => void loadPlans(), 400);
       },
     });
-    return () => {
+  }, [realtimeUrl, anonKey, channelKey, loadPlans]);
+
+  // Tear the socket down — and cancel any in-flight debounced refetch, which
+  // would otherwise fire ~400ms after unmount and setState on a dead screen.
+  useEffect(
+    () => () => {
       rt.current?.close();
       rt.current = null;
-    };
-  }, [profile, loadPlans]);
+      if (refetchTimer.current) clearTimeout(refetchTimer.current);
+    },
+    [],
+  );
 
   const myPlans = useMemo(() => (plans ?? []).filter((p) => !p.familyId).sort(byUpdated), [plans]);
   const familyPlans = useMemo(() => (plans ?? []).filter((p) => p.familyId).sort(byUpdated), [plans]);

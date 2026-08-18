@@ -48,17 +48,34 @@ export function subscribeFamilyChannels(opts: Opts): RealtimeHandle {
     return `${base}/realtime/v1/websocket?apikey=${encodeURIComponent(opts.anonKey)}&vsn=1.0.0`;
   };
 
+  /** join_ref per joined channel, so we can phx_leave it later. */
+  const joinRefs = new Map<string, string>();
+
   const joinChannel = (name: string) => {
     if (!ws || ws.readyState !== 1) return;
+    // ONE ref, used for both fields. Phoenix treats the join's `ref` as that
+    // channel instance's join_ref; sending two different values (nextRef()
+    // twice) made join_ref always ref+1, which correlates to no channel.
+    const r = nextRef();
+    joinRefs.set(name, r);
     ws.send(
       JSON.stringify({
         topic: `realtime:${name}`,
         event: "phx_join",
         // Broadcast-only: no presence, receive others' messages (self:false).
         payload: { config: { broadcast: { ack: false, self: false }, presence: { key: "" }, private: false }, access_token: opts.anonKey },
-        ref: nextRef(),
-        join_ref: nextRef(),
+        ref: r,
+        join_ref: r,
       }),
+    );
+  };
+
+  const leaveChannel = (name: string) => {
+    const joinRef = joinRefs.get(name);
+    joinRefs.delete(name);
+    if (!ws || ws.readyState !== 1 || !joinRef) return;
+    ws.send(
+      JSON.stringify({ topic: `realtime:${name}`, event: "phx_leave", payload: {}, ref: nextRef(), join_ref: joinRef }),
     );
   };
 
@@ -72,6 +89,7 @@ export function subscribeFamilyChannels(opts: Opts): RealtimeHandle {
     }
     ws.onopen = () => {
       attempts = 0;
+      joinRefs.clear(); // refs are per-socket; a reconnect re-joins from scratch
       opts.onStatus?.("open");
       channels.forEach(joinChannel);
       heartbeat = setInterval(() => {
@@ -123,9 +141,12 @@ export function subscribeFamilyChannels(opts: Opts): RealtimeHandle {
     setChannels(next: string[]) {
       const uniq = [...new Set(next)];
       const added = uniq.filter((c) => !channels.includes(c));
+      const removed = channels.filter((c) => !uniq.includes(c));
       channels = uniq;
-      // Join any newly-added channels on the live socket; dropped channels are
-      // simply ignored (a full re-list on reconnect reflects the new set).
+      // Reconcile BOTH ways. Only joining meant a dropped channel (leaving a
+      // family) kept streaming that family's plan pushes over the live socket
+      // until the next reconnect.
+      removed.forEach(leaveChannel);
       added.forEach(joinChannel);
     },
     close() {

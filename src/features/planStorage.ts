@@ -33,14 +33,21 @@ export async function importVfsPlansOnce(): Promise<void> {
   }
   try {
     const plans = await listWeekPlans();
+    let failed = 0;
     for (const plan of plans) {
       try {
         await api.savePlanRecord({ plan, title: planTitle(plan), familyId: null });
       } catch {
-        /* skip one, keep going */
+        failed++; // keep going; the flag below decides whether we retry
       }
     }
-    await vfs.write(MIGRATED_PLANS_FLAG, new Date().toISOString());
+    // Only stamp the flag when everything landed. Swallowing per-plan failures
+    // AND stamping regardless meant a backend outage marked the migration
+    // "done" with nothing imported — permanently, since the flag never
+    // reopens. That is exactly what happened while the manifest pointed at the
+    // wrong project: every savePlanRecord threw, and legacy plans on disk were
+    // orphaned. Leaving it unset costs one cheap re-list next launch.
+    if (failed === 0) await vfs.write(MIGRATED_PLANS_FLAG, new Date().toISOString());
   } catch {
     /* leave flag unset → retry next launch */
   }

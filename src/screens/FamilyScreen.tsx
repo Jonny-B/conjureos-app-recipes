@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createFamily,
   getFamilyInfo,
@@ -82,7 +82,10 @@ function FamilyCard({
   onChanged: () => Promise<AppProfile | null>;
 }) {
   const [members, setMembers] = useState<FamilyMember[] | null>(null);
+  const [membersError, setMembersError] = useState(false);
   const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
   const [rename, setRename] = useState(family.name);
   const [savingName, setSavingName] = useState(false);
   const link = familyInviteLink(family.inviteCode);
@@ -108,14 +111,25 @@ function FamilyCard({
 
   useEffect(() => {
     if (!expanded) return;
-    getFamilyInfo(family.id).then((r) => setMembers(r.members)).catch(() => setMembers([]));
+    let alive = true;
+    setMembersError(false);
+    getFamilyInfo(family.id)
+      .then((r) => alive && setMembers(r.members))
+      // An empty list used to stand in for a failed load, which always reads
+      // wrong: you are a member of any family shown here, so "no members" can
+      // only mean the call didn't land.
+      .catch(() => alive && setMembersError(true));
+    return () => {
+      alive = false;
+    };
   }, [expanded, family.id]);
 
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(link);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
+      window.clearTimeout(copiedTimer.current);
+      copiedTimer.current = window.setTimeout(() => setCopied(false), 1600);
     } catch {
       /* clipboard blocked — the link is shown to copy by hand */
     }
@@ -167,7 +181,9 @@ function FamilyCard({
           </div>
 
           <div className="ing-group-label" style={{ marginTop: 10 }}>Members</div>
-          {members === null ? (
+          {membersError ? (
+            <div className="fam-error">Couldn't load members. Check your connection and reopen.</div>
+          ) : members === null ? (
             <div className="muted" style={{ fontSize: 13 }}>Loading…</div>
           ) : (
             <div className="fam-members">
