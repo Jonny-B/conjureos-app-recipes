@@ -14,6 +14,8 @@ import { RecipeRow } from "../components/RecipeRow";
 import { RecipeDetail } from "./RecipeDetail";
 import { CreateScreen } from "./CreateScreen";
 import { SnapRecipeScreen } from "./SnapRecipeScreen";
+import { ingredientsFromPantry } from "../features/pantry";
+import { computeCoverage } from "../features/scaling";
 import { Icon } from "../icons";
 
 interface Props {
@@ -96,6 +98,14 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
   }, [feedItems, query, category, source]);
 
   const visible = ranked.slice(0, page * PAGE_SIZE);
+
+  // Pantry coverage for the rows on screen. Home and Pantry already show these
+  // chips; the browse list didn't, so applying a category filter looked like it
+  // "lost" the have/short/missing counts. Slim catalog rows carry `tokens`,
+  // which is what computeCoverage matches on, so this works pre-body-fetch.
+  const pantryIng = useMemo(() => (pantry ? ingredientsFromPantry(pantry) : []), [pantry]);
+  const covFor = (fi: FeedRecipe) =>
+    pantryIng.length > 0 ? computeCoverage(fi.recipe, pantryIng) ?? undefined : undefined;
 
   const categoryOptions = useMemo<DropdownOption<string>[]>(
     () => [
@@ -277,7 +287,20 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
         <>
           <div className="browse-list">
             {visible.map((fi) => (
-              <RecipeRow key={keyOf(fi)} fi={fi} onOpen={async () => { await loadRecipeBody(fi.recipe); setSelected(fi); }} />
+              <RecipeRow
+                key={keyOf(fi)}
+                fi={fi}
+                cov={covFor(fi)}
+                onOpen={async () => {
+                  // loadRecipeBody RETURNS the filled row (catalog rows ship
+                  // slim — no ingredients/instructions until opened). Awaiting
+                  // it and then selecting the original `fi` threw the body away,
+                  // so the detail screen rendered empty INGREDIENTS and
+                  // INSTRUCTIONS headings.
+                  const recipe = await loadRecipeBody(fi.recipe);
+                  setSelected({ ...fi, recipe } as FeedRecipe);
+                }}
+              />
             ))}
           </div>
           {visible.length < ranked.length && (

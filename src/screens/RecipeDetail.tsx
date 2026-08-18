@@ -198,7 +198,10 @@ export function RecipeDetail({
           </section>
         )}
 
-        {cov && (
+        {/* total === 0 means the ingredient list hasn't loaded (or is empty),
+            NOT that the pantry covers it — claiming "you have everything" off a
+            0-of-0 coverage is how an unloaded recipe read as fully stocked. */}
+        {cov && cov.total > 0 && (
           <div className={`cov-banner${cov.missing === 0 ? " complete" : ""}`}>
             <Icon name={cov.missing === 0 ? "check" : "basket-shopping"} />
             {cov.missing === 0

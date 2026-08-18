@@ -401,7 +401,7 @@ function MoodStep(p: MoodProps) {
           <form className="add-ing-form" onSubmit={p.addChip}>
             <input
               type="text"
-              placeholder="Add an ingredient you want this week…"
+              placeholder="Add an ingredient…"
               value={p.chipInput}
               onChange={(e) => p.setChipInput(e.target.value)}
               maxLength={50}
