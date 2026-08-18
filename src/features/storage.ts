@@ -79,21 +79,32 @@ async function migrateLegacyRecipes(): Promise<void> {
     }
     const entries = await vfs.ls(RECIPES_DIR).catch(() => [] as string[]);
     const mdFiles = entries.filter((e) => e.endsWith(".md"));
+    // A file we can't read or parse is skipped FOREVER — retrying won't fix it.
+    // A file the BACKEND refused is a different thing: that's transient, and it
+    // must hold the flag open so a later launch retries. Lumping both into one
+    // catch and marking migrated regardless is how a backend outage silently
+    // consumed the one-shot migration and orphaned everyone's legacy recipes.
+    let backendFailures = 0;
     for (const file of mdFiles) {
       const path = `${RECIPES_DIR}/${file}`;
+      let parsed: ReturnType<typeof parseMarkdown> = null;
       try {
         const text = await vfs.read(path);
-        const parsed = parseMarkdown(text, path, file.replace(/\.md$/, ""));
-        if (!parsed) continue;
+        parsed = parseMarkdown(text, path, file.replace(/\.md$/, ""));
+      } catch {
+        continue; // unreadable file — nothing a retry would change
+      }
+      if (!parsed) continue; // unparseable — same
+      try {
         const added = await api.addRecipe({ ...toPlainRecipe(parsed), visibility: "private" });
         if (parsed.favorite) {
           await api.setFavorite(recipeIdFromPath(added.path), true).catch(() => {});
         }
       } catch {
-        /* skip one bad / unreadable file, keep going */
+        backendFailures++;
       }
     }
-    await markMigrated();
+    if (backendFailures === 0) await markMigrated();
   } catch {
     /* leave the flag unset; a later launch retries */
   }
