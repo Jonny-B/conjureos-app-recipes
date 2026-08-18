@@ -1,0 +1,50 @@
+name: CI Publish Prod (temp 0.31.4)
+
+# TEMPORARY. The documented prod path for this repo is publishing a GitHub
+# Release; this branch-triggered twin exists only because the release could not
+# be cut from the automation session that shipped 0.31.4. It mirrors the prod
+# step of publish-store.yml exactly — same composite action, same prod secrets,
+# same manifest stamping. Delete the branch once the publish is green.
+
+on:
+  push:
+    branches: [ci/publish-0.31.4]
+
+concurrency:
+  group: ci-publish-prod-0.31.4
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout app source
+        uses: actions/checkout@v4
+
+      - name: Checkout ConjureOS (shared publish action)
+        uses: actions/checkout@v4
+        with:
+          repository: Jonny-B/ConjureOS
+          ref: dev
+          token: ${{ secrets.CONJUREOS_REPO_TOKEN }}
+          path: .conjureos
+
+      # Belt and braces: 0.31.4 already commits the PROD url, but stamp it from
+      # the secret anyway so this path can never ship a dev-pointing manifest —
+      # that omission is the exact bug this release fixes.
+      - name: Stamp recipes-db backend URL into manifest (prod)
+        run: |
+          export RECIPES_DB_URL="https://${{ secrets.SUPABASE_PROD_PROJECT_REF }}.supabase.co/functions/v1/recipes-db"
+          node -e "const fs=require('fs');const p=require('./package.json');p.conjureos.remoteActions.recipesDb.url=process.env.RECIPES_DB_URL;fs.writeFileSync('./package.json',JSON.stringify(p,null,2)+'\n');console.log('stamped recipesDb url ->',process.env.RECIPES_DB_URL);"
+
+      - name: Publish to App Store (prod)
+        uses: ./.conjureos/.github/actions/publish-anchor-app
+        with:
+          supabase-url: https://${{ secrets.SUPABASE_PROD_PROJECT_REF }}.supabase.co
+          supabase-anon-key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im50Z2VsYnRlcGVjcXNxbG94bWN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwOTkzMzEsImV4cCI6MjA5MzY3NTMzMX0.fgRCszkeAbHANaK-JJAGmTwWHyOh-3b6-od1c3s3V0w
+          bot-email: conjureosbot@gmail.com
+          bot-password: ${{ secrets.PUBLISH_BOT_PROD_PASSWORD }}
+          source-path: .
+          project-name: Recipes
+          slug: recipes
+          changelog: 'Recovers saved recipes and week plans created in older versions that could be left behind when the app could not reach the server.'
