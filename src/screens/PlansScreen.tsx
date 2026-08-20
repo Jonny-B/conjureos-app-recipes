@@ -490,9 +490,17 @@ function PlanView({
   // Print a purpose-built sheet rather than the app's own DOM — see printList.ts.
   // Items already in the cart still print (struck through): the paper copy is a
   // record of the whole trip, and someone else may be holding it.
-  const doPrint = () =>
+  const doPrint = () => {
+    // The store layout is read from the VFS, so for the first moments after a
+    // plan opens `groups` is empty while `total` isn't. Printing that would
+    // hand over a sheet saying "nothing to buy" for a list full of items —
+    // fall back to one ungrouped list rather than lie on paper.
+    const printGroups =
+      groups.length > 0
+        ? groups
+        : [{ aisleId: "all", aisleName: "Shopping list", items: plan.shoppingList ?? [] }];
     printShoppingList({
-      groups: groups.map((g) => ({
+      groups: printGroups.map((g) => ({
         aisleName: g.aisleName,
         items: g.items.map((i) => ({
           name: i.name,
@@ -506,6 +514,7 @@ function PlanView({
       familyName: rec.familyId ? familyName : null,
       storeName: store?.name ?? null,
     });
+  };
 
   const doneCount = (plan.shoppingList ?? []).filter((i) => checked.has(i.canonical)).length;
   const allDone = total > 0 && doneCount === total;
