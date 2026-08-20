@@ -25,6 +25,7 @@ import {
   type StoreLayout,
 } from "../features/storeLayout";
 import { inferAislePlacements } from "../features/aiStoreSort";
+import { printShoppingList } from "../features/printList";
 import type { PlansIntent, CogItem } from "../App";
 import { Icon } from "../icons";
 
@@ -94,6 +95,15 @@ export function PlansScreen({
     return p;
   }, []);
 
+  // Joining or leaving a family changes which plans exist for us, not just the
+  // profile — reload both so the list can't keep showing a family's plans after
+  // we've left it.
+  const familyChanged = useCallback(async () => {
+    const p = await loadProfile();
+    await loadPlans();
+    return p;
+  }, [loadProfile, loadPlans]);
+
   useEffect(() => {
     (async () => {
       await loadProfile();
@@ -153,6 +163,8 @@ export function PlansScreen({
   const familyPlans = useMemo(() => (plans ?? []).filter((p) => p.familyId).sort(byUpdated), [plans]);
   const families = profile?.families ?? [];
   const hasFamilies = families.length > 0;
+  /** Stable identity for "which families, called what" — see the cog effect. */
+  const familyKey = families.map((f) => `${f.id}:${f.name}`).join(",");
   const familyName = useCallback(
     (id: string | null) => families.find((f) => f.id === id)?.name ?? "Family",
     [families],
@@ -180,6 +192,11 @@ export function PlansScreen({
 
 
   // ── mutations (optimistic where it helps) ──
+  // Latest plans, readable from callbacks that outlive the render they were
+  // created in (the header-cog actions).
+  const plansRef = useRef<PlanRecord[] | null>(null);
+  plansRef.current = plans;
+
   const patchLocal = (rec: PlanRecord) =>
     setPlans((prev) => (prev ? prev.map((p) => (p.id === rec.id ? rec : p)) : prev));
 
@@ -212,14 +229,20 @@ export function PlansScreen({
   };
   const uncheckAll = (rec: PlanRecord) => saveData(rec, { ...rec.data, checked: [] });
 
-  const sharePlan = async (rec: PlanRecord, familyId: string | null) => {
+  // Both take an ID, not a record. The header-cog effect below only re-runs
+  // when the plan's id/scope changes, so a captured record goes stale the
+  // moment anything else about the plan does — sharing after ticking items off
+  // was re-uploading the pre-tick data and undoing the check-offs.
+  const sharePlan = async (planId: string, familyId: string | null) => {
+    const rec = plansRef.current?.find((p) => p.id === planId);
+    if (!rec) return;
     await savePlanRecord({ id: rec.id, plan: rec.data, title: rec.title, familyId }).catch(() => {});
     await loadPlans();
     setScope(familyId ? "family" : "my");
   };
-  const removePlan = async (rec: PlanRecord) => {
-    setPlans((prev) => (prev ? prev.filter((p) => p.id !== rec.id) : prev));
-    await deletePlanRecord(rec.id).catch(() => {});
+  const removePlan = async (planId: string) => {
+    setPlans((prev) => (prev ? prev.filter((p) => p.id !== planId) : prev));
+    await deletePlanRecord(planId).catch(() => {});
     await loadPlans();
   };
 
@@ -240,24 +263,27 @@ export function PlansScreen({
       onCogItems([]);
       return;
     }
+    const planId = cogPlan.id;
     const items: CogItem[] = [];
     if (cogPlan.familyId) {
-      items.push({ key: "private", label: "Make private", icon: "user", onClick: () => void sharePlan(cogPlan, null) });
+      items.push({ key: "private", label: "Make private", icon: "user", onClick: () => void sharePlan(planId, null) });
     } else {
       for (const f of families) {
         items.push({
           key: `share-${f.id}`,
           label: families.length > 1 ? `Share with ${f.name}` : "Share with family",
           icon: "user",
-          onClick: () => void sharePlan(cogPlan, f.id),
+          onClick: () => void sharePlan(planId, f.id),
         });
       }
     }
-    items.push({ key: "delete", label: "Delete plan", icon: "trash-can", danger: true, onClick: () => void removePlan(cogPlan) });
+    items.push({ key: "delete", label: "Delete plan", icon: "trash-can", danger: true, onClick: () => void removePlan(planId) });
     onCogItems(items);
     return () => onCogItems([]);
+    // `familyKey` (not families.length) so renaming a family relabels
+    // "Share with <name>" instead of leaving the old name in the sheet.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cogPlan?.id, cogPlan?.familyId, mode, families.length]);
+  }, [cogPlan?.id, cogPlan?.familyId, mode, familyKey]);
 
   // ── routed sub-screens ──
   if (mode === "new") {
@@ -277,7 +303,7 @@ export function PlansScreen({
     return (
       <FamilyScreen
         profile={profile}
-        onChanged={loadProfile}
+        onChanged={familyChanged}
         onBack={() => {
           setMode("landing");
           void loadProfile();
@@ -411,6 +437,10 @@ function PlanView({
       setStoreId(st.some((s) => s.id === last) ? last! : d);
     });
   }, []);
+  // Latest stores, for the async AI-placement effect below (which resolves long
+  // after the render that started it).
+  const storesRef = useRef<StoreLayout[]>(stores);
+  storesRef.current = stores;
   const store = stores.find((s) => s.id === storeId) ?? stores[0] ?? null;
   const pickStore = (id: string) => {
     setStoreId(id);
@@ -438,11 +468,14 @@ function PlanView({
         store,
       );
       if (cancelled || Object.keys(placements).length === 0) return;
-      setStores((prev) => {
-        const next = prev.map((s) => (s.id === store.id ? withLearned(s, placements) : s));
-        void saveStores({ stores: next, defaultId });
-        return next;
-      });
+      // The write lives outside the state updater: React may invoke an updater
+      // more than once for the same change (StrictMode does it deliberately),
+      // and each extra invocation would be another VFS write + sync push.
+      const next = (storesRef.current ?? []).map((s) =>
+        s.id === store.id ? withLearned(s, placements) : s,
+      );
+      void saveStores({ stores: next, defaultId });
+      setStores(next);
       const n = Object.keys(placements).length;
       setAiNote(`Placed ${n} item${n === 1 ? "" : "s"} using your store layout`);
     })();
@@ -453,6 +486,27 @@ function PlanView({
 
   const checked = useMemo(() => new Set(plan.checked ?? []), [plan]);
   const total = (plan.shoppingList ?? []).length;
+
+  // Print a purpose-built sheet rather than the app's own DOM — see printList.ts.
+  // Items already in the cart still print (struck through): the paper copy is a
+  // record of the whole trip, and someone else may be holding it.
+  const doPrint = () =>
+    printShoppingList({
+      groups: groups.map((g) => ({
+        aisleName: g.aisleName,
+        items: g.items.map((i) => ({
+          name: i.name,
+          quantity: i.quantity,
+          quantityNote: i.quantityNote,
+          checked: checked.has(i.canonical),
+        })),
+      })),
+      meals: (plan.picks ?? []).map((p) => p.title),
+      dateLabel: formatDate(plan.createdAt),
+      familyName: rec.familyId ? familyName : null,
+      storeName: store?.name ?? null,
+    });
+
   const doneCount = (plan.shoppingList ?? []).filter((i) => checked.has(i.canonical)).length;
   const allDone = total > 0 && doneCount === total;
   const shared = !!rec.familyId;
@@ -500,7 +554,7 @@ function PlanView({
         <div className="home-section-head">
           <h3>Shopping list</h3>
           {total > 0 && (
-            <button className="link-btn no-print" onClick={() => window.print()} title="Print this list">
+            <button className="link-btn no-print" onClick={doPrint} title="Print this list">
               <Icon name="print" /> Print
             </button>
           )}

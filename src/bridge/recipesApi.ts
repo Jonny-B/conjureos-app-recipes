@@ -559,6 +559,24 @@ export async function renameFamily(familyId: string, name: string): Promise<AppF
   return r.family;
 }
 
+/**
+ * Leave a family. `deletedFamily` is true when you were the last one out, in
+ * which case the family is gone and its shared plans revert to personal plans
+ * of whoever created them.
+ */
+export async function leaveFamily(familyId: string): Promise<{ deletedFamily: boolean }> {
+  if (!isBackendAvailable()) {
+    const i = devProfile.families.findIndex((f) => f.id === familyId);
+    if (i >= 0) devProfile.families.splice(i, 1);
+    devPlans.forEach((p) => {
+      if (p.familyId === familyId) p.familyId = null;
+    });
+    return { deletedFamily: true };
+  }
+  const r = await invokeRaw<{ deletedFamily?: boolean }>("leaveFamily", { familyId });
+  return { deletedFamily: !!r.deletedFamily };
+}
+
 export async function joinFamily(inviteCode: string): Promise<AppFamily> {
   if (!isBackendAvailable()) {
     const fam: AppFamily = { id: `fam-${devSeq++}`, name: "Joined family", role: "member", inviteCode, channelToken: "devtoken" };
@@ -642,7 +660,11 @@ export async function savePlanRecord(args: {
     devPlans.unshift(rec);
     return rec;
   }
-  const params: Record<string, unknown> = { plan: args.plan, title: args.title ?? null };
+  // Send `title` only when the caller supplied one. A check-off toggle passes
+  // just the plan, and the server treats an absent title as "leave it alone" —
+  // it used to arrive as an explicit null and wipe the stored title.
+  const params: Record<string, unknown> = { plan: args.plan };
+  if ("title" in args || !args.id) params.title = args.title ?? null;
   if (args.id) params.id = args.id;
   if (setScope || !args.id) params.familyId = args.familyId ?? null; // always set scope on create
   const r = await invokeRaw<{ plan?: PlanRecord }>("savePlan", params);

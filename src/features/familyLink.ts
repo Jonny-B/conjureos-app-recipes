@@ -1,10 +1,15 @@
 /**
- * Family invite links. A link is `<conjureos-web>/?joinFamily=<inviteCode>`.
- * Today the recipient opens it (landing in ConjureOS), then in Recipes → Family
- * → Join pastes the same link; `parseInvite` pulls the code out. The URL is
- * also forward-compatible with a future shell auto-open. The web base is derived
- * from which Supabase project the kernel injected (dev vs prod), falling back to
- * the app's own origin.
+ * Family invite links. A link is `<conjureos-web>/join?c=<inviteCode>`.
+ * Opening it lands in ConjureOS, which stashes the code and hands it to this
+ * app; pasting the same link into Recipes → Family → Join also works, because
+ * `parseInvite` pulls the code back out. The web base is derived from which
+ * Supabase project the kernel injected (dev vs prod), falling back to the app's
+ * own origin.
+ *
+ * `/join` is a dedicated path, not a query param on `/`, so the native app can
+ * claim invite links via Universal Links / App Links without claiming every
+ * conjureos.com URL. `parseInvite` still reads the older `?joinFamily=` form —
+ * a shared link lives forever, and that's one regex, not a UI branch.
  */
 
 interface Env {
@@ -37,13 +42,13 @@ export function webBase(): string {
 }
 
 export function familyInviteLink(code: string): string {
-  return `${webBase()}/?joinFamily=${encodeURIComponent(code)}`;
+  return `${webBase()}/join?c=${encodeURIComponent(code)}`;
 }
 
 /** Extract an invite code from a pasted link OR a bare code. Null if neither. */
 export function parseInvite(input: string): string | null {
   const s = input.trim();
-  const m = s.match(/[?&]joinFamily=([A-Za-z0-9]+)/i);
+  const m = s.match(/[?&](?:joinFamily|c)=([A-Za-z0-9]+)/i);
   if (m) return m[1]!.toUpperCase();
   const bare = s.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
   return bare.length >= 4 && bare.length <= 16 ? bare : null;
