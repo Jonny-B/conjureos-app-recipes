@@ -3060,6 +3060,40 @@ select {
   padding: 1px 7px;
   border-radius: 999px;
 }
+/* An invited-but-not-yet-accepted member, so an empty-looking family reads as
+   "waiting on them" rather than "the invite failed". */
+.fam-pending-tag {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-faint);
+  border: 1px solid var(--border);
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+
+/* Leaving a family: a quiet link that expands into a two-step confirm, since
+   the last-member case deletes the family. */
+.fam-leave-row {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.link-btn.danger { color: var(--danger); }
+.fam-leave-confirm {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.fam-leave-warn {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--fg-dim);
+  text-align: center;
+}
+.fam-leave-confirm .join-actions { margin-top: 12px; }
+
 .username-claimed {
   display: inline-flex;
   align-items: center;

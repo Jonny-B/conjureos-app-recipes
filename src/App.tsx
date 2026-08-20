@@ -34,6 +34,11 @@ export interface CogItem {
   danger?: boolean;
 }
 
+/** Where the ConjureOS shell drops an invite code for us (shell + native app). */
+const HANDOFF_PATH = "/home/Documents/Recipes/.family-invite.json";
+/** Older than this and the handoff is someone else's moment, not this one. */
+const HANDOFF_TTL_MS = 60 * 60 * 1000;
+
 const TAB_TITLE: Record<Tab, string> = {
   home: "Home",
   recipes: "Recipes",
@@ -93,27 +98,35 @@ export function App() {
   };
 
   useEffect(() => {
-    const HANDOFF = "/home/Documents/Recipes/.family-invite.json";
     const check = async () => {
       try {
-        if (!(await vfs.exists(HANDOFF))) return;
-        const raw = await vfs.read(HANDOFF);
-        await vfs.rm(HANDOFF).catch(() => {});
-        const parsed = JSON.parse(raw) as { code?: string; ts?: number };
+        if (!(await vfs.exists(HANDOFF_PATH))) return;
+        const parsed = JSON.parse(await vfs.read(HANDOFF_PATH)) as { code?: string; ts?: number };
         const code = (parsed.code ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-        // Ignore a stale handoff (>10 min) — the shell writes it right before it
-        // opens us, so a fresh one is seconds old.
-        if (code && (!parsed.ts || Date.now() - parsed.ts < 10 * 60 * 1000)) setPendingJoin(code);
+        // An invite the shell handed over hours ago isn't what the user is
+        // doing now — drop it rather than ambushing them with a stale prompt.
+        if (!code || (parsed.ts && Date.now() - parsed.ts > HANDOFF_TTL_MS)) {
+          await vfs.rm(HANDOFF_PATH).catch(() => {});
+          return;
+        }
+        setPendingJoin(code);
       } catch {
         /* no handoff / unreadable — nothing to redeem */
       }
     };
     void check();
-    // Also re-check when the app regains focus, in case it was already open when
-    // the shell wrote the handoff.
+    // Re-check when the app comes back to the foreground, in case it was
+    // already open (warm) when the shell wrote the handoff — in that case the
+    // app never remounts, so the mount check above has already been and gone.
+    // `focus` covers hosts where an offscreen→onscreen move doesn't fire
+    // visibilitychange (notably the native app's warm WebView pool).
     const onVis = () => document.visibilityState === "visible" && void check();
     document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onVis);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", onVis);
+    };
   }, []);
 
   useEffect(() => {
@@ -283,8 +296,15 @@ export function App() {
       {pendingJoin && (
         <FamilyJoinPrompt
           code={pendingJoin}
-          onClose={() => setPendingJoin(null)}
+          // Declining consumes the invite; a failed attempt does NOT (the
+          // handoff file survives, so the next launch offers it again rather
+          // than making them ask for a fresh link over a dropped connection).
+          onClose={() => {
+            void vfs.rm(HANDOFF_PATH).catch(() => {});
+            setPendingJoin(null);
+          }}
           onJoined={() => {
+            void vfs.rm(HANDOFF_PATH).catch(() => {});
             setPendingJoin(null);
             setCookTarget(null);
             setTab("plan");

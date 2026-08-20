@@ -19,6 +19,9 @@ Output ONLY a JSON object mapping each item's EXACT given name to an aisle id,
 e.g. {"all-purpose flour":"a1b2c3"}. Use only ids that appear in the layout.
 Omit an item entirely if you genuinely cannot tell. No prose, no code fences.`;
 
+/** Items per model call — see the chunking note in inferAislePlacements. */
+const CHUNK = 25;
+
 function parseObject(raw: string): Record<string, unknown> | null {
   const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
   const start = cleaned.indexOf("{");
@@ -41,6 +44,15 @@ export async function inferAislePlacements(
   store: StoreLayout,
 ): Promise<Record<string, string>> {
   if (!items.length || !store.aisles.length) return {};
+  // One reply has a token ceiling, and a truncated JSON object parses to
+  // nothing — losing EVERY placement in the batch, not just the overflow. A
+  // big shop can easily leave 40+ items unplaced, so split the ask.
+  if (items.length > CHUNK) {
+    const chunks: (typeof items)[] = [];
+    for (let i = 0; i < items.length; i += CHUNK) chunks.push(items.slice(i, i + CHUNK));
+    const results = await Promise.all(chunks.map((c) => inferAislePlacements(c, store)));
+    return Object.assign({}, ...results) as Record<string, string>;
+  }
 
   const learnedByAisle = new Map<string, string[]>();
   for (const [canon, aid] of Object.entries(store.learned ?? {})) {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   loadStores,
   saveStores,
@@ -31,9 +31,30 @@ export function StoreEditor({ onBack }: { onBack: () => void }) {
     });
   }, []);
 
+  // Every field here is a controlled text input, so a naive save-on-change wrote
+  // the whole stores file to the VFS once per KEYSTROKE — and each write marks
+  // the file dirty for cloud sync. Debounce the write (state still updates
+  // immediately, so typing stays responsive) and flush on unmount so nothing is
+  // lost when the user backs out mid-word.
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pending = useRef<StoresState | null>(null);
+  const flush = () => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    if (pending.current) {
+      void saveStores(pending.current);
+      pending.current = null;
+    }
+  };
+  useEffect(() => flush, []);
+
   const commit = (next: StoresState) => {
     setState(next);
-    void saveStores(next);
+    pending.current = next;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(flush, 500);
   };
 
   if (!state) {

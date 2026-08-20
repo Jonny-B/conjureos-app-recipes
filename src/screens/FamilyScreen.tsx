@@ -3,6 +3,7 @@ import {
   createFamily,
   getFamilyInfo,
   joinFamily,
+  leaveFamily as leaveFamilyApi,
   renameFamily,
   type AppFamily,
   type AppProfile,
@@ -192,12 +193,81 @@ function FamilyCard({
                   <Icon name="user" />
                   <span>{m.username ? `@${m.username}` : m.displayName || m.email || "member"}</span>
                   {m.role === "owner" && <span className="fam-owner-tag">owner</span>}
+                  {m.status === "pending" && <span className="fam-pending-tag">invited</span>}
                 </div>
               ))}
             </div>
           )}
+
+          <LeaveFamily family={family} members={members} onChanged={onChanged} />
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Leaving is deliberately available to everyone, owners included: joining a
+ * family must never be a one-way door, or one mistaken tap on an invite link
+ * permanently spends one of your three slots. The server promotes a new owner
+ * if needed; the last member out takes the family with them, and we say so
+ * before they commit, because that case is not reversible.
+ */
+function LeaveFamily({
+  family,
+  members,
+  onChanged,
+}: {
+  family: AppFamily;
+  members: FamilyMember[] | null;
+  onChanged: () => Promise<AppProfile | null>;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Unknown while members are still loading — assume the softer wording and
+  // let the server be the authority on what actually happens.
+  const isLastMember = members !== null && members.filter((m) => m.status === "active").length <= 1;
+
+  const leave = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await leaveFamilyApi(family.id);
+      await onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+      setConfirming(false);
+    }
+  };
+
+  if (!confirming) {
+    return (
+      <div className="fam-leave-row">
+        {error && <div className="fam-error">{error}</div>}
+        <button className="link-btn danger" type="button" onClick={() => setConfirming(true)}>
+          <Icon name="xmark" /> Leave {family.name}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fam-leave-confirm">
+      <div className="fam-leave-warn">
+        {isLastMember
+          ? "You're the only one here, so leaving deletes this family. Plans shared with it become your own private plans."
+          : "You'll lose access to this family's shared plans and shopping lists. You can rejoin with the invite link."}
+      </div>
+      <div className="join-actions">
+        <button className="btn ghost" type="button" disabled={busy} onClick={() => setConfirming(false)}>
+          Cancel
+        </button>
+        <button className="btn danger" type="button" disabled={busy} onClick={leave}>
+          {busy ? "Leaving…" : isLastMember ? "Delete family" : "Leave"}
+        </button>
+      </div>
     </div>
   );
 }
