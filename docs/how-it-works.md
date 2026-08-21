@@ -1,5 +1,15 @@
 # How It Works — the keystone doc
 
+> ⚠️ **STALE — kept for history.** This doc predates three shipped changes and is
+> wrong in ways that matter: the app no longer uses **Vite** (it builds through
+> `@conjureos/pack`'s `bundle()`; see `internals.md` → `recipes-de-vite-migration`),
+> saved recipes are **no longer markdown files** (they are rows in the `recipes`
+> table; see `recipes-all-in-db-decision`), the catalog is **no longer bundled**,
+> and the app now has **per-user identity and roles** via a minted token (see
+> `recipes-identity-and-roles`). `VITE_USDA_API_KEY` and the ZIP-import /
+> `DEFAULT_APPS` deployment story are both gone.
+> **Read [internals.md](./internals.md) instead.**
+
 This is the end-to-end explanation of the Recipes app: what it does, how it's
 structured, why those structures exist, and the rules we follow to change and
 ship it. Read it top to bottom once; reference it forever.

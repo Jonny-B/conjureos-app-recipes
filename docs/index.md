@@ -18,9 +18,10 @@ exist. Put it here.
 
 | Doc | What it covers |
 |---|---|
-| **[how-it-works.md](./how-it-works.md)** | The keystone. The whole system end to end: the user journey, the layers and why they exist, auth & permissions, the "backend", mocks, the manifest + orchestrator, how we ship PRs, and how deployments work. |
+| **[internals.md](./internals.md)** | **The current keystone.** The whole system as it is today — architecture, screens, the `recipes` data model and `recipes-db` backend, the catalog pipeline, every `ai.complete()` call, cross-app actions, build/publish — plus the decision layer (catalog licensing, the no-JSON-import rule, the de-Vite migration, the build-check supersession, all-in-DB, ratings). Written as discrete `{ id, title, body }` sections for porting into the in-app "ConjureOS Internals" app. |
+| [how-it-works.md](./how-it-works.md) | ⚠️ **Stale — history only.** The original keystone. Predates the de-Vite migration, the all-in-DB move, and per-user identity: it still describes a Vite build, markdown recipe files, ZIP-import deployment, and "no user login". Read `internals.md` instead. |
 
-> The keystone doc is the one you read first and the one every other doc is
+> `internals.md` is the one you read first and the one every other doc is
 > measured against. New docs narrow in on a single topic; they do not restate
 > the keystone, they link to it.
 
