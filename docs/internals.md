@@ -106,12 +106,39 @@ bridge/                  the ONLY code allowed to touch window.__conjureos / win
 target. `src/types.ts` is shared by every layer and imports nothing.
 
 **The load-bearing rule:** only `src/bridge/*` may reference `window.__conjureos`
-or `window.__vfs`. Everything else imports the typed wrapper. Two deliberate
-exceptions, both genuinely-external HTTP rather than host access:
+or `window.__vfs`. Everything else imports the typed wrapper.
 
-- `src/features/nutrition.ts` `fetch`es the USDA proxy directly.
-- `src/bridge/recipesApi.ts` `fetch`es the public `recipes-db` actions directly
-  (it is a bridge file, so it is inside the rule).
+**Two modules in `features/` currently break that rule** — the complete list, by
+`grep -rn "__conjureos\|__vfs" src/ | grep -v "^src/bridge/"`:
+
+| Module | What it reads off the host global | Live? |
+|---|---|---|
+| `src/features/nutrition.ts:54` | `__conjureos.env.usdaProxyUrl` | Yes — every nutrition lookup |
+| `src/features/familyLink.ts:13` | `__conjureos.env.recipesApiUrl` | Yes — via `src/screens/FamilyScreen.tsx:11` |
+
+Both are **host access from the features layer**, not (as an earlier version of
+this doc claimed) "external HTTP rather than host access". They read injected
+env off `globalThis.__conjureos`, which is exactly what the rule reserves to
+`bridge/`. The tidy fix is a one-line `bridge/env.ts` both import from. Note
+that `src/bridge/recipesApi.ts` `fetch`ing `recipes-db` directly is **not** an
+exception — it is a bridge file, so it is inside the rule by construction.
+
+**`familyLink.ts` carries a second, worse problem: hardcoded project refs.**
+`webBase()` (`src/features/familyLink.ts:28-30`) picks the ConjureOS web origin
+by **string-matching Supabase project refs** out of the injected
+`recipesApiUrl` — one literal ref for prod, one for dev, each mapped to a web
+origin, with a `.conjureos.app` hostname check and a prod default behind them.
+
+That is environment-specific configuration **baked into source**, which
+contradicts the de-Vite principle stated in `recipes-de-vite-migration`
+("anything environment-specific is resolved at runtime from the injected bridge
+env, or stamped into the manifest by CI"). It is *derived* from a runtime value,
+so it is not a build-time constant — but the mapping is fixed, so a third
+project, a renamed project, or a migrated ref silently falls through to the prod
+default and mints invite links pointing at the wrong shell. Treat it as a
+**defect to fix**, not a documented exception. (The same pattern, less
+dangerously, backs the dev-project fallback URLs in `recipesApi.ts:20` and
+`nutrition.ts:35`; those at least fail toward a read-only dev service.)
 
 Every bridge wrapper ships a **dev mock** so the whole UI boots with zero
 ConjureOS present (`src/bridge/ai.ts:73`, `src/bridge/vfs.ts:33`,
@@ -299,7 +326,7 @@ Recipes is the precedent later reused by Conjure Health's community food DB.
 
 **Side effects worth knowing.** On every token-verified call the function
 best-effort registers/refreshes the caller in `recipe_app_users`
-(`touchUser`, `index.ts:104`), and a bootstrap-admin allowlist grants `admin` on
+(`touchUser`, called at `index.ts:108`, defined at `:210`), and a bootstrap-admin allowlist grants `admin` on
 first sign-in so the in-app console can take over role management with no seed
 row (`index.ts:44-46`).
 
@@ -390,9 +417,11 @@ title: Every `ai.complete()` call in the app
 All model access goes through one wrapper, `complete()` in `src/bridge/ai.ts`,
 which is gated on the `ai.complete` permission. The app asks for a **tier**; the
 host decides the model (BYO key → Sonnet at `capable`; hosted free-tier proxy →
-Haiku regardless of hint). There are **nine** call sites, covering eight
-user-facing features (#2 and #3 are two prompts of the same "generate recipes"
-feature).
+Haiku regardless of hint). There are **nine** call sites. They back nine
+distinct exported functions; the count differs from the tab/doorway count only
+because two of them (`generateRecipes`, `recipes.ts:42`, and
+`generateFromDescription`, `recipes.ts:113`) are the two Home cooking doorways
+described in `recipes-screens-and-flow`, not one feature called twice.
 
 | # | Feature | Call site | Tier | System prompt marker | Vision |
 |---|---|---|---|---|---|
@@ -476,21 +505,67 @@ cross-app actions") and were refined at **`0.9.4`** (`203a920`, exact-match
 `returns` for cross-app discovery); `importRecipeFromImage` arrived later, at
 **`0.10.0`** (`ed01bc0`), and never got them.
 
-The consequence is concrete, not cosmetic. `conj-pack`'s validator warns:
+**The consequence is at runtime, in the kernel.** `resolveNeed` matches a
+consumer's declared `need` against "every OTHER installed app's actions with a
+declared `returns` where `schemaSatisfies(returns, need.shape)`", and states the
+rule flatly (`ConjureOS/src/kernel/connectionMap.ts:197`):
 
-> `conjureos.actions.importRecipeFromImage` has no `returns` schema — other apps
-> can't discover this action as a data provider (Phase 45 needs↔provides matches
-> on `returns`).
+> **No `returns` schema → no match.**
 
-(`conjureos-pack/src/validate.ts:508`; the same check is an **ERROR**, not a
-warning, for any app that declares a `needs` block or is validated with
-`--strict` — `validate.ts:496`.) So the fifth action is invisible to exactly the
-shape-matching this section credits Recipes with supporting. Treat it as an open
-gap; adding the two schemas is the fix.
+So `importRecipeFromImage` can never resolve a consumer's need, however well it
+would fit. The AI fallback cannot rescue it either: that path proposes
+**rename-only** field maps validated against *declared* schemas, and a missing
+`returns` is a refuse case by design — there is nothing to rename.
 
-Reads never prompt (side-effect-free); writes hit the kernel's one-time grant
-dialog — *Allow once / Always / Block*, **per calling app, per action**. A
-meal planner granted `addRecipe` cannot silently call `markCooked`.
+Worth being precise about what is and isn't switched on here, because it is easy
+to over- or under-state:
+
+- **Exact structural matching is on by default.** The `CONNECTION_MAP_AI` flag
+  (`connectionMap.ts:55`) gates *only* the AI-proposed field-map path; with it
+  off, `resolveNeed` still returns free exact structural matches plus confirmed
+  bindings. The gap this section describes sits on the always-on path.
+- There is a separate **user-facing master toggle** (`isCrossAppEnabled`,
+  `connectionMap.ts:152`, kernel default `() => true`); with it off,
+  `resolveNeed` returns `[]` for everything, schemas or not.
+
+`conj-pack`'s validator would also flag this — *"has no `returns` schema — other
+apps can't discover this action as a data provider"* (`validate.ts:508` in pack
+**`0.2.0`**, escalating to an ERROR under `--strict` or when the app declares
+`needs`, `:496`). But do not cite that as what *this* repo is being told: the
+pack this repo installs is `0.1.1`, whose `validate.ts` has no such check at
+all, and neither `bundle-app.ts` nor `publish-app.mjs` invokes the validator on
+any path. Nothing in Recipes' local or CI flow emits that warning today. The
+runtime consequence above is the real one.
+
+Adding the two schemas is the fix; it is tracked in `recipes-open-questions`.
+
+**Every cross-app invoke from a sandboxed caller prompts — reads included.**
+Since **Phase 30b (#220)** the kernel gates `actions.read` as well as
+`actions.write` (`ConjureOS/src/kernel/actionRegistry.ts:432-435`), and the
+motivating example in the kernel's own comment is this app:
+
+> any installed app could silently enumerate another app's read actions (e.g. a
+> "calorie tracker" reading the full recipe library) the moment it's installed
+
+An earlier version of this doc said "reads never prompt (side-effect-free)".
+That was **wrong**, and wrong in the direction that matters: a third-party
+developer who believes it designs a provider assuming read actions are silently
+invocable and a consumer with no consent UX, and both discover the truth as a
+surprise permission dialog in someone else's app. Reads are not side-effect-free
+from the *user's* point of view — enumerating a recipe library is a disclosure.
+
+The rest of the grant model is as you would expect, and is unchanged:
+
+- The dialog offers **Allow once / Always / Block**, worded by action kind
+  ("Allow X to see your recipes?" vs "Allow X to add a recipe?").
+- `always` and `block` persist into the **caller's** manifest under
+  `actionGrants[<target appPath>][<actionName>]`; `once` is deliberately **not**
+  persisted, so it re-prompts next time (`actionRegistry.ts:483-512`).
+- Grants are therefore **per calling app, per target action**: a meal planner
+  granted `addRecipe` cannot silently call `markCooked`, and one granted
+  `listRecipes` has no claim on `getRecipe`.
+- Only the shell's own orchestrator bypasses the gate — it invokes with
+  `callerAppPath === null` and is trusted shell code, not a sandboxed app.
 
 **Callers are not trusted.** Every param is validated field-by-field before the
 handler runs: type checks, length caps (title 80, summary 400, 30 ingredients ×
@@ -539,14 +614,38 @@ Saved recipes and week plans are in the DB. What remains on the device, under
 | `nutrition-cache.json` | USDA lookup cache (app-folder relative). `src/features/nutrition.ts:59` |
 | `Plans/` | Legacy week plans, read once by the VFS→DB migration then left alone. `src/features/planStorage.ts:13` |
 | `.migrated-to-db`, `Plans/.migrated-to-db` | One-shot migration markers. |
-| `.family-invite.json` | Kernel→app handoff for `?joinFamily=<code>` web links. Written by the shell, read and deleted by the app; ignored if older than 10 minutes. `src/App.tsx:96` |
+| `.family-invite.json` | Kernel→app handoff for `?joinFamily=<code>` web links. Written by the shell, read and deleted by the app. A handoff carrying a `ts` is ignored after 10 minutes — but one **without** a `ts` is accepted at any age (`src/App.tsx:106`). |
+
+**A second store, not in the VFS: per-app-origin `localStorage`.** Three keys,
+and they are invisible in the Files app, so the table above is not the whole
+picture of device state:
+
+| Key | Written by | Holds |
+|---|---|---|
+| `recipes.stores.aiSort` | `src/features/storeLayout.ts:114,118,125` | AI aisle-sort on/off (absent ⇒ on) |
+| `recipes.stores.lastStoreId` | `src/features/storeLayout.ts:64,138,145` | Last selected grocery store |
+| `recipes.plans.lastView` | `src/screens/PlansScreen.tsx:38,41,50` | Last Plans sub-view |
+
+All three are **preferences, not recipes**, so the "nothing recipe-shaped is
+written to the device" claim survives — but they are genuinely separate state.
+`localStorage` is scoped to the app's own origin (`<slug>.conjureos.app`;
+`<slug>.mobile.conjureos.app` on mobile), so it partitions, backs up, and clears
+differently from the VFS, and it does not appear in the Files app the way the
+paths above do. Clearing site data drops these; it does not drop the VFS.
 
 One caveat on "nothing recipe-shaped is written to the device": `planStorage.ts`
-still exports a live `saveWeekPlan()` that writes `<base>.json` plus a
-`<base>-shopping.md` checkbox list into `Plans/` (`src/features/planStorage.ts:56`).
-It is **dead code** — `grep -rn "saveWeekPlan" src/` finds no caller outside the
-module — so the statement holds behaviorally, but the function is still there
-and would reintroduce device writes if anyone wired it up.
+still exports `saveWeekPlan()`, which writes `<base>.json` plus a
+`<base>-shopping.md` checkbox list into `Plans/`
+(`src/features/planStorage.ts:56`). It is **genuinely dead** — `grep -rn
+"saveWeekPlan" src/` returns only its own definition, with no caller anywhere,
+inside the module or out — so the statement holds behaviorally, but the function
+would reintroduce device writes the moment anyone wired it up. Delete it or
+guard it.
+
+Do **not** make the same call about `listWeekPlans()` (`:67`): it has no caller
+*outside* the module, but it is live inside one — `importVfsPlansOnce()` calls
+it at `:35`, and that migration runs from `PlansScreen.tsx:100`. It is the read
+half of the VFS→DB lift, not dead code.
 
 **Two one-time migrations** lift pre-existing local data into the DB:
 `migrateLegacyRecipes()` (markdown recipes → rows, `src/features/storage.ts:63`)
@@ -598,6 +697,24 @@ the code is itself consent.
 family-plan write. `postgres_changes` is impossible without a session, so
 broadcast-with-an-unguessable-channel is the substitute.
 
+**Where the anon key comes from, since this section's whole subject is what the
+app may hold:** its own backend hands it over. `myProfile` returns
+`anonKey` and `realtimeUrl` alongside the role and family list
+(`supabase/functions/recipes-db/index.ts:568`), so the key arrives **only after
+minted-token verification**; the app then passes it to
+`subscribeFamilyChannels` (`src/screens/PlansScreen.tsx:111,130`). This is
+deliberate and not a weakening of the "no Supabase session in the app" rule —
+the anon key is public by design and RLS still applies to anything it reaches —
+but the delivery path is worth stating rather than leaving the key to appear
+from nowhere.
+
+**Consequence for local dev:** the dev-mock profile returns `anonKey: ""`
+(`src/bridge/recipesApi.ts:502`) and the subscribe effect short-circuits on an
+empty key (`PlansScreen.tsx:120`), so **realtime is inert under
+`npm run dev`**. Every other bridge has a working mock; family live-update is
+the one flow that cannot be exercised without the real backend. Know that before
+you spend an afternoon debugging why a second window never updates.
+
 **Images.** The app has no storage capability, so `uploadImage` ships bytes as
 base64 over the minted-token action and the function service-role-uploads into
 the **public** `recipe-images` bucket (migration 109), returning a URL stored on
@@ -623,10 +740,26 @@ FoodData Central's `Foundation` + `SR Legacy` datasets, and aggregated.
 
 **The USDA key is never in the client bundle.** Lookups go through the
 `usda-proxy` Supabase Edge Function, which holds `USDA_API_KEY` as a server
-secret. Because a store app ships **one** artifact that must run in dev and
-prod, the proxy URL is resolved at **runtime** from
-`globalThis.__conjureos.env.usdaProxyUrl`, with a fallback to the dev proxy
+secret (`supabase/functions/usda-proxy/index.ts:69`). Because a store app ships
+**one** artifact that must run in dev and prod, the proxy URL is resolved at
+**runtime** from `globalThis.__conjureos.env.usdaProxyUrl`
 (`src/features/nutrition.ts:52`). There is no build-time env and no `VITE_*`.
+
+**The host does inject it, per environment** — `resolveUsdaProxyUrl()` in
+`ConjureOS/src/kernel/sandbox.ts:130` derives
+`<VITE_SUPABASE_URL>/functions/v1/usda-proxy` and the sandbox wires it into
+`env` at `:1040`, so a prod install gets the prod URL. The
+`DEV_PROXY_URL` fallback (`nutrition.ts:35`) therefore only applies **outside**
+ConjureOS — `conj-pack dev`, or the standalone `dist/recipes.html`.
+
+Two stale things in the app's own comment, worth knowing before you trust it:
+`nutrition.ts:43-50` still says the bridge field is *"additive/future; absent
+today"* (it is present), and its `TODO(backend)` asks for `usda-proxy` to be
+deployed to prod. The bridge half of that TODO is done; **whether the function
+is actually deployed on the prod project is not verifiable from this repo** (the
+source exists here and `supabase-functions.yml` deploys changed functions per
+environment, but the prod project's state is not observable from source). See
+`recipes-open-questions`.
 
 Accuracy is roughly ±25–40% — fine for "should I cook this?", not medical. The
 strip renders `rough` instead of `est.` below 70% ingredient coverage. Results
@@ -653,7 +786,7 @@ repo invokes it in exactly two places**, both calling the library directly:
    `scripts/bundle-app.ts` so local output matches CI output.
 2. **CI**, via the shared composite action
    `ConjureOS/.github/actions/publish-anchor-app` in `source-path` mode, which
-   compiles and runs `scripts/bundle-app.ts` (`action.yml:108`).
+   compiles and runs `scripts/bundle-app.ts` (`action.yml:108-118`).
 
 **One bundler, but not one bundler *version*.** `build-bundle.mjs` exists to
 make local output match CI output, yet a lockfile-honest local install runs pack
@@ -761,7 +894,12 @@ tooling broken"* — labelled `legal` + `blocker`, **open**. Four facts, plainly
 2. **Only about a third of the live corpus was ever rewritten.** The instruction
    rewrite (`e97e085`, `0.5.2`) covered **~1,170 recipes**; the live corpus is
    **~3,170 rows** (`fc3381d` records "bundle 1170 vs prod 3170"). So roughly
-   **2,000 live rows never went through the rewrite**.
+   **2,000 live rows never went through the rewrite**. The strongest recorded
+   evidence is the seed itself: `ConjureOS/DECISIONS_ARCHIVE.md:85` logs
+   *"Catalog seeded into BOTH dev and prod (**1,170 rows each**) 2026-06-21 via
+   the Management API SQL endpoint"* — the only seed anyone wrote down is 1,170
+   rows, against a live corpus of ~3,170. The remaining rows arrived by a path
+   with no record.
 3. **Nothing records which rows are which.** There is no column, migration note,
    or manifest distinguishing rewritten rows from untouched ones. The question
    *"which live recipes still carry verbatim AllRecipes instructions?"* cannot
@@ -1005,7 +1143,10 @@ first-party answer.
 - No `vite.config.ts`, no `vite` dependency, no `.env` / `VITE_*` build-time
   config. Anything environment-specific is resolved at **runtime** from the
   injected bridge env (`usdaProxyUrl`, `recipesApiUrl`) or stamped into the
-  manifest by CI (`remoteActions.recipesDb.url`).
+  manifest by CI (`remoteActions.recipesDb.url`) — **with one live exception**:
+  `src/features/familyLink.ts:28-30` hardcodes both Supabase project refs and
+  maps them to web origins. The principle holds everywhere else; that one file
+  does not honor it (see `recipes-architecture`).
 - Two build outputs (`build` + `build:inline`) collapsed to one:
   `npm run build` → `dist/recipes.html`.
 - The old "ZIP import / `DEFAULT_APPS` embed" deployment story is gone; publish
@@ -1293,7 +1434,18 @@ Recorded so the next person doesn't have to rediscover them.
   has no `json` entry in its `LOADER_MAP`, so `npm ci` and `npm install` can
   produce different bundler behavior from the same commit. Part of #76.
 - **Add `params` + `returns` to `importRecipeFromImage`** so the fifth action is
-  visible to Phase-45 shape matching (`recipes-cross-app-actions`).
+  visible to Phase-45 shape matching. Without a `returns`, `resolveNeed` can
+  never match it (`ConjureOS/src/kernel/connectionMap.ts:197`), and the AI
+  fallback cannot rescue it either (`recipes-cross-app-actions`).
+- **Fix `familyLink.ts`'s hardcoded project refs.** `webBase()`
+  (`src/features/familyLink.ts:28-30`) maps two literal Supabase project refs to
+  web origins and defaults to prod for anything else, so a third or renamed
+  project silently mints invite links pointing at the wrong shell. It is also
+  one of the two features-layer modules reading the host global directly
+  (`recipes-architecture`); a shared `bridge/env.ts` would fix both at once.
+- **Remove or guard the dead `saveWeekPlan()`** (`src/features/planStorage.ts:56`)
+  — the only remaining code path that would write recipe-shaped data to the
+  device.
 
 **Unverified facts, flagged rather than guessed.**
 
@@ -1303,9 +1455,14 @@ Recorded so the next person doesn't have to rediscover them.
   against the databases; the current build/seed scripts never write `summary`.
 - Which app version each App Store actually serves. The store tables were not
   queried; the last release-driven prod publish was `v0.6.1`.
-- Runtime behavior of `dist/recipes.html` was not exercised while writing this
-  (no `node_modules` in the audited checkout). Every build claim here comes from
-  source, not from a run.
+- **Whether `usda-proxy` is deployed on the prod Supabase project.** The
+  function source is in the ConjureOS repo and `supabase-functions.yml` deploys
+  changed functions per environment, and the kernel hands prod installs a prod
+  URL regardless (`sandbox.ts:130`) — but the prod project's actual state is not
+  observable from source, and `nutrition.ts:43-50` still carries an open
+  `TODO(backend)` asking for exactly this. Unsettled here.
+- Runtime behavior of `dist/recipes.html` was not exercised while writing this.
+  Every build claim here comes from source, not from a run.
 
 **Stale docs and comments to fix when touched.**
 
@@ -1334,6 +1491,11 @@ Recorded so the next person doesn't have to rediscover them.
   `src/data/catalog.json` while the code default (line 41) is
   `src/data/catalog.ts`; the comment at `:503` describes the JSON failure mode
   as returning `undefined` (it was the text loader returning a raw string).
+- `src/features/nutrition.ts:43-50` — says the `env.usdaProxyUrl` bridge field
+  is "additive/future; absent today". It is present and injected per
+  environment (`ConjureOS/src/kernel/sandbox.ts:130,1040`). The `TODO(backend)`
+  below it is half-done: the bridge half shipped; the prod-deploy half is
+  unverified from here.
 - `src/bridge/vfs.ts:7` — says the app writes recipes to
   `/home/Documents/Recipes/<slug>.md`; it no longer does.
 - `src/features/favorites.ts:4` — says saved recipes carry their favorite flag
