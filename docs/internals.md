@@ -6,15 +6,21 @@ Working draft for the in-app **ConjureOS Internals** documentation app. Every
 everything after the `---` rule is the `body`. Ids are stable — rename a title
 if you must, never an id.
 
-Verified against `conjureos-app-recipes` at **`0.31.4`** (`package.json:3`,
-`src/version.ts:1`) on 2026-08-21. Where a claim could not be verified from
-source, it says so out loud rather than guessing.
+Verified against `conjureos-app-recipes` source at **`0.31.4`**
+(`package.json:3`, `src/version.ts:1`) on 2026-08-21, and revised after an
+adversarial QA pass. Where a claim could not be verified from source it says so
+out loud rather than guessing — the "not determinable from this repo" notes are
+deliberate, not gaps.
 
-> **Two older docs in this folder are stale.** `docs/how-it-works.md` describes
-> a Vite build, markdown-file recipe storage, and "no user login" — all three
-> were replaced (see `recipes-de-vite-migration`, `recipes-all-in-db-decision`,
-> `recipes-identity-and-roles`). Read this file instead; treat `how-it-works.md`
-> as history until it is rewritten.
+> **`docs/how-it-works.md` is stale** and carries its own warning banner. Its
+> biggest error is architectural: it calls Recipes "a client-only app… there is
+> no server we own", which stopped being true when `recipes-db` shipped. Read
+> this file instead.
+
+> **If you are porting only part of this into the shipped in-app internals
+> doc:** `recipes-catalog-licensing` is a first-party written assessment of a
+> live copyright exposure and carries a "not legal advice" preamble. Ship it or
+> withhold it deliberately — do not let it travel by default with the rest.
 
 ---
 
@@ -29,6 +35,15 @@ Recipes is the first **Phase 12a anchor app**: a first-party ConjureOS app that
 lives in its own repo (`Jonny-B/conjureos-app-recipes`), is built by the *same*
 pipeline a user-published store app goes through, and is installed from the App
 Store like any other app. It is live in **both the dev and prod App Stores**.
+
+**Which version each store carries is not determinable from this repo.** Prod
+publishes fire only on `release: published`
+(`.github/workflows/publish-store.yml:17,124`), and the newest GitHub Release is
+**`v0.6.1`** (2026-06-22) — yet the workflow's own comment records that
+`0.10.0`–`0.31.0` were published **outside** this workflow. So prod carries
+something later than `v0.6.1`, of unrecorded version. Everything below is
+verified against the source at `0.31.4`; do not assume the installed prod build
+behaves identically.
 
 It runs as a sandboxed app inside the ConjureOS shell (desktop/web) and inside
 the `conjureos-mobile` WebView. It has no privileged access: everything it can
@@ -240,7 +255,7 @@ title: The `recipes-db` backend and the minted-token auth path
 
 ---
 
-`supabase/functions/recipes-db/index.ts` (in the **ConjureOS** repo, ~1,380
+`supabase/functions/recipes-db/index.ts` (in the **ConjureOS** repo, 1,376
 lines) is the app's BYO backend. It is deployed with `verify_jwt = false`
 because (a) the minted ConjureOS token is not a Supabase JWT so the gateway
 cannot check it, and (b) the public actions must work with no auth at all. All
@@ -440,9 +455,10 @@ shape matters.
 
 **Provides — five actions**, declared in `package.json` under
 `conjureos.actions` and registered at boot by `registerActions()`
-(`src/bridge/actions.ts:325`). Each carries its own `permission`, a
+(`src/bridge/actions.ts:325`). Each carries its own `permission` and a
 tool-description-grade `description` (this is the orchestrator's *only* routing
-signal), and JSON-Schema `params` + `returns`.
+signal). **Four of the five also carry JSON-Schema `params` + `returns`; one
+does not** — see the gap below.
 
 | Action | Permission | What it does |
 |---|---|---|
@@ -452,6 +468,26 @@ signal), and JSON-Schema `params` + `returns`.
 | `importRecipeFromImage({ images })` | `actions.write` | Transcribe a recipe from up to 6 attached photos and save it — this is "add this recipe to my recipe app" with a photo attached. Runs the same vision transcription as Snap-a-recipe. |
 | `markCooked({ slug })` | `actions.write` | Increment `madeCount`, set `lastMadeAt`. |
 
+**Schema gap — `importRecipeFromImage` is not shape-matchable.** It declares
+only `permission` + `description`; no `params`, no `returns` (verified against
+the `conjureos.actions` block in `package.json`). The reason is ordering: typed
+schemas landed at **`0.9.3`** (`0fa2d8e`, "typed params + returns for all four
+cross-app actions") and were refined at **`0.9.4`** (`203a920`, exact-match
+`returns` for cross-app discovery); `importRecipeFromImage` arrived later, at
+**`0.10.0`** (`ed01bc0`), and never got them.
+
+The consequence is concrete, not cosmetic. `conj-pack`'s validator warns:
+
+> `conjureos.actions.importRecipeFromImage` has no `returns` schema — other apps
+> can't discover this action as a data provider (Phase 45 needs↔provides matches
+> on `returns`).
+
+(`conjureos-pack/src/validate.ts:508`; the same check is an **ERROR**, not a
+warning, for any app that declares a `needs` block or is validated with
+`--strict` — `validate.ts:496`.) So the fifth action is invisible to exactly the
+shape-matching this section credits Recipes with supporting. Treat it as an open
+gap; adding the two schemas is the fix.
+
 Reads never prompt (side-effect-free); writes hit the kernel's one-time grant
 dialog — *Allow once / Always / Block*, **per calling app, per action**. A
 meal planner granted `addRecipe` cannot silently call `markCooked`.
@@ -460,8 +496,8 @@ meal planner granted `addRecipe` cannot silently call `markCooked`.
 handler runs: type checks, length caps (title 80, summary 400, 30 ingredients ×
 80 chars, 30 instructions × 400 chars), ASCII control-character stripping,
 URL-safe slug normalization, numeric range checks, and an image media-type
-allowlist (`image/jpeg|png|webp|gif`, max 6 images) — `src/bridge/actions.ts:60`
-onward. Invalid params reject as `HANDLER_THREW`, which the kernel reports
+allowlist (`image/jpeg|png|webp|gif`, max 6 images) — the caps at
+`src/bridge/actions.ts:59-64`, the validators from `:68` onward. Invalid params reject as `HANDLER_THREW`, which the kernel reports
 cleanly to the caller.
 
 **Shape contract that consumers depend on:** nutrition is stored **per
@@ -474,7 +510,9 @@ Recipes is a Phase-45 *provider*, not a consumer: the self-describing-apps work
 (`needs` + shape-matched connection) was built to kill Conjure Health's
 hardcoding of *Recipes'* action names, so the `needs` live on the consumer side.
 Recipes' contribution to Phase 45 was gaining typed `params`/`returns` on its
-actions (app `0.9.4`) so a consumer can shape-match against it. If you are
+actions — four of them at `0.9.3`, refined at `0.9.4` — so a consumer can
+shape-match against it. The fifth action, added at `0.10.0`, missed that pass
+(see the schema gap above). If you are
 writing developer docs: Recipes is the "how to expose capability" example, not
 the "how to consume one" example.
 
@@ -502,6 +540,13 @@ Saved recipes and week plans are in the DB. What remains on the device, under
 | `Plans/` | Legacy week plans, read once by the VFS→DB migration then left alone. `src/features/planStorage.ts:13` |
 | `.migrated-to-db`, `Plans/.migrated-to-db` | One-shot migration markers. |
 | `.family-invite.json` | Kernel→app handoff for `?joinFamily=<code>` web links. Written by the shell, read and deleted by the app; ignored if older than 10 minutes. `src/App.tsx:96` |
+
+One caveat on "nothing recipe-shaped is written to the device": `planStorage.ts`
+still exports a live `saveWeekPlan()` that writes `<base>.json` plus a
+`<base>-shopping.md` checkbox list into `Plans/` (`src/features/planStorage.ts:56`).
+It is **dead code** — `grep -rn "saveWeekPlan" src/` finds no caller outside the
+module — so the statement holds behaviorally, but the function is still there
+and would reintroduce device writes if anyone wired it up.
 
 **Two one-time migrations** lift pre-existing local data into the DB:
 `migrateLegacyRecipes()` (markdown recipes → rows, `src/features/storage.ts:63`)
@@ -594,12 +639,13 @@ the first `429`.
 ## recipes-build-and-publish
 
 id: `recipes-build-and-publish`
-title: Build and publish: one bundler, three places it runs
+title: Build and publish: one bundler, two entry points in this repo
 
 ---
 
 **The bundler.** `@conjureos/pack`'s `bundle()` (esbuild-wasm + a jspm.io
-importmap, deps externalized rather than inlined) is the single bundler for:
+importmap, deps externalized rather than inlined) is the single bundler. **This
+repo invokes it in exactly two places**, both calling the library directly:
 
 1. `npm run build` locally — `scripts/build-bundle.mjs` walks the repo into a
    FileMap and calls `bundle(files, { projectName: "Recipes" })`, writing
@@ -607,9 +653,23 @@ importmap, deps externalized rather than inlined) is the single bundler for:
    `scripts/bundle-app.ts` so local output matches CI output.
 2. **CI**, via the shared composite action
    `ConjureOS/.github/actions/publish-anchor-app` in `source-path` mode, which
-   compiles and runs `scripts/bundle-app.ts`.
-3. `conj-pack`'s **build-check**, which bundles the app exactly as the shell's
-   importer would (see `recipes-build-check-supersession`).
+   compiles and runs `scripts/bundle-app.ts` (`action.yml:108`).
+
+**One bundler, but not one bundler *version*.** `build-bundle.mjs` exists to
+make local output match CI output, yet a lockfile-honest local install runs pack
+**`0.1.1`** (this repo's `package-lock.json`) while CI installs **`0.2.0`**
+(ConjureOS `scripts/package-lock.json`). Treat "local matches CI" as an
+intention that is currently two minor versions off; the consequences are worked
+through in `recipes-no-json-import`.
+
+There is a **third** path — `conj-pack`'s **build-check**, which bundles an app
+exactly as the shell's importer would and fails the pack on error — but Recipes
+**does not use it**. Build-check runs only inside the `conj-pack` *pack* command
+(`conjureos-pack/src/cli.ts`), and this repo's `scripts` are `dev`, `build`,
+`typecheck`: there is no `pack` step anywhere in its local or CI flow. Same
+bundler, so a bundle-time failure still fails the build in both paths — but the
+CLI's gate is not the path this repo takes. Details in
+`recipes-build-check-supersession`.
 
 `npm run dev` (`conj-pack dev`) is a *different*, faster path: esbuild with
 inlined deps and mocked bridges. Good for iteration, not proof.
@@ -672,121 +732,223 @@ both in the same commit, always.
 ## recipes-catalog-licensing
 
 id: `recipes-catalog-licensing`
-title: DECISION — catalog licensing: partially de-risked, NOT resolved
+title: DECISION — catalog licensing: open, provenance unknown
 
 ---
 
-**Read this before any public or prod-facing decision about the catalog. The
-honest summary is "risk reduced from HIGH to MEDIUM, and the remaining item is
-an open blocker."**
+> **Not legal advice.** No lawyer has reviewed any position in this section. It
+> records what was done to the data and what remains unknown, so the next person
+> can brief counsel accurately — it is not itself a clearance. Whether this
+> section should ship into the user-visible in-app internals doc is a decision
+> to make deliberately, not by default: it is a first-party written assessment
+> of a live copyright exposure.
 
 **Origin.** The catalog was built from a **scraped AllRecipes dataset** — a
-~64 MB `pg_dump` fetched by `scripts/build-catalog.ts` and cached under
+~64 MB Postgres `pg_dump` fetched by `scripts/build-catalog.ts` and cached under
 `scripts/.cache/` (gitignored). It is third-party content we did not license.
 
-**What has been done.**
+### The open blocker: provenance, and broken remediation tooling
 
-1. **Instructions were programmatically rewritten** into original wording
-   (commit `e97e085`, app `0.5.2`, "Reword all catalog instructions into
-   original wording (copyright de-risk)"). Recipe *instruction prose* is the
-   clearly copyrightable expression, so this was the biggest item. The mechanism
-   is `scripts/rewrite-catalog.ts`: it `split`s the catalog into small chunk
-   files, AI agents rewrite each chunk, then `merge` patches `title` (`t`) and
-   `instructions` (`n`) back in by id. **The script itself calls no model** —
-   the rewriting was done by agents over the chunk files.
-2. **Ingredient lists were left untouched, deliberately.** An ingredient list is
-   a statement of fact, not copyrightable expression — *Publications
-   International v. Meredith Corp.*, 88 F.3d 473 (7th Cir. 1996). `tokens`
-   derive from ingredients, so they inherit the same position.
-3. **Attribution retained.** Every row keeps its original `source_url`
-   (`recipes.source_url`), rendered as a "Source" link in the app.
+Tracked as **[Jonny-B/conjureos-app-recipes#48](https://github.com/Jonny-B/conjureos-app-recipes/issues/48)**
+— *"Recipe catalog licensing: provenance unknown for ~2,000 live rows, rewrite
+tooling broken"* — labelled `legal` + `blocker`, **open**. Four facts, plainly:
+
+1. **The catalog is already live in production.** The earlier hold was released
+   **2026-06-21** and the catalog shipped. This stopped being a "before prod
+   publish" question and became a **live-exposure** question. That is not an
+   emergency, but the original framing ("resolve before prod") is no longer
+   accurate and should not lull anyone.
+2. **Only about a third of the live corpus was ever rewritten.** The instruction
+   rewrite (`e97e085`, `0.5.2`) covered **~1,170 recipes**; the live corpus is
+   **~3,170 rows** (`fc3381d` records "bundle 1170 vs prod 3170"). So roughly
+   **2,000 live rows never went through the rewrite**.
+3. **Nothing records which rows are which.** There is no column, migration note,
+   or manifest distinguishing rewritten rows from untouched ones. The question
+   *"which live recipes still carry verbatim AllRecipes instructions?"* cannot
+   currently be answered without deriving it. This **inverts** the issue's
+   original premise: it was written as "instructions are handled, titles and
+   descriptions remain"; the accurate version is *instructions are handled for a
+   subset we can no longer identify, and the rest is unknown.*
+4. **The remediation path is broken.** `src/data/catalog.ts` was **deleted** in
+   `0.30.0` (`fc3381d`), but the three scripts that would do this work —
+   `scripts/rewrite-catalog.ts:30`, `scripts/gen-seed-sql.ts:13`,
+   `scripts/recategorize-catalog.ts:23` — all still
+   `import { CATALOG } from "../src/data/catalog"` and therefore **cannot run as
+   written**. Any rewrite pass has to be re-pointed at `recipes-db` first.
+
+#48's revised scope, in its order (provenance first, because without it every
+later step is guesswork):
+
+- Establish provenance — which live rows were rewritten. Consider a column
+  recording rewrite status so this never becomes unanswerable again.
+- Re-point the rewrite tooling at `recipes-db`.
+- Audit the ~2,000 unrewritten rows for verbatim instructions; rewrite what
+  needs it.
+- Determine **empirically** whether descriptions exist on live rows, rather than
+  assuming either way.
+- Titles: audit for creative/branded phrasing beyond plain dish names.
+- Record the outcome in `DECISIONS.md`, including how provenance is tracked
+  going forward.
+
+### The subordinate item: titles and descriptions
+
+Still unaudited, and now downstream of provenance. Purely descriptive titles
+("Chicken Parmesan") are fine; creative or branded titles ("Grandma's Sunday
+Secret Casserole") and expressive description text are copyrightable.
+
+Two things are known about descriptions, and they do not settle the question:
+the generated record shape is `i,t,c,d,m,s,g,n,u,k,z,a` — **no
+summary/description field** (`scripts/build-catalog.ts:479`) — and
+`gen-seed-sql.ts:59` inserts no `summary` column. So *by that seeding path* rows
+carry no description. Whether the rows actually in the dev/prod databases carry
+summaries or verbatim titles has **never been checked against the live data**.
+Unverified in both directions.
+
+### What has been done
+
+1. **Instructions rewritten for ~1,170 of the ~3,170 live rows; which rows is
+   not recorded.** Commit `e97e085` (app `0.5.2`) — "All 1170 recipe
+   instructions reworded". Recipe *instruction prose* is the clearly
+   copyrightable expression, so this was the largest single item — but see
+   points 2 and 3 above before treating it as coverage. Mechanism:
+   `scripts/rewrite-catalog.ts` `split`s the catalog into chunk files, AI agents
+   rewrite each chunk, then `merge` patches `title` (`t`) and `instructions`
+   (`n`) back in by id. **The script itself calls no model.**
+2. **Ingredient lists left untouched, deliberately.** The position taken is that
+   an ingredient list is a statement of fact rather than copyrightable
+   expression, following *Publications International v. Meredith Corp.*, 88 F.3d
+   473 (7th Cir. 1996). Note what that is: a **single-circuit** holding, applied
+   here by us, **reviewed by no counsel**. `tokens` derive from ingredients and
+   inherit the same position.
+3. **Attribution retained.** Every row keeps its original `source_url`, rendered
+   as a "Source" link in the app.
 4. **Separability built into the schema.** `source = 'catalog'` vs
    `source = 'user'` (migration 086) means catalog rows can be filtered,
    re-seeded, or deleted wholesale without touching a single user recipe.
-5. Some **title normalization** happened in the same pass — the rewrite script's
-   stated intent includes stripping personal names from titles, and `merge`
-   does patch titles.
+5. **Some title normalization** happened in the same pass — `e97e085` also
+   stripped personal names from titles, and `merge` patches titles.
 
-**What is NOT done — the open blocker.**
+### Standing rule — keep this
 
-Tracked as **[Jonny-B/conjureos-app-recipes#48](https://github.com/Jonny-B/conjureos-app-recipes/issues/48)**,
-labelled `legal` + `blocker`, **still open** as of 2026-08-21:
+**Do not describe this catalog as "cleared", "resolved", "safe", or "de-risked"
+in any document, commit message, release note, or in-app text until the
+provenance question is actually answered.** Partial remediation described as
+complete is worse than no remediation, because it stops anyone from looking
+again.
 
-> Recipe **titles** and **descriptions** may still be verbatim from AllRecipes.
-> Purely descriptive titles ("Chicken Parmesan") are fine, but creative titles
-> ("Grandma's Sunday Secret Casserole") and expressive description text are
-> copyrightable.
+The accurate phrasing, when you need one: *instructions rewritten for ~1,170 of
+~3,170 live rows, with no record of which; ingredient lists left in place on a
+not-copyrightable position no lawyer has reviewed; titles and descriptions
+unaudited; remediation tooling non-functional; #48 open.*
 
-Its remaining checklist — audit titles, programmatically rewrite/normalize the
-creative ones, rewrite or drop descriptions, rebuild, smoke-test — is **entirely
-unchecked**. The issue's own assessment: *"Risk level: reduced from HIGH to
-**MEDIUM**… should be cleaned up before prod."*
+### Licensing of the app itself (a different question)
 
-**Facts that complicate the picture — do not paper over these.**
+The **app code** is MIT (`LICENSE`). The ConjureOS licensing policy
+(`ConjureOS/DECISIONS_ARCHIVE.md:1095`) makes PolyForm Noncommercial 1.0.0 the
+default for anchor apps, **with a standing exception that keeps Recipes MIT**:
+apps that are deliberately teaching/template tier — "recipes today fits" — stay
+MIT, because the point of those is community members learning to build the
+pattern. So no relicense is pending for this app.
 
-- **The catalog is already live in the prod store.** The 2026-06-21 decision
-  entry records that the owner cleared the reworded catalog for prod use,
-  releasing an earlier "hold for licensing review" gate, and ~1,170 rows were
-  seeded into **both** dev and prod. So #48 is not a pre-launch gate any more;
-  it is an open legal item against something already shipped.
-- **The live catalog is larger than what was rewritten.** Commit `fc3381d`
-  records prod at **~3,170** rows against a bundled/rewritten set of **1,170**.
-  Where the extra ~2,000 rows came from, and whether they went through the same
-  instruction-rewrite pass, is **not recorded anywhere in this repo**. Treat
-  their provenance as unverified.
-- **The current build pipeline emits no description field at all.** The
-  generated record shape is `i,t,c,d,m,s,g,n,u,k,z,a` — no summary/description
-  (`scripts/build-catalog.ts:479`) — and `gen-seed-sql.ts` inserts no `summary`
-  column. So *by that path* catalog rows carry no description. Whether the rows
-  actually in the dev/prod databases carry summaries (or verbatim titles) has
-  **not been checked against the live data**; #48 assumes they may.
-- **The rewrite tooling is currently unrunnable.** `rewrite-catalog.ts`,
-  `gen-seed-sql.ts`, and `recategorize-catalog.ts` all import
-  `../src/data/catalog`, which was deleted in `0.30.0`. Any work on #48 has to
-  regenerate that module first.
-
-**Standing rules.**
-
-- The catalog is regenerable and swappable by design; each row keeps its source
-  URL; catalog and user content are separable by one column.
-- The app itself is MIT (`LICENSE`); the ConjureOS licensing policy
-  (2026-05-xx) contemplates moving anchor apps to PolyForm Noncommercial once
-  fleshed out. **Neither license says anything about the catalog data**, which
-  is third-party content shipped alongside — a distinct question.
-- Do not describe the catalog as "licensing-cleared", "de-risked", or "resolved"
-  anywhere. The accurate phrasing is: *instructions rewritten; ingredient lists
-  not copyrightable; titles and descriptions unaudited; issue #48 open.*
+Neither license says anything about the **catalog data**, which is third-party
+content shipped alongside the code. Do not let one stand in for the other.
 
 ---
 
 ## recipes-no-json-import
 
 id: `recipes-no-json-import`
-title: DECISION — never `import` a `.json` file in a ConjureOS app
+title: DECISION — the `.json` import trap: fixed upstream, not in this lockfile
 
 ---
 
-**The rule: bundled data ships as a `.ts` module that `export`s a constant.
-Never `import data from "./data.json"`.**
+**Status first, in two halves, because they point opposite ways.** The
+*platform* fixed this: `@conjureos/pack@0.1.2` (commit `749b7a5`, 2026-06-20)
+added the missing loader, with a committed regression test. But **this repo's
+lockfile still installs the pre-fix bundler** (`0.1.1`), so as a matter of what
+is on disk here, the bug is not behind us — see the exposure table below.
 
-**The failure mode, precisely.** The store bundler's loader map covers
-`tsx / ts / jsx / js / css` plus image and font types — but **not** `.json`. The
-esbuild dev server behind `conj-pack dev` *does* handle JSON. So a JSON import:
+So `CLAUDE.md` and `README.md` are wrong in a subtler way than "stale": they
+describe the wrong *mechanism* (they say `undefined`; it was the text loader
+returning a raw string) while the *constraint* they warn about happens to still
+hold for this checkout, for a different reason than they give. Fix both halves —
+correct the note **and** bump the dependency — or the next reader inherits a
+right-for-the-wrong-reason rule.
 
-- works perfectly in `npm run dev`;
-- bundles **without an error** in the store build;
-- and hands back **`undefined`** at runtime.
+**What actually went wrong** — quoting the fix commit, because the mechanism
+matters and the repo's own comments describe it incorrectly:
 
-There is no compile error and no bundle warning. The app boots and then crashes
-(or silently renders nothing) the first time it touches the imported value — in
-Recipes' case `getCatalog()` returning `undefined`, i.e. an empty app, only for
-users who installed from the store.
+> The VFS loader map (and the esbuild loader config) covered ts/tsx/js/jsx/css
+> and image/font types but omitted `.json`, so a `.json` import fell back to the
+> **"text" loader**: the default export was the raw JSON **string** and there
+> were no named exports. Native esbuild (`conj-pack dev`) uses its built-in json
+> loader, so an anchor app that imported data from a `.json` file built clean in
+> dev but crashed on import (the recipes app's catalog: `getCatalog` read `.r`
+> off a string).
 
-That asymmetry is the whole reason this is a written rule rather than a
-footnote: it is invisible in every place a developer normally looks.
+Two corrections to the version of this story that circulates in the repo:
 
-**The fix, as shipped.** `scripts/build-catalog.ts` emits a TypeScript module,
-not JSON, and says why inline (`scripts/build-catalog.ts:503`):
+- It was **not** `undefined`. A default import got the file's raw text; property
+  access then read `undefined` *off a string*, which is what surfaced as the
+  crash. `CLAUDE.md`, `README.md:58`, and the comment at
+  `scripts/build-catalog.ts:503` all say "hands back `undefined`" — wrong
+  mechanism, right symptom.
+- It did **not** always bundle silently. A *named* import (`import data, { x }
+  from "./d.json"`) had no matching export, so `bundle()` **rejected** — the
+  regression test at `conjureos-pack/src/bundle/__tests__/json-import.test.ts`
+  is written around exactly that. The silent path was the default-import case.
+
+**Why it was invisible in dev:** `conj-pack dev` runs native esbuild, whose
+built-in JSON loader has always worked. The divergence was between the dev
+server and the store bundler — the same class of gap the build-check work later
+closed (`recipes-build-check-supersession`).
+
+**The fix, and why it holds.** `json: "json"` was added to both the VFS plugin
+loader map and the esbuild loader config, so the store build parses `.json`
+exactly like the dev server. The regression test guards the return.
+
+**Is this repo exposed? Yes — and the answer depends on which install command
+you ran, which is worse than a simple stale pin.** The caret range is not what
+decides this; **the lockfile is.**
+
+| Where | What resolves pack | Version | Has the fix? |
+|---|---|---|---|
+| This repo, `npm ci` (and any lockfile-honest install) | `package-lock.json` | **`0.1.1`** | ❌ |
+| This repo, `npm install` | free to float within `^0.1.1` | up to `0.1.5` | ✅ (and silently rewrites the lockfile) |
+| CI publish job | ConjureOS `scripts/package-lock.json` | **`0.2.0`** | ✅ |
+
+`package.json` declares `"@conjureos/pack": "^0.1.1"`, but
+`package-lock.json` resolves **`0.1.1` exactly** — the release *before* the fix.
+This is not theoretical: the copy currently in this checkout's `node_modules` is
+`0.1.1`, and its `dist/bundle/core/vfs-plugin.js` has **no `json` entry** in
+`LOADER_MAP`, so a `.json` import still falls through the
+`LOADER_MAP[ext] ?? "text"` default. The buggy bundler is physically present.
+
+**Why that is more dangerous than a stale pin.** Two developers on the same
+commit get *different bundler behavior* depending on whether they ran `npm ci`
+or `npm install`, and a floating `npm install` rewrites the lockfile as a side
+effect — so the fix can appear, disappear, and reappear across machines with no
+source change to blame. An intermittent, environment-dependent bundler bug gets
+attributed to whatever was edited last. That is the failure mode to fear here,
+not the original crash.
+
+**A second divergence falls out of the same table.** `scripts/build-bundle.mjs`
+exists to make local output match CI output — its header says it "mirrors
+ConjureOS `scripts/bundle-app.ts` so local output matches CI output". But a
+lockfile-honest local build runs pack **`0.1.1`** while CI runs **`0.2.0`**:
+different minor lines of the very bundler the local build exists to rehearse.
+The gap is small today (Recipes imports no `.json`, so this specific bug cannot
+fire for this app), but "local mirrors CI" is currently untrue by two minor
+versions.
+
+**The fix is one line and one command:** bump the `devDependencies` range to
+match ConjureOS's publish CLI (`^0.2.0`) and refresh the lockfile, so `npm ci`,
+`npm install`, and CI all land on the same bundler. Tracked on #76.
+
+**What survives as guidance.** Recipes ships data as a TS module for historical
+reasons, and there is still a small reason to prefer it — the generated module
+carries a broad `as {...}` cast that stops `tsc` from deep-inferring a
+~1,000-record object literal, which is slow:
 
 ```ts
 // AUTO-GENERATED by scripts/build-catalog.ts. Do not edit by hand.
@@ -795,14 +957,22 @@ export const CATALOG = { /* … */ } as {
 };
 ```
 
-The broad `as {...}` cast is not cosmetic — it stops `tsc` from deep-inferring a
-~1,000-record object literal, which is slow.
+Recipes has no bundled data module at all any more (the catalog moved
+server-side in `0.30.0`), so no live code path here can trip the bug even on
+`0.1.1`.
 
-**Is the caveat still live?** Yes as a bundler fact, but Recipes no longer has a
-bundled data module at all (the catalog moved server-side in `0.30.0`), so the
-app is not currently exposed to it. Keep the rule for the next app that wants to
-ship data; issue #76 flags re-confirming it before trimming the note from
-`CLAUDE.md`.
+The durable lesson is not "never import JSON". It is three things: **never
+assume a dev-server behavior holds in the store bundler**; **keep
+`@conjureos/pack` current — and check the lockfile, not the caret range, when
+you want to know what you are actually running**; and **keep local and CI on the
+same bundler version**, which this repo currently does not.
+
+**Answering #76's checklist item** ("the `.json` import caveat may still be
+live; confirm before trimming"): confirmed, with a correction — do **not** just
+trim it. The upstream bug is fixed, so the note should be rewritten as history;
+but the dependency bump has to land in the same change, because until it does,
+trimming the note would remove a warning about a bundler this repo still
+installs.
 
 ---
 
@@ -887,9 +1057,27 @@ or emits an error-level message. From its own header:
 > FileMap, so a real build error surfaces to the dev BEFORE they ship, not to
 > the user at import.
 
-The CLI runs it as a step of packing and returns exit code **1** with
-`✖ build-check failed — this app would NOT import cleanly into ConjureOS`
-(`src/cli.ts:226-242`). So the gate is now **`conj-pack` exiting 0**.
+The CLI runs it as a step of the **pack** command and returns exit code **1**
+with `✖ build-check failed — this app would NOT import cleanly into ConjureOS`
+(`conjureos-pack/src/cli.ts:226-242` on the pinned `0.1.x` line; `340-358` on
+`0.2.0`). For apps that pack with the CLI, the gate is now **`conj-pack`
+exiting 0**.
+
+**But be precise about Recipes specifically: this repo never runs build-check.**
+It runs only inside the `conj-pack` pack command — not `conj-pack dev`, and not
+the library `bundle()` entry point. Recipes' `package.json` `scripts` are `dev`,
+`build`, `typecheck`; `npm run build` calls `bundle()` directly through
+`scripts/build-bundle.mjs`, and CI calls `bundle-app.ts` directly through the
+composite action. Neither goes through the CLI, so neither runs the check.
+
+That is a **more precise story than #76 currently tells**, and it does not
+weaken the conclusion — it relocates it. All three paths drive the *same*
+bundler, so an import-breaking bundle error fails `npm run build` locally and
+fails the publish job in CI regardless. What "build-check is the gate" means for
+Recipes is therefore: *a clean `npm run build` and a green publish job already
+prove what the manual browser load was invented to prove.* The manual load was
+never testing the bundler — it was the only way to reach it before the tooling
+made that reachable everywhere.
 
 **The corrected story, in full — including the parts that are still true.**
 
@@ -903,15 +1091,21 @@ The CLI runs it as a step of packing and returns exit code **1** with
   with a warning when jspm.io is unreachable — that is "couldn't verify", not
   "would not import", so a green pack after a jspm outage proves less than
   usual.
-- **Recipes' own `npm run build` is not build-check.** `scripts/build-bundle.mjs`
-  calls `bundle()` directly, and CI runs `bundle-app.ts` directly — neither goes
-  through `conj-pack`. They exercise the same bundler, so a bundle-time failure
-  still fails the publish job; they just aren't the CLI's checked path.
-- **Version skew is real and open.** `CLAUDE.md` and this repo's
-  `devDependencies` pin `@conjureos/pack@^0.1.1`; ConjureOS's publish CLI
-  (`scripts/package.json`) pins `^0.2.0`. Local and CI can therefore diverge —
-  exactly what the "keep the pin aligned" note was written to prevent. Fixing
-  the pin is on #76's checklist.
+- **Don't say "conj-pack passes" about this repo.** The accurate sentence for
+  Recipes is "`npm run build` succeeds and the CI publish job is green" — same
+  bundler, same guarantee, different entry point. The `conj-pack`-exits-0
+  phrasing is right for apps that pack with the CLI (and for the third-party
+  docs), wrong as a description of Recipes' own flow.
+- **Version skew is real, open, and currently produces divergent behavior.**
+  This repo's `package-lock.json` resolves `@conjureos/pack` to **`0.1.1`**
+  (the declared range is `^0.1.1`, but the lockfile is what installs);
+  ConjureOS's publish CLI locks **`0.2.0`**. So a lockfile-honest local build
+  and a CI build run *different minor versions of the same bundler*, and a
+  local `npm install` can float to `0.1.5` and change the answer again — which
+  means the environment, not the source, decides. `0.1.1` predates the `.json`
+  loader fix, so the difference is behavioral, not just cosmetic
+  (`recipes-no-json-import` has the full table). Fixing the pin **and** the
+  lockfile is on #76's checklist.
 
 **Why this matters beyond tidiness:** the same story is going into third-party
 developer docs, where the message must be *"if `conj-pack` passes, it imports."*
@@ -985,7 +1179,9 @@ Shape, and the reasoning behind each choice
   It is a per-row, owner-set value — there is no aggregation across users to
   model, so a join table would be pure overhead.
 - **`NULL` means "not rated yet"**, deliberately distinct from a 0 rating, which
-  the check constraint forbids: `rating is null or (rating between 1 and 5)`.
+  the check constraint forbids. The literal SQL
+  (`supabase/migrations/087_recipes_rating.sql`) is
+  `check (rating is null or (rating >= 1 and rating <= 5))`.
 - **Written through `recipes-db`'s `setRating` action** as the service role,
   scoped `.eq("creator_id", userId)` so a caller can only rate their own row
   (`supabase/functions/recipes-db/index.ts:1259`). `null` clears a rating;
@@ -1076,33 +1272,74 @@ Recorded so the next person doesn't have to rediscover them.
 
 **Open issues.**
 
-- **#48 — catalog titles/descriptions (`legal`, `blocker`, open).** The gate for
-  calling the catalog licensing-clean. See `recipes-catalog-licensing`.
-- **#76 — `CLAUDE.md`'s manual build gate (`docs`, `dx`, open).** Includes
-  re-checking the `.json` caveat and fixing the `@conjureos/pack` pin skew
-  (`^0.1.1` here vs `^0.2.0` in ConjureOS's publish CLI). See
-  `recipes-build-check-supersession`.
+- **#48 — "Recipe catalog licensing: provenance unknown for ~2,000 live rows,
+  rewrite tooling broken"** (`legal`, `blocker`, open). The scope was revised
+  2026-08-21: provenance of the ~2,000 unrewritten live rows comes **first**,
+  then re-pointing the dead rewrite tooling at `recipes-db`; titles and
+  descriptions are subordinate to both. See `recipes-catalog-licensing`.
+- **#76 — `CLAUDE.md`'s manual build gate** (`docs`, `dx`, open). Its checklist
+  also covers the `@conjureos/pack` pin skew and asks whether the `.json`
+  caveat is still live. The honest answer is **"fixed upstream, but not in this
+  repo's lockfile"**: `@conjureos/pack@0.1.2` (`749b7a5`) fixed it, yet
+  `package-lock.json` here still resolves **`0.1.1`** while CI runs `0.2.0`. So
+  the doc note should be rewritten as history *and* the dependency bumped — one
+  without the other leaves a bundler that still has the bug. See
+  `recipes-no-json-import`.
+
+**Actionable, verified, and not yet done.**
+
+- **Bump `@conjureos/pack` and refresh `package-lock.json`.** Declared `^0.1.1`,
+  **locked at `0.1.1`**, CI on `0.2.0`. The installed `0.1.1` in this checkout
+  has no `json` entry in its `LOADER_MAP`, so `npm ci` and `npm install` can
+  produce different bundler behavior from the same commit. Part of #76.
+- **Add `params` + `returns` to `importRecipeFromImage`** so the fifth action is
+  visible to Phase-45 shape matching (`recipes-cross-app-actions`).
 
 **Unverified facts, flagged rather than guessed.**
 
-- The provenance of the live catalog rows beyond the 1,170 that were rewritten
-  and seeded (prod was ~3,170 at `0.30.0`) is not recorded anywhere in this
-  repo.
-- Whether live catalog rows carry `summary` text is unchecked; the current
-  build/seed scripts never write that column.
+- Which live catalog rows were instruction-rewritten and which were not. ~1,170
+  of ~3,170 were; nothing records which. This is #48's item one.
+- Whether live catalog rows carry `summary` text or verbatim titles. Unchecked
+  against the databases; the current build/seed scripts never write `summary`.
+- Which app version each App Store actually serves. The store tables were not
+  queried; the last release-driven prod publish was `v0.6.1`.
+- Runtime behavior of `dist/recipes.html` was not exercised while writing this
+  (no `node_modules` in the audited checkout). Every build claim here comes from
+  source, not from a run.
 
 **Stale docs and comments to fix when touched.**
 
 - `docs/how-it-works.md` — describes Vite (`build` + `build:inline`), markdown
-  recipe files, ZIP-import deployment, `VITE_USDA_API_KEY`, and "no user login".
-  All four are wrong now.
-- `CLAUDE.md` — the publish gate (#76) and the pack pin.
-- `README.md` — still describes the bundled catalog as an "instant, offline
-  fallback"; it was deleted in `0.30.0`.
-- `src/bridge/vfs.ts:7` — comment says the app writes recipes to
+  recipe files, ZIP-import deployment, `VITE_USDA_API_KEY`, "no user login",
+  and — the largest reversal — "**a client-only app… there is no server we
+  own**" (`:39-41`, `:107-108`). All wrong now: `recipes-db` is 1,376 lines of
+  backend we operate, plus `usda-proxy`, a Realtime WebSocket, and service-role
+  image upload.
+- `CLAUDE.md` — the manual publish gate (#76), the pack pin (declared `^0.1.1`,
+  locked at `0.1.1`, CI on `0.2.0`), and the `.json` rule, which states the
+  wrong mechanism and is fixed upstream but **not** in this repo's lockfile.
+  Rewrite the note and bump the dependency together.
+- `README.md:22` — still calls the bundled catalog an "instant, offline
+  fallback"; it was deleted in `0.30.0`. `README.md:58` — repeats the `.json`
+  caveat, describes the wrong failure mode ("hands back `undefined`" — it was
+  the text loader handing back a raw string), and points at the deleted
+  `src/data/catalog.ts`.
+- `package.json` — `addRecipe`'s `returns` still documents `path` as "VFS path
+  the recipe was saved to"; the actual value is `db:<uuid>`
+  (`src/bridge/recipesApi.ts:131`). Manifest text is what third-party consumers
+  read, so this one is more than cosmetic.
+- `package.json` — `importRecipeFromImage` has no `params`/`returns`; see
+  `recipes-cross-app-actions`.
+- `scripts/build-catalog.ts` — header lines 5 and 10 still say
+  `src/data/catalog.json` while the code default (line 41) is
+  `src/data/catalog.ts`; the comment at `:503` describes the JSON failure mode
+  as returning `undefined` (it was the text loader returning a raw string).
+- `src/bridge/vfs.ts:7` — says the app writes recipes to
   `/home/Documents/Recipes/<slug>.md`; it no longer does.
-- `src/features/favorites.ts:4` — comment says saved recipes carry their
-  favorite flag "in their own markdown frontmatter"; it is a DB column.
+- `src/features/favorites.ts:4` — says saved recipes carry their favorite flag
+  "in their own markdown frontmatter"; it is a DB column.
+- `src/features/planStorage.ts:56` — `saveWeekPlan()` is dead code that still
+  writes plan files to the device.
 - `scripts/rewrite-catalog.ts`, `scripts/gen-seed-sql.ts`,
   `scripts/recategorize-catalog.ts` — all import the deleted
-  `src/data/catalog`, so they cannot run as-is.
+  `src/data/catalog`, so none can run. This is #48's blocker, not a nit.

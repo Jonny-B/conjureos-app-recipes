@@ -18,8 +18,8 @@ exist. Put it here.
 
 | Doc | What it covers |
 |---|---|
-| **[internals.md](./internals.md)** | **The current keystone.** The whole system as it is today — architecture, screens, the `recipes` data model and `recipes-db` backend, the catalog pipeline, every `ai.complete()` call, cross-app actions, build/publish — plus the decision layer (catalog licensing, the no-JSON-import rule, the de-Vite migration, the build-check supersession, all-in-DB, ratings). Written as discrete `{ id, title, body }` sections for porting into the in-app "ConjureOS Internals" app. |
-| [how-it-works.md](./how-it-works.md) | ⚠️ **Stale — history only.** The original keystone. Predates the de-Vite migration, the all-in-DB move, and per-user identity: it still describes a Vite build, markdown recipe files, ZIP-import deployment, and "no user login". Read `internals.md` instead. |
+| **[internals.md](./internals.md)** | **The current keystone.** The whole system as it is today — architecture, screens, the `recipes` data model and `recipes-db` backend, the catalog pipeline, every `ai.complete()` call, cross-app actions, build/publish — plus the decision layer (catalog licensing and its open provenance blocker, the `.json` import trap (fixed upstream, still live in this repo's lockfile), the de-Vite migration, the build-check supersession, all-in-DB, ratings). Written as discrete `{ id, title, body }` sections for porting into the in-app "ConjureOS Internals" app. |
+| [how-it-works.md](./how-it-works.md) | ⚠️ **Largely stale — read for history, verify before use.** The original keystone. Its architecture chapters are now wrong in the largest possible way (it says the app is client-only with no server we operate; `recipes-db` says otherwise), along with Vite, markdown recipe files, the bundled catalog, ZIP-import deployment, and "no user login". Its layer rule, mock convention, and PR hygiene sections do still hold — and are restated current in `internals.md`. |
 
 > `internals.md` is the one you read first and the one every other doc is
 > measured against. New docs narrow in on a single topic; they do not restate

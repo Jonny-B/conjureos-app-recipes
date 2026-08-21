@@ -1,14 +1,26 @@
 # How It Works — the keystone doc
 
-> ⚠️ **STALE — kept for history.** This doc predates three shipped changes and is
-> wrong in ways that matter: the app no longer uses **Vite** (it builds through
-> `@conjureos/pack`'s `bundle()`; see `internals.md` → `recipes-de-vite-migration`),
-> saved recipes are **no longer markdown files** (they are rows in the `recipes`
-> table; see `recipes-all-in-db-decision`), the catalog is **no longer bundled**,
-> and the app now has **per-user identity and roles** via a minted token (see
-> `recipes-identity-and-roles`). `VITE_USDA_API_KEY` and the ZIP-import /
-> `DEFAULT_APPS` deployment story are both gone.
-> **Read [internals.md](./internals.md) instead.**
+> ⚠️ **STALE — kept for history. Assume nothing in this file is current; verify
+> every claim against [internals.md](./internals.md) before acting on it.**
+>
+> The largest reversal is architectural: this doc says *"It is a **client-only
+> app**. There is no server we own"* (`§1`) and *"There is no backend server in
+> this repository and none that we operate"* (`§3`). Both are false now —
+> `recipes-db` is a 1,376-line Supabase Edge Function we operate, alongside
+> `usda-proxy`, a Realtime WebSocket connection, and service-role image upload
+> into a public bucket.
+>
+> Also wrong, non-exhaustively: the **Vite** build and its `build` /
+> `build:inline` modes (the app builds through `@conjureos/pack`'s `bundle()`);
+> saved recipes as **markdown files** (they are rows in the `recipes` table);
+> the bundled **catalog** (deleted in `0.30.0`); **"no user login"** (there is
+> per-user identity, roles, and a minted-token backend); `VITE_USDA_API_KEY`
+> (resolved at runtime now); and **ZIP import / `DEFAULT_APPS`** deployment
+> (publish is CI-only).
+>
+> A few things here did survive and are still worth reading — the one-way layer
+> rule (§2), the "every bridge ships a mock" convention (§5), and the PR
+> hygiene in §7 — but they are restated, current, in `internals.md`.
 
 This is the end-to-end explanation of the Recipes app: what it does, how it's
 structured, why those structures exist, and the rules we follow to change and
