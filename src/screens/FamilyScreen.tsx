@@ -35,7 +35,7 @@ export function FamilyScreen({
   const atLimit = families.length >= FAMILY_LIMIT;
 
   return (
-    <div className="browse-screen">
+    <div className="browse-screen form-screen">
       <div className="detail-actions">
         <button className="btn ghost" onClick={onBack}>
           <Icon name="chevron-down" className="back-caret" /> Plans

@@ -86,7 +86,7 @@ export function StoreEditor({ onBack }: { onBack: () => void }) {
   const setDefault = () => commit({ ...state, defaultId: store.id });
 
   return (
-    <div className="browse-screen">
+    <div className="browse-screen form-screen">
       <div className="detail-actions">
         <button className="btn ghost" onClick={onBack}>
           <Icon name="chevron-down" className="back-caret" /> Plans

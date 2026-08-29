@@ -1593,6 +1593,133 @@ select {
   }
 }
 
+/* ── Desktop layout ───────────────────────────────────────────────────
+ * Recipes has TWO layouts, not one. 0.12.0 aligned the app to Conjure
+ * Health's native look — bottom tab bar, `.app` capped at 560px — and
+ * applied it at every width, so a 1440px browser window rendered a phone:
+ * a 560px column using 39% of the screen with ~880px of dead space either
+ * side. That is the regression this block undoes, without giving up the
+ * native feel where it belongs.
+ *
+ * Desktop is: a left nav rail instead of a bottom tab bar, no width cap,
+ * and lists that use the width they're given.
+ *
+ * The query needs BOTH conditions. Width alone is not enough — a phone
+ * held sideways is 932px wide, and it should still get the app layout —
+ * so `pointer: fine` is what actually separates "mouse" from "thumb".
+ * 860px clears the common case of an app window opening at ~62% of a
+ * 1440px screen (~893px), so a maximised laptop window gets the desktop
+ * layout rather than sitting just under the line.
+ *
+ * Because the query measures the APP's own viewport (the iframe), a
+ * deliberately narrow ConjureOS window keeps the compact layout and
+ * widening it flips to this one, which is the behaviour you'd want. */
+@media (min-width: 860px) and (pointer: fine) {
+  .app {
+    /* The rail spans all three rows; the content column carries its own
+       header, body and footer. */
+    max-width: 1600px;
+    display: grid;
+    grid-template-columns: 232px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "rail top"
+      "rail body"
+      "rail ver";
+  }
+
+  .topbar { grid-area: top; }
+  .app-body { grid-area: body; padding: 32px 40px 40px; }
+  .app-version { grid-area: ver; text-align: right; padding: 6px 40px 10px; }
+
+  /* Bottom tab bar → left rail. */
+  .tabbar {
+    grid-area: rail;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 2px;
+    padding: 14px 12px;
+    border-top: none;
+    border-right: 1px solid var(--cui-border);
+    background: color-mix(in srgb, var(--bg-1) 55%, transparent);
+    overflow-y: auto;
+  }
+
+  .tab {
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 11px 14px;
+    border-radius: 12px;
+    font-size: 14px;
+    text-align: left;
+    transition: color var(--cui-duration) var(--cui-ease),
+                background var(--cui-duration) var(--cui-ease);
+  }
+
+  .tab:hover { background: var(--cui-accent-mute); }
+
+  /* The active tab reads as a filled row, so the top-edge indicator the
+     bottom bar used has nothing left to point at. */
+  .tab.active {
+    background: var(--cui-accent-mute);
+    color: var(--cui-fg);
+  }
+  .tab.active::before {
+    top: 50%;
+    left: 0;
+    width: 3px;
+    height: 20px;
+    border-radius: 0 3px 3px 0;
+    transform: translateY(-50%);
+  }
+  .tab.active .tab-icon { transform: none; }
+  .tab-icon .fa-icon { width: 17px; height: 17px; }
+
+  /* Content can breathe. `.browse-screen` and `.home-screen` keep a
+     comfortable measure for reading, but a wider one than the phone's. */
+  .browse-screen,
+  .home-screen { max-width: 1120px; }
+
+  /* A recipe list on a wide screen should be a grid, not a 1120px-wide
+     single column of short rows. Only TOP-LEVEL lists become grids —
+     `.browse-list` nested in a `.home-section` (this week's meals,
+     previous plans) stays a column, where a stack still reads better. */
+  .browse-screen > .browse-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    align-items: start;
+    gap: 14px;
+  }
+
+  /* Controls should NOT inherit the content width the way lists do. A
+     three-item segmented switch stretched across 1120px, or a search field
+     that wide, is the giveaway that a phone layout was merely unclamped
+     rather than laid out for a screen. */
+  .seg,
+  .plans-tabs-row .seg { max-width: 460px; }
+  .lib-header { max-width: 640px; }
+  .add-ing-form { max-width: 560px; }
+
+  /* Settings-shaped screens (Family, Grocery stores) are forms, not browse
+     views — they want a column you can read down, not the full width. An
+     aisle name is "7" or "Oils & Baking"; a 1000px input for it looks
+     unfinished. */
+  .browse-screen.form-screen { max-width: 780px; }
+  .aisle-name { max-width: 420px; }
+  .fam-invite { max-width: 620px; }
+}
+
+/* Above ~1500px the two-column recipe grid leaves rows uncomfortably long;
+   let it find a third column instead of stretching. */
+@media (min-width: 1500px) and (pointer: fine) {
+  .browse-screen,
+  .home-screen { max-width: 1360px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   body::before,
