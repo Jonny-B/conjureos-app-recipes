@@ -255,6 +255,8 @@ export async function planWeekRemote(args: {
   excludeIds?: string[];
   favoriteIds?: string[];
   pinnedId?: string;
+  /** Picks to hold onto — the server fills only the remaining slots. */
+  pinnedIds?: string[];
 }): Promise<{ recipes: CatalogRecipe[]; warnings: string[]; shortfall: number }> {
   const r = await invokeRaw<{ recipes?: DbRecipe[]; warnings?: string[]; shortfall?: number }>(
     "planWeek",
