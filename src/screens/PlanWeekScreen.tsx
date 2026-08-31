@@ -43,6 +43,8 @@ function uniq(a: string[]): string[] {
 export function PlanWeekScreen({
   pantry,
   catalogVersion = 0,
+  families = [],
+  defaultFamilyId = null,
   onDone,
   onPersist,
 }: {
@@ -50,13 +52,20 @@ export function PlanWeekScreen({
   /** Bumped by App when the catalog reloads from the DB, so the memo re-runs. */
   catalogVersion?: number;
   /**
+   * The families this plan could be shared with. Empty (the solo case) hides
+   * the destination picker entirely — there is nothing to choose between.
+   */
+  families?: { id: string; name: string }[];
+  /** Pre-selected destination; null = personal. */
+  defaultFamilyId?: string | null;
+  /**
    * Called to leave the wizard — after a plan is saved, or when the user backs
    * out. When present (launched from the Plans landing), the shell shows a
    * "Plans" back bar and returns there on save. Absent = standalone wizard.
    */
   onDone?: () => void;
   /** Persist the finished plan (DB, via the Plans landing). Required in-app. */
-  onPersist: (plan: WeekPlan) => Promise<void>;
+  onPersist: (plan: WeekPlan, familyId: string | null) => Promise<void>;
 }) {
   const [step, setStep] = useState<Step>("mood");
   const [moodMode, setMoodMode] = useState<MoodMode>("ingredients");
@@ -87,6 +96,9 @@ export function PlanWeekScreen({
   const [planning, setPlanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedPath, setSavedPath] = useState<string | null>(null);
+  // Who this plan is for. "my" = personal; anything else is a family id. Held
+  // as a string so it maps straight onto the radio group's values.
+  const [destination, setDestination] = useState<string>(defaultFamilyId ?? "my");
 
   useEffect(() => {
     Promise.all([listSavedRecipes(), loadFavorites(), loadBlocked()]).then(([s, f, b]) => {
@@ -279,7 +291,7 @@ export function PlanWeekScreen({
     if (!plan) return;
     setBusy("saving");
     try {
-      await onPersist(plan);
+      await onPersist(plan, destination === "my" ? null : destination);
       setSavedPath("saved");
       // Launched from the Plans landing: return there so the just-saved plan
       // shows as the most-recent. A brief beat lets the "Saved" state flash.
@@ -386,6 +398,9 @@ export function PlanWeekScreen({
       {step === "shopping" && plan && (
         <ShoppingStep
           plan={plan}
+          families={families}
+          destination={destination}
+          setDestination={setDestination}
           saving={busy === "saving"}
           savedPath={savedPath}
           onBack={() => setStep("review")}
@@ -719,12 +734,18 @@ function ReviewStep({
 
 function ShoppingStep({
   plan,
+  families,
+  destination,
+  setDestination,
   saving,
   savedPath,
   onBack,
   onSave,
 }: {
   plan: WeekPlan;
+  families: { id: string; name: string }[];
+  destination: string;
+  setDestination: (d: string) => void;
   saving: boolean;
   savedPath: string | null;
   onBack: () => void;
@@ -772,13 +793,51 @@ function ShoppingStep({
         ))
       )}
 
+      {/* Who gets this plan is asked HERE, once, at the moment of saving —
+          never inferred from which tab happened to be open behind the wizard.
+          Skipped entirely when the user is in no families: nothing to choose. */}
+      {families.length > 0 && (
+        <div className="ing-group">
+          <div className="ing-group-label">Save to</div>
+          <div className="seg" role="radiogroup" aria-label="Who this plan is for">
+            <button
+              role="radio"
+              aria-checked={destination === "my"}
+              className={`seg-btn${destination === "my" ? " active" : ""}`}
+              onClick={() => setDestination("my")}
+            >
+              Just me
+            </button>
+            {families.map((f) => (
+              <button
+                key={f.id}
+                role="radio"
+                aria-checked={destination === f.id}
+                className={`seg-btn${destination === f.id ? " active" : ""}`}
+                onClick={() => setDestination(f.id)}
+              >
+                {f.name}
+              </button>
+            ))}
+          </div>
+          <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+            {destination === "my"
+              ? "Only you will see this plan."
+              : `Everyone in ${families.find((f) => f.id === destination)?.name ?? "your family"} sees this plan and its shopping list, live.`}
+          </div>
+        </div>
+      )}
+
       <div className="detail-actions">
         <button className="btn ghost" onClick={onBack}>
           <Icon name="chevron-down" className="back-caret" /> Back
         </button>
         {savedPath ? (
           <span className="muted" style={{ fontSize: 13, display: "inline-flex", alignItems: "center", gap: 5 }}>
-            <Icon name="check" /> Saved to your plans
+            <Icon name="check" /> Saved to{" "}
+            {destination === "my"
+              ? "your plans"
+              : families.find((f) => f.id === destination)?.name ?? "your family"}
           </span>
         ) : (
           <button className="btn" disabled={saving} onClick={onSave}>

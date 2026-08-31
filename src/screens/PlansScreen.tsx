@@ -32,6 +32,21 @@ import { Icon } from "../icons";
 type Scope = "my" | "family";
 type Mode = "landing" | "new" | "family" | "stores";
 
+/**
+ * Three-state load, never two. A bare `T | null` forces "still loading" and
+ * "the request failed" to share one value, and the screens below then render a
+ * confident conclusion about it — "You're not in a family yet", "No family
+ * plans yet". Those sentences told a user his family data had been deleted
+ * when in fact one fetch hadn't landed. `stale` marks an OK value whose last
+ * refresh failed: we keep showing it rather than blanking the screen.
+ */
+type Loaded<T> =
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "ok"; value: T; stale?: boolean };
+
+const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
 const byUpdated = (a: PlanRecord, b: PlanRecord) => (b.updatedAt || "").localeCompare(a.updatedAt || "");
 
 // Remember the last plan + scope the user viewed, so opening the Plans tab
@@ -49,6 +64,25 @@ function readLastView(): { scope: Scope; planId: string | null } | null {
 function writeLastView(v: { scope: Scope; planId: string | null }): void {
   try {
     localStorage.setItem(LAST_VIEW_KEY, JSON.stringify(v));
+  } catch {
+    /* private mode / no storage — non-fatal */
+  }
+}
+
+// Where the user last chose to send a new plan ("my" or a family id). The
+// wizard asks every time, but a household that always plans together shouldn't
+// have to re-pick "The Blewitts" on every plan.
+const LAST_DEST_KEY = "recipes.plans.lastDestination";
+function readLastDestination(): string | null {
+  try {
+    return localStorage.getItem(LAST_DEST_KEY);
+  } catch {
+    return null;
+  }
+}
+function writeLastDestination(v: string): void {
+  try {
+    localStorage.setItem(LAST_DEST_KEY, v);
   } catch {
     /* private mode / no storage — non-fatal */
   }
@@ -75,25 +109,53 @@ export function PlansScreen({
   /** Contribute plan actions (share / delete) to the header settings sheet. */
   onCogItems?: (items: CogItem[]) => void;
 }) {
-  const [profile, setProfile] = useState<AppProfile | null>(null);
-  const [plans, setPlans] = useState<PlanRecord[] | null>(null);
+  const [profile, setProfile] = useState<Loaded<AppProfile>>({ status: "loading" });
+  const [plans, setPlans] = useState<Loaded<PlanRecord[]>>({ status: "loading" });
   const [scope, setScope] = useState<Scope>(() => readLastView()?.scope ?? "my");
   const [mode, setMode] = useState<Mode>("landing");
   const [viewing, setViewing] = useState(0);
+  /** A failed share / delete. Rendered on the landing; cleared on the next try. */
+  const [actionError, setActionError] = useState<string | null>(null);
   // The last-viewed plan id to restore once, after the first plans load.
   const restoreRef = useRef<string | null>(readLastView()?.planId ?? null);
   const rt = useRef<RealtimeHandle | null>(null);
   const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadPlans = useCallback(async () => {
-    const list = await listPlans().catch(() => [] as PlanRecord[]);
-    setPlans(list);
+    try {
+      setPlans({ status: "ok", value: await listPlans() });
+    } catch (e) {
+      // A failed REFETCH must never blank a list we already have. The realtime
+      // refetch fires exactly when another family member edits a plan, so one
+      // dropped request showed up as "the family's plans vanished the moment
+      // my wife touched one". Keep the list; mark it stale and say so.
+      setPlans((prev) =>
+        prev.status === "ok" ? { ...prev, stale: true } : { status: "error", message: errText(e) },
+      );
+    }
   }, []);
   const loadProfile = useCallback(async () => {
-    const p = await getMyProfile().catch(() => null);
-    setProfile(p);
-    return p;
+    try {
+      const p = await getMyProfile();
+      setProfile({ status: "ok", value: p });
+      return p;
+    } catch (e) {
+      setProfile((prev) =>
+        prev.status === "ok" ? { ...prev, stale: true } : { status: "error", message: errText(e) },
+      );
+      return null;
+    }
   }, []);
+  /** Re-run both loads from scratch — the "Try again" button on the error card. */
+  const retryLoad = useCallback(() => {
+    setProfile({ status: "loading" });
+    setPlans({ status: "loading" });
+    setActionError(null);
+    void (async () => {
+      await loadProfile();
+      await loadPlans();
+    })();
+  }, [loadProfile, loadPlans]);
 
   // Joining or leaving a family changes which plans exist for us, not just the
   // profile — reload both so the list can't keep showing a family's plans after
@@ -117,9 +179,12 @@ export function PlansScreen({
   // getMyProfile returns a fresh object), so renaming a family or any
   // incidental reload caused a needless reconnect. What actually matters is
   // whether the channel list changed.
-  const realtimeUrl = profile?.realtimeUrl ?? "";
-  const anonKey = profile?.anonKey ?? "";
-  const channelKey = (profile?.families ?? [])
+  const profileValue = profile.status === "ok" ? profile.value : null;
+  const planList = plans.status === "ok" ? plans.value : null;
+
+  const realtimeUrl = profileValue?.realtimeUrl ?? "";
+  const anonKey = profileValue?.anonKey ?? "";
+  const channelKey = (profileValue?.families ?? [])
     .map((f) => `family-${f.channelToken}`)
     .sort()
     .join(",");
@@ -159,9 +224,9 @@ export function PlansScreen({
     [],
   );
 
-  const myPlans = useMemo(() => (plans ?? []).filter((p) => !p.familyId).sort(byUpdated), [plans]);
-  const familyPlans = useMemo(() => (plans ?? []).filter((p) => p.familyId).sort(byUpdated), [plans]);
-  const families = profile?.families ?? [];
+  const myPlans = useMemo(() => (planList ?? []).filter((p) => !p.familyId).sort(byUpdated), [planList]);
+  const familyPlans = useMemo(() => (planList ?? []).filter((p) => p.familyId).sort(byUpdated), [planList]);
+  const families = profileValue?.families ?? [];
   const hasFamilies = families.length > 0;
   /** Stable identity for "which families, called what" — see the cog effect. */
   const familyKey = families.map((f) => `${f.id}:${f.name}`).join(",");
@@ -174,7 +239,7 @@ export function PlansScreen({
   // When plans/scope change: restore the last-viewed plan once (on first load),
   // otherwise snap to the most recent.
   useEffect(() => {
-    if (restoreRef.current && plans) {
+    if (restoreRef.current && planList) {
       const idx = active.findIndex((p) => p.id === restoreRef.current);
       restoreRef.current = null;
       setViewing(idx >= 0 ? idx : 0);
@@ -182,7 +247,7 @@ export function PlansScreen({
       setViewing(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope, plans]);
+  }, [scope, planList]);
 
   // Persist where the user is, so the next visit reopens here.
   const currentId = (active[viewing] ?? active[0])?.id ?? null;
@@ -195,21 +260,41 @@ export function PlansScreen({
   // Latest plans, readable from callbacks that outlive the render they were
   // created in (the header-cog actions).
   const plansRef = useRef<PlanRecord[] | null>(null);
-  plansRef.current = plans;
+  plansRef.current = planList;
 
   const patchLocal = (rec: PlanRecord) =>
-    setPlans((prev) => (prev ? prev.map((p) => (p.id === rec.id ? rec : p)) : prev));
+    setPlans((prev) =>
+      prev.status === "ok"
+        ? { ...prev, value: prev.value.map((p) => (p.id === rec.id ? rec : p)) }
+        : prev,
+    );
 
-  const persistNewPlan = async (plan: WeekPlan) => {
-    // On the Family tab a new plan must land in a FAMILY, not silently become
-    // private. Prefer the family whose plan is currently open, else the first
-    // one. (The old code only did this when you had exactly one family, so
-    // anyone in 2+ families got a private plan without being told.)
-    const familyId =
-      scope === "family"
-        ? (active[viewing] ?? active[0])?.familyId ?? families[0]?.id ?? null
-        : null;
+  /**
+   * Where a new plan lands, PRE-SELECTED for the wizard's final step — not
+   * decided there. Inferring it from whichever scope tab happened to be open
+   * is what silently privatized plans people meant to share: a freshly-joined
+   * member has no saved last-view, lands on "My plans", and every route into
+   * the wizard then saved private with nothing on screen saying so.
+   *
+   * Coming from the Family tab means the family you're looking at; otherwise
+   * whatever you picked last time, and personal if you've never picked.
+   */
+  const defaultFamilyId = (): string | null => {
+    if (scope === "family") return (active[viewing] ?? active[0])?.familyId ?? families[0]?.id ?? null;
+    const last = readLastDestination();
+    return last && last !== "my" && families.some((f) => f.id === last) ? last : null;
+  };
+
+  const persistNewPlan = async (plan: WeekPlan, familyId: string | null) => {
+    // The destination is now an explicit choice, so a family that doesn't
+    // resolve is a REFUSAL, not a fallback to private. The old expression fell
+    // through to `null` whenever `families` was empty — reachable any time the
+    // profile fetch failed, since this screen remounts on every tab switch.
+    if (familyId !== null && !families.some((f) => f.id === familyId)) {
+      throw new Error("That family isn't loaded right now, so this plan wasn't shared. Reopen Plans and try again.");
+    }
     await savePlanRecord({ plan, title: planTitle(plan), familyId });
+    writeLastDestination(familyId ?? "my");
     await loadPlans();
   };
 
@@ -236,13 +321,34 @@ export function PlansScreen({
   const sharePlan = async (planId: string, familyId: string | null) => {
     const rec = plansRef.current?.find((p) => p.id === planId);
     if (!rec) return;
-    await savePlanRecord({ id: rec.id, plan: rec.data, title: rec.title, familyId }).catch(() => {});
+    setActionError(null);
+    try {
+      await savePlanRecord({ id: rec.id, plan: rec.data, title: rec.title, familyId });
+    } catch (e) {
+      // Swallowing this and switching to the Family tab regardless looked
+      // EXACTLY like a successful share landing on an empty family: the plan
+      // was still private and nothing on screen said so.
+      setActionError(
+        `${familyId ? "Couldn't share that plan" : "Couldn't make that plan private"} — ${errText(e)}`,
+      );
+      await loadPlans();
+      return;
+    }
     await loadPlans();
     setScope(familyId ? "family" : "my");
   };
   const removePlan = async (planId: string) => {
-    setPlans((prev) => (prev ? prev.filter((p) => p.id !== planId) : prev));
-    await deletePlanRecord(planId).catch(() => {});
+    setActionError(null);
+    setPlans((prev) =>
+      prev.status === "ok" ? { ...prev, value: prev.value.filter((p) => p.id !== planId) } : prev,
+    );
+    try {
+      await deletePlanRecord(planId);
+    } catch (e) {
+      // The optimistic removal above is undone by the reload; without this the
+      // plan just reappeared with no explanation.
+      setActionError(`Couldn't delete that plan — ${errText(e)}`);
+    }
     await loadPlans();
   };
 
@@ -286,11 +392,41 @@ export function PlansScreen({
   }, [cogPlan?.id, cogPlan?.familyId, mode, familyKey]);
 
   // ── routed sub-screens ──
+  // The store editor is pure local VFS, so it must not be gated behind a
+  // backend load it doesn't use.
+  if (mode === "stores") {
+    return <StoreEditor onBack={() => setMode("landing")} />;
+  }
+
+  const backToLanding = () => {
+    setMode("landing");
+    void loadProfile();
+    void loadPlans();
+  };
+
+  // Load state is resolved BEFORE anything that draws a conclusion about the
+  // user's data. The Family sub-screen used to render ahead of the spinner
+  // guard, so opening cog → Family painted the full "You're not in a family
+  // yet" page while its own fetch was still in flight.
+  if (mode === "family") {
+    if (profile.status === "loading") return <Spinner />;
+    if (profile.status === "error") {
+      return <LoadError message={profile.message} onRetry={retryLoad} onBack={backToLanding} />;
+    }
+    return <FamilyScreen profile={profile.value} onChanged={familyChanged} onBack={backToLanding} />;
+  }
+
+  if (profile.status === "loading" || plans.status === "loading") return <Spinner />;
+  if (profile.status === "error") return <LoadError message={profile.message} onRetry={retryLoad} />;
+  if (plans.status === "error") return <LoadError message={plans.message} onRetry={retryLoad} />;
+
   if (mode === "new") {
     return (
       <PlanWeekScreen
         pantry={pantry}
         catalogVersion={catalogVersion}
+        families={families}
+        defaultFamilyId={defaultFamilyId()}
         onPersist={persistNewPlan}
         onDone={() => {
           setMode("landing");
@@ -299,35 +435,23 @@ export function PlansScreen({
       />
     );
   }
-  if (mode === "family") {
-    return (
-      <FamilyScreen
-        profile={profile}
-        onChanged={familyChanged}
-        onBack={() => {
-          setMode("landing");
-          void loadProfile();
-          void loadPlans();
-        }}
-      />
-    );
-  }
-  if (mode === "stores") {
-    return <StoreEditor onBack={() => setMode("landing")} />;
-  }
-
-  if (plans === null) {
-    return (
-      <div className="center-spinner">
-        <div className="spinner" />
-      </div>
-    );
-  }
 
   const current = active[viewing] ?? active[0];
 
   return (
     <div className="browse-screen">
+      {(plans.stale || profile.stale) && (
+        <div className="status-banner">
+          <Icon name="circle-info" />
+          <span>Couldn't refresh just now — showing what loaded last time.</span>
+        </div>
+      )}
+      {actionError && (
+        <div className="status-banner error">
+          <Icon name="triangle-exclamation" />
+          <span>{actionError}</span>
+        </div>
+      )}
       <div className="plans-tabs-row">
         <div className="seg" role="tablist" aria-label="Plan scope">
           <button role="tab" aria-selected={scope === "my"} className={`seg-btn${scope === "my" ? " active" : ""}`} onClick={() => setScope("my")}>
@@ -400,6 +524,56 @@ export function PlansScreen({
           </>
         )
       )}
+    </div>
+  );
+}
+
+function Spinner() {
+  return (
+    <div className="center-spinner">
+      <div className="spinner" />
+    </div>
+  );
+}
+
+/**
+ * What a failed load looks like. The point is that it is VISIBLY not an empty
+ * state: "no plans yet" and "we couldn't ask" are different facts, and only one
+ * of them means the user should go looking for their data.
+ */
+function LoadError({
+  message,
+  onRetry,
+  onBack,
+}: {
+  message: string;
+  onRetry: () => void;
+  onBack?: () => void;
+}) {
+  return (
+    <div className="browse-screen">
+      {onBack && (
+        <div className="detail-actions">
+          <button className="btn ghost" onClick={onBack}>
+            <Icon name="chevron-down" className="back-caret" /> Plans
+          </button>
+        </div>
+      )}
+      <div className="home-nudge">
+        <Icon name="triangle-exclamation" />
+        <div>
+          <strong>Couldn't reach Recipes.</strong> Check your connection — nothing has been lost,
+          we just can't load your plans and families right now.
+          {message && (
+            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+              {message}
+            </div>
+          )}
+        </div>
+        <button className="btn" onClick={onRetry}>
+          <Icon name="arrows-rotate" /> Try again
+        </button>
+      </div>
     </div>
   );
 }
