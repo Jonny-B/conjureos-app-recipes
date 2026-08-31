@@ -10,6 +10,7 @@ import type {
 import { getCatalog } from "../features/catalog";
 import { listSavedRecipes } from "../features/storage";
 import { loadFavorites } from "../features/favorites";
+import { blockRecipe, loadBlocked, unblockRecipe } from "../features/blocked";
 import { ingredientsFromPantry } from "../features/pantry";
 import {
   planFromChosen,
@@ -68,6 +69,13 @@ export function PlanWeekScreen({
 
   const [saved, setSaved] = useState<SavedRecipe[]>([]);
   const [favs, setFavs] = useState<Set<string>>(new Set());
+  // Thumbs-downed recipes. Merged into every run's excludeIds, so a blocked
+  // recipe can never be suggested again on any device (the index syncs).
+  const [blocked, setBlocked] = useState<Set<string>>(new Set());
+  // The most recent thumbs-down, so it can be undone. "Never again" with no way
+  // back is a trap on a touch target this small — one mis-tap and the recipe is
+  // gone from every future plan with nothing to show you it happened.
+  const [lastBlocked, setLastBlocked] = useState<{ id: string; title: string } | null>(null);
 
   const [scanned, setScanned] = useState<Ingredient[]>([]);
   const [scanMode, setScanMode] = useState<"idle" | "capture" | "identifying">("idle");
@@ -81,9 +89,10 @@ export function PlanWeekScreen({
   const [savedPath, setSavedPath] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([listSavedRecipes(), loadFavorites()]).then(([s, f]) => {
+    Promise.all([listSavedRecipes(), loadFavorites(), loadBlocked()]).then(([s, f, b]) => {
       setSaved(s);
       setFavs(f);
+      setBlocked(b);
     });
   }, []);
 
@@ -170,7 +179,13 @@ export function PlanWeekScreen({
    * holds it). The server returns the picks hydrated; we build the shopping
    * list locally from just those, with the same tested code as before.
    */
-  const runPlan = async (exclude: string[], c = constraints) => {
+  const runPlan = async (
+    exclude: string[],
+    c = constraints,
+    keep?: string[],
+    /** Slot the replacement should occupy, so a rerolled meal doesn't jump to the end. */
+    replaceAt?: number,
+  ) => {
     if (!c) return;
     setPlanning(true);
     setError(null);
@@ -178,11 +193,14 @@ export function PlanWeekScreen({
       const res = await planWeekRemote({
         constraints: c as unknown as Record<string, unknown>,
         onHand: onHand.map((i) => i.name),
-        excludeIds: exclude,
+        // Blocked recipes are excluded on EVERY run, not just the one where
+        // the user pressed thumbs-down.
+        excludeIds: [...new Set([...exclude, ...blocked])],
         favoriteIds: [...favs],
+        ...(keep && keep.length > 0 ? { pinnedIds: keep } : {}),
         ...(moodMode === "seed" && seed?.id ? { pinnedId: seed.id } : {}),
       });
-      const chosen: PlanCandidate[] = res.recipes.map((r) => ({
+      let chosen: PlanCandidate[] = res.recipes.map((r) => ({
         id: r.id,
         title: r.title,
         recipe: r,
@@ -190,6 +208,16 @@ export function PlanWeekScreen({
         tags: r.tags,
         isFavorite: favs.has(r.id),
       }));
+      // The server returns pins first, then whatever it filled — so a rerolled
+      // meal would otherwise appear at the BOTTOM of the list, which is its own
+      // kind of "the list changed under me". Put it back in the slot the
+      // rejected meal occupied.
+      if (keep && typeof replaceAt === "number") {
+        const kept = keep.map((id) => chosen.find((x) => x.id === id)).filter(Boolean) as PlanCandidate[];
+        const fresh = chosen.filter((x) => !keep.includes(x.id));
+        kept.splice(replaceAt, 0, ...fresh);
+        chosen = kept;
+      }
       setPlan(planFromChosen(chosen, onHand, c, res.warnings, res.shortfall));
       setExcludeIds(exclude);
     } catch (e) {
@@ -211,7 +239,41 @@ export function PlanWeekScreen({
     }
   };
 
-  const removePick = (id: string) => { void runPlan([...excludeIds, id]); };
+  /**
+   * Regenerate ONE meal. The old behaviour re-ran the whole optimizer with the
+   * rejected id excluded, and because selection is greedy — each pick is scored
+   * against what the earlier picks already put in the basket — dropping one meal
+   * re-shuffled every meal after it. Pinning the keepers means only the empty
+   * slot gets filled, and the replacement is still chosen to share ingredients
+   * with the meals you kept.
+   */
+  const rerollPick = (id: string) => {
+    const all = (plan?.picks ?? []).map((p) => p.id);
+    const at = all.indexOf(id);
+    void runPlan([...excludeIds, id], constraints ?? undefined, all.filter((p) => p !== id), at);
+  };
+
+  /**
+   * Thumbs-down: never suggest this again, then fill its slot. The block is
+   * durable (a synced index, see features/blocked.ts) and only affects
+   * RECOMMENDATIONS — the recipe stays searchable and cookable.
+   */
+  const blockPick = async (id: string) => {
+    const title = (plan?.picks ?? []).find((p) => p.id === id)?.title ?? "That meal";
+    setBlocked(await blockRecipe(id).catch(() => new Set([...blocked, id])));
+    setLastBlocked({ id, title });
+    const all = (plan?.picks ?? []).map((p) => p.id);
+    const at = all.indexOf(id);
+    await runPlan([...excludeIds, id], constraints ?? undefined, all.filter((p) => p !== id), at);
+  };
+
+  /** Undo the last thumbs-down. Doesn't put the meal back in this plan — it
+   *  just makes the recipe eligible for future suggestions again. */
+  const undoBlock = async () => {
+    if (!lastBlocked) return;
+    setBlocked(await unblockRecipe(lastBlocked.id).catch(() => blocked));
+    setLastBlocked(null);
+  };
 
   const onSave = async () => {
     if (!plan) return;
@@ -312,7 +374,10 @@ export function PlanWeekScreen({
       {step === "review" && plan && (
         <ReviewStep
           plan={plan}
-          onRemove={removePick}
+          onReroll={rerollPick}
+          onBlock={(id) => void blockPick(id)}
+          lastBlocked={lastBlocked}
+          onUndoBlock={() => void undoBlock()}
           onBack={() => setStep("scan")}
           onNext={() => setStep("shopping")}
         />
@@ -552,12 +617,18 @@ function ScanStep({
 
 function ReviewStep({
   plan,
-  onRemove,
+  onReroll,
+  onBlock,
+  lastBlocked,
+  onUndoBlock,
   onBack,
   onNext,
 }: {
   plan: WeekPlan;
-  onRemove: (id: string) => void;
+  onReroll: (id: string) => void;
+  onBlock: (id: string) => void;
+  lastBlocked: { id: string; title: string } | null;
+  onUndoBlock: () => void;
   onBack: () => void;
   onNext: () => void;
 }) {
@@ -579,14 +650,39 @@ function ReviewStep({
         </div>
       )}
 
+      {lastBlocked && (
+        <div className="status-banner blocked-note">
+          <Icon name="thumbs-down" />
+          <span>
+            Won't suggest <strong>{lastBlocked.title}</strong> again.
+          </span>
+          <button className="link-btn" onClick={onUndoBlock}>Undo</button>
+        </div>
+      )}
+
       <div className="meal-list">
         {plan.picks.map((pick) => (
           <article key={pick.id} className="meal-card">
             <div className="meal-card-head">
               <h3>{pick.title}</h3>
-              <button className="icon-btn meal-swap" onClick={() => onRemove(pick.id)} title="Swap out" aria-label={`Swap out ${pick.title}`}>
-                <Icon name="xmark" />
-              </button>
+              <div className="meal-card-actions">
+                <button
+                  className="icon-btn meal-swap"
+                  onClick={() => onReroll(pick.id)}
+                  title="Suggest a different meal for this slot"
+                  aria-label={`Replace ${pick.title} with a different meal`}
+                >
+                  <Icon name="arrows-rotate" />
+                </button>
+                <button
+                  className="icon-btn meal-block"
+                  onClick={() => onBlock(pick.id)}
+                  title="Don't suggest this again"
+                  aria-label={`Never suggest ${pick.title} again`}
+                >
+                  <Icon name="thumbs-down" />
+                </button>
+              </div>
             </div>
             <div className="meal-card-meta">
               <span className={`cov-chip${pick.totalCount === pick.haveCount ? " complete" : ""}`}>

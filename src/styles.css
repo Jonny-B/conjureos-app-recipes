@@ -2001,13 +2001,43 @@ select {
   font-weight: 700;
   line-height: 1.25;
 }
-.meal-swap {
+/* Two distinct outs for a meal you don't want, side by side: regenerate just
+   this slot, or never suggest it again. They read as quiet affordances until
+   hovered — the plan is the content, these are the escape hatches. */
+.meal-card-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.meal-swap,
+.meal-block {
   flex: 0 0 auto;
   opacity: 0.55;
+  transition: opacity var(--cui-duration-fast) var(--cui-ease),
+              color var(--cui-duration-fast) var(--cui-ease);
 }
 .meal-swap:hover {
   opacity: 1;
 }
+/* Thumbs-down is destructive-ish (it's remembered), so it earns a warning
+   tint on hover that the plain regenerate doesn't. */
+.meal-block:hover {
+  opacity: 1;
+  color: var(--danger);
+}
+/* The undo affordance after a thumbs-down. Sits above the list so it's the
+   first thing you see if you hit it by accident. */
+.blocked-note {
+  align-items: center;
+  gap: 10px;
+}
+.blocked-note .link-btn {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-weight: 700;
+}
+
 .meal-card-meta {
   display: flex;
   align-items: center;
