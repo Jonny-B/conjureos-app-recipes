@@ -440,10 +440,10 @@ export function PlansScreen({
 
   return (
     <div className="browse-screen">
-      {plans.stale && (
+      {(plans.stale || profile.stale) && (
         <div className="status-banner">
           <Icon name="circle-info" />
-          <span>Couldn't refresh just now — showing your plans from the last successful load.</span>
+          <span>Couldn't refresh just now — showing what loaded last time.</span>
         </div>
       )}
       {actionError && (
