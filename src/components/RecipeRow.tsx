@@ -1,6 +1,7 @@
 import type { FeedRecipe } from "../types";
 import type { CoverageResult } from "../features/scaling";
 import { prettyIngredient } from "../features/scaling";
+import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
 import { Icon } from "../icons";
 
 /**
@@ -21,7 +22,7 @@ export function RecipeRow({
   const category = fi.kind === "catalog" ? fi.recipe.category : null;
   return (
     <div className="browse-item" onClick={onOpen}>
-      {r.imageUrl && (
+      {RECIPE_PHOTOS_ENABLED && r.imageUrl && (
         <div className="browse-thumb">
           <img src={r.imageUrl} alt="" loading="lazy" />
         </div>

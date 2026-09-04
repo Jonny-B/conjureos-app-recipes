@@ -3,6 +3,7 @@ import type { FeedRecipe, PantryItem, Recipe, SavedRecipe } from "../types";
 import { ingredientsFromPantry } from "../features/pantry";
 import { computeAvailability, computeCoverage } from "../features/scaling";
 import { parseIngredient, formatStrip } from "../features/nutrition";
+import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
 import { CHEF_NAME } from "./StudioScreen";
 import { Icon } from "../icons";
 
@@ -163,7 +164,7 @@ export function RecipeDetail({
         >
           <Icon name="heart" />
         </button>
-        {recipe.imageUrl && (
+        {RECIPE_PHOTOS_ENABLED && recipe.imageUrl && (
           <div className="recipe-hero">
             <img src={recipe.imageUrl} alt={recipe.title} loading="lazy" />
           </div>
