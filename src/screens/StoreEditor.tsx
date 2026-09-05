@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  loadStores,
+  loadStoresState,
   saveStores,
   newStore,
   newId,
@@ -23,11 +23,19 @@ export function StoreEditor({ onBack }: { onBack: () => void }) {
   const [state, setState] = useState<StoresState | null>(null);
   const [editingId, setEditingId] = useState<string>("");
   const [aiOn, setAiOn] = useState<boolean>(aiSortEnabled());
+  // An unreadable stores file must not become an editable blank slate: every
+  // edit here is debounced straight back to disk, so editing a wrong "default"
+  // would overwrite the user's real aisle layouts. Show the failure instead.
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
-    loadStores().then((s) => {
-      setState(s);
-      setEditingId(s.defaultId);
+    void loadStoresState().then((r) => {
+      if (!r.ok) {
+        setLoadFailed(true);
+        return;
+      }
+      setState(r.value);
+      setEditingId(r.value.defaultId);
     });
   }, []);
 
@@ -56,6 +64,26 @@ export function StoreEditor({ onBack }: { onBack: () => void }) {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(flush, 500);
   };
+
+  if (loadFailed) {
+    return (
+      <div className="browse-screen">
+        <div className="detail-actions">
+          <button className="btn ghost" onClick={onBack}>
+            <Icon name="chevron-down" className="back-caret" /> Back
+          </button>
+        </div>
+        <div className="empty-state">
+          <h4>Couldn&apos;t open your stores</h4>
+          <p className="muted">
+            Your saved store layouts are there but wouldn&apos;t load, so nothing has been
+            changed. Check your connection and come back — editing now would overwrite them.
+          </p>
+          <button className="btn" onClick={onBack}>Back</button>
+        </div>
+      </div>
+    );
+  }
 
   if (!state) {
     return (

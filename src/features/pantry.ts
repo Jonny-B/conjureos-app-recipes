@@ -8,6 +8,7 @@
  */
 
 import { vfs } from "../bridge/vfs";
+import { readJsonDoc, requireJsonDoc } from "./jsonDoc";
 import { sanitizeName } from "./vision";
 import type { Ingredient, PantryItem } from "../types";
 
@@ -22,16 +23,28 @@ interface PantryDoc {
   updatedAt: string;
 }
 
+/** Shape check shared by the display and mutator loaders. */
+function parsePantry(raw: unknown): PantryItem[] | null {
+  const doc = raw as Partial<PantryDoc> | null;
+  if (!doc || !Array.isArray(doc.items)) return null;
+  return doc.items.filter(isValidItem).slice(0, MAX_ITEMS);
+}
+
+const PANTRY_DOC = { maxBytes: MAX_FILE_BYTES, empty: [] as PantryItem[] };
+
+/**
+ * Read for DISPLAY. Still degrades to an empty list, because a screen that
+ * can't read the pantry has nothing better to render.
+ * Mutators must use `loadPantryForWrite` instead — see jsonDoc.ts.
+ */
 export async function loadPantry(): Promise<PantryItem[]> {
-  try {
-    const text = await vfs.read(PANTRY_PATH);
-    if (text.length > MAX_FILE_BYTES) return [];
-    const doc = JSON.parse(text) as Partial<PantryDoc>;
-    if (!doc || !Array.isArray(doc.items)) return [];
-    return doc.items.filter(isValidItem).slice(0, MAX_ITEMS);
-  } catch {
-    return [];
-  }
+  const r = await readJsonDoc(PANTRY_PATH, parsePantry, PANTRY_DOC);
+  return r.ok ? r.value : [];
+}
+
+/** Read for a read-modify-write. Throws rather than returning a false empty. */
+async function loadPantryForWrite(): Promise<PantryItem[]> {
+  return requireJsonDoc(PANTRY_PATH, parsePantry, { ...PANTRY_DOC, what: "pantry" });
 }
 
 export async function savePantry(items: PantryItem[]): Promise<void> {
@@ -52,7 +65,7 @@ export async function addPantryItem(input: {
 }): Promise<PantryItem[]> {
   const name = sanitizeName(input.name);
   if (!name) throw new Error("Enter an ingredient name.");
-  const items = await loadPantry();
+  const items = await loadPantryForWrite();
   return mergeItem(items, {
     name,
     quantity: clean(input.quantity),
@@ -65,7 +78,7 @@ export async function addPantryItem(input: {
 export async function addPantryItems(
   incoming: Array<{ name: string; quantity?: string; notes?: string }>,
 ): Promise<PantryItem[]> {
-  let items = await loadPantry();
+  let items = await loadPantryForWrite();
   const now = new Date().toISOString();
   for (const raw of incoming) {
     const name = sanitizeName(raw.name);
@@ -85,7 +98,7 @@ export async function updatePantryItem(
   name: string,
   patch: Partial<Pick<PantryItem, "quantity" | "notes">>,
 ): Promise<PantryItem[]> {
-  const items = await loadPantry();
+  const items = await loadPantryForWrite();
   const key = dedupeKey(name);
   const next = items.map((i) =>
     dedupeKey(i.name) === key
@@ -101,7 +114,7 @@ export async function updatePantryItem(
 }
 
 export async function removePantryItem(name: string): Promise<PantryItem[]> {
-  const items = await loadPantry();
+  const items = await loadPantryForWrite();
   const key = dedupeKey(name);
   const next = items.filter((i) => dedupeKey(i.name) !== key);
   await savePantry(next);
