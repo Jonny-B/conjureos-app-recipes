@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PantryItem, WeekPlan } from "../types";
 import { importVfsPlansOnce, planTitle } from "../features/planStorage";
+import { PlanWriter } from "../features/planSync";
 import {
   deletePlanRecord,
   getMyProfile,
@@ -121,9 +122,36 @@ export function PlansScreen({
   const rt = useRef<RealtimeHandle | null>(null);
   const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /**
+   * Shopping-list ticks go through here, not through a whole-blob save per tap
+   * — see features/planSync.ts for why (lost ticks, and two shoppers erasing
+   * each other). Created once per mount; `overlay` replays anything still
+   * queued on top of whatever the server just told us.
+   */
+  const writerRef = useRef<PlanWriter | null>(null);
+  if (!writerRef.current) {
+    writerRef.current = new PlanWriter({
+      save: (a) => savePlanRecord(a),
+      onRecord: (rec) =>
+        setPlans((prev) =>
+          prev.status === "ok"
+            ? { ...prev, value: prev.value.map((p) => (p.id === rec.id ? rec : p)) }
+            : prev,
+        ),
+      onError: (e) => {
+        setActionError(`Couldn't save your shopping list — ${errText(e)}`);
+        void loadPlansRef.current?.();
+      },
+    });
+  }
+  const writer = writerRef.current;
+
   const loadPlans = useCallback(async () => {
     try {
-      setPlans({ status: "ok", value: await listPlans() });
+      // Replay un-acknowledged ticks over the fetched rows: a realtime refetch
+      // fires ~400ms after any family edit, and without this it would paint the
+      // pre-tap list over a tap the server hasn't confirmed yet.
+      setPlans({ status: "ok", value: (await listPlans()).map((p) => writer.overlay(p)) });
     } catch (e) {
       // A failed REFETCH must never blank a list we already have. The realtime
       // refetch fires exactly when another family member edits a plan, so one
@@ -133,7 +161,13 @@ export function PlansScreen({
         prev.status === "ok" ? { ...prev, stale: true } : { status: "error", message: errText(e) },
       );
     }
+    // `writer` comes from a ref and never changes identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // The writer outlives the render that built it, so it reaches the CURRENT
+  // loadPlans through a ref instead of capturing the first render's copy.
+  const loadPlansRef = useRef<(() => Promise<void>) | null>(null);
+  loadPlansRef.current = loadPlans;
   const loadProfile = useCallback(async () => {
     try {
       const p = await getMyProfile();
@@ -262,13 +296,6 @@ export function PlansScreen({
   const plansRef = useRef<PlanRecord[] | null>(null);
   plansRef.current = planList;
 
-  const patchLocal = (rec: PlanRecord) =>
-    setPlans((prev) =>
-      prev.status === "ok"
-        ? { ...prev, value: prev.value.map((p) => (p.id === rec.id ? rec : p)) }
-        : prev,
-    );
-
   /**
    * Where a new plan lands, PRE-SELECTED for the wizard's final step — not
    * decided there. Inferring it from whichever scope tab happened to be open
@@ -298,21 +325,15 @@ export function PlansScreen({
     await loadPlans();
   };
 
-  const saveData = async (rec: PlanRecord, data: WeekPlan) => {
-    patchLocal({ ...rec, data });
-    try {
-      const saved = await savePlanRecord({ id: rec.id, plan: data });
-      patchLocal(saved);
-    } catch {
-      await loadPlans();
-    }
-  };
+  // Ticks are OPS, not blob writes. `rec` here is what's on screen (server
+  // state + anything still queued), so the toggle reads the box the user just
+  // looked at, and the op that goes out sets that item to a value rather than
+  // uploading a whole list built from data that may already be stale.
   const toggleChecked = (rec: PlanRecord, canonical: string) => {
-    const set = new Set(rec.data.checked ?? []);
-    set.has(canonical) ? set.delete(canonical) : set.add(canonical);
-    return saveData(rec, { ...rec.data, checked: [...set] });
+    const checked = new Set(rec.data.checked ?? []);
+    writer.push(rec, { kind: "setChecked", canonical, value: !checked.has(canonical) });
   };
-  const uncheckAll = (rec: PlanRecord) => saveData(rec, { ...rec.data, checked: [] });
+  const uncheckAll = (rec: PlanRecord) => writer.push(rec, { kind: "uncheckAll" });
 
   // Both take an ID, not a record. The header-cog effect below only re-runs
   // when the plan's id/scope changes, so a captured record goes stale the

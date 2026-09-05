@@ -57,6 +57,19 @@ export async function listSavedRecipes(): Promise<SavedRecipe[]> {
   return r.ok ? r.recipes : [];
 }
 
+/**
+ * Rewrite an already-saved recipe's body. The one caller today is the nutrition
+ * backfill: the USDA estimate for a card can land AFTER the user hit Save, and
+ * nothing else ever recomputes nutrition for a saved recipe — so without this
+ * the row keeps `nutrition: null` forever (see RecipesScreen.onSave).
+ */
+export async function updateSavedRecipe(
+  saved: SavedRecipe,
+  recipe: Recipe,
+): Promise<SavedRecipe> {
+  return api.updateRecipe(recipeIdFromPath(saved.path), recipe);
+}
+
 export async function markMade(recipe: SavedRecipe): Promise<SavedRecipe> {
   return api.markCooked(recipeIdFromPath(recipe.path));
 }

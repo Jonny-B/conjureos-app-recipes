@@ -315,10 +315,184 @@ export function normalizeIngredientName(s: string): string {
     .replace(/s$/, "");
 }
 
+// ── "same ingredient?" ────────────────────────────────────────────────
+
 /**
- * Match a recipe ingredient name to a user-supplied one. Tolerates
- * modifiers + crude singularization, prefers exact match, falls back to
- * directional substring (either contains the other).
+ * Adjectives that describe a FORM of the same food rather than a different
+ * food. Dropped from both names before comparing, so a pantry "chicken breast"
+ * still meets a recipe's "boneless skinless chicken breasts".
+ */
+const NEUTRAL_MODIFIERS = new Set([
+  "boneless", "skinless", "bone-in", "skin-on", "lean", "unsalted", "salted",
+  "organic", "ripe", "peeled", "softened", "melted", "packed", "plain",
+  "uncooked", "all-purpose", "allpurpose", "virgin", "extra-virgin",
+  "kosher", "baby", "rolled", "heavy", "whipping",
+]);
+
+/**
+ * Trailing words that name a CUT or FORM of the food named before them, so
+ * dropping them leaves the SAME ingredient: a chicken breast is chicken, feta
+ * cheese is feta.
+ *
+ * Deliberately excludes every word that names a food MADE FROM the one before
+ * it — broth, stock, crumbs, oil, sauce, powder, juice, butter, flour, milk.
+ * That class is the whole reason this list exists: "chicken" is not "chicken
+ * broth" and "bread" is not "bread crumbs", and the old either-contains-the-
+ * other test said they were.
+ */
+const CUT_OR_FORM_HEADS = new Set(
+  [
+    "breast", "thigh", "drumstick", "wing", "leg", "fillet", "filet", "cutlet",
+    "loin", "tenderloin", "tender", "shoulder", "rib", "ribeye", "chop",
+    "steak", "chuck", "brisket", "sirloin", "flank", "skirt", "shank", "rump",
+    "roast", "mince", "meat", "cheese", "leaf", "leave", "sprig", "clove",
+    "half", "halve", "piece", "chunk", "slice", "strip", "cube", "wedge",
+    "floret", "stalk", "stem", "bulb", "kernel",
+  ].map(reduceToken),
+);
+
+/**
+ * Compounds whose head IS in CUT_OR_FORM_HEADS but which are a different food
+ * from their own prefix. Cream cheese is not cream.
+ */
+const NOT_ITS_PREFIX = new Set(["cream cheese", "head cheese"].map((s) => s.split(" ").map(reduceToken).join(" ")));
+
+/** Shortest name we'll fuzzy-match at all. Blocks "ice"/"oil"-scale collisions. */
+const MIN_FUZZY_LEN = 3;
+
+/**
+ * Fold one token to a comparison form. This has to absorb TWO plural spellings
+ * of the same word, because the input may arrive raw ("tomatoes") or already
+ * through normalizeIngredientName, whose crude `/s$/` strip leaves "tomatoe".
+ * Both must land on "tomato" or the two spellings stop matching each other.
+ */
+function reduceToken(t: string): string {
+  let s = t;
+  if (s.length > 4 && s.endsWith("ies")) return `${s.slice(0, -3)}y`; // berries -> berry
+  if (s.length > 3 && s.endsWith("s") && !s.endsWith("ss")) s = s.slice(0, -1);
+  // What's left of an "-es" plural (or of normalizeIngredientName's strip):
+  // "tomatoe" -> "tomato", "dishe" -> "dish", "boxe" -> "box".
+  if (s.length > 3 && /(?:o|ch|sh|s|x|z)e$/.test(s)) s = s.slice(0, -1);
+  return s;
+}
+
+/**
+ * The comparison form of a name: leading measure/container noise off
+ * (prettyIngredient), modifier stopwords off (normalizeIngredientName), form
+ * adjectives off, every token folded. Same pipeline planWeek's canonOf uses,
+ * so canonical shopping-list keys and pantry names meet on the same ground.
+ */
+// Ingredient names repeat heavily (the browse screen scores a pantry against
+// every recipe in the catalog), and this runs per pair, so memoize the folding.
+const tokenCache = new Map<string, string[]>();
+const TOKEN_CACHE_MAX = 5000;
+
+function matchTokens(name: string): string[] {
+  const hit = tokenCache.get(name);
+  if (hit) return hit;
+  const all = normalizeIngredientName(prettyIngredient(name))
+    .split(" ")
+    .filter((t) => t.length > 0);
+  // A name made ENTIRELY of form adjectives is that food, not a modifier of one
+  // ("baby" is a modifier, "baby corn" too, but a pantry line reading "baby"
+  // would otherwise reduce to nothing and match every recipe or none).
+  const kept = all.filter((t) => !NEUTRAL_MODIFIERS.has(t));
+  const out = (kept.length > 0 ? kept : all).map(reduceToken);
+  if (tokenCache.size < TOKEN_CACHE_MAX) tokenCache.set(name, out);
+  return out;
+}
+
+/**
+ * Do these two ingredient names refer to the same thing? The single definition
+ * of that question — the pantry-coverage matcher, the "scale to my ingredients"
+ * matcher and the shopping-list merge all route through here, so the detail
+ * screen can't claim you have something the shopping list then tells you to buy.
+ *
+ * Matching is loose about morphology and about a trailing cut/form word, and
+ * STRICT about everything else:
+ *
+ *   rice / ice            -> no  (not a whole token)
+ *   buttermilk / milk     -> no  (not a whole token)
+ *   eggplant / egg        -> no  (not a whole token)
+ *   olive oil / oil       -> no  (the shared token isn't the head of both)
+ *   sour cream / cream    -> no  (ditto)
+ *   chicken broth/chicken -> no  ("broth" is a food made FROM chicken)
+ *   bread crumbs / bread  -> no  (ditto)
+ *   chicken breasts / chicken -> YES (a cut of the same food)
+ *   feta cheese / feta        -> YES (a category word, not a new food)
+ *   tomatoes / tomato         -> YES (reduceToken folds both spellings)
+ *
+ * The old rule was `a.includes(b) || b.includes(a)` on raw normalized strings,
+ * guarded only by a 2-character minimum. A pantry holding literally "ice" and
+ * "oil" satisfied a recipe needing rice and olive oil, and the recipe card said
+ * "You have everything for this".
+ */
+/**
+ * Cultivar/size words that don't change what the food IS — but only in front of
+ * a head noun listed in VARIETY_HEADS. Kept tiny on purpose: a false positive
+ * here puts the user in the kitchen without an ingredient the app promised.
+ * Notably ABSENT: "brown" (brown sugar isn't sugar), "green"/"spring" (a green
+ * onion is a scallion), "sour"/"heavy"/"double" (creams), and every plant-milk
+ * word.
+ */
+const VARIETY_WORDS = new Set([
+  "red", "white", "yellow", "purple", "cherry", "grape", "plum", "roma",
+  "russet", "baby", "ripe",
+]);
+// "sweet" is deliberately NOT here: a sweet potato is a different vegetable
+// from a potato, so folding it would promise the cook an ingredient they don't
+// have — the exact failure this whole matcher exists to prevent.
+
+/** Head nouns whose varieties are interchangeable enough to match. */
+const VARIETY_HEADS = new Set([
+  "onion", "tomato", "potato", "apple", "spinach", "lettuce", "cabbage",
+  "mushroom", "grape", "carrot", "bean",
+]);
+
+export function ingredientNamesMatch(a: string, b: string): boolean {
+  const ta = matchTokens(a);
+  const tb = matchTokens(b);
+  if (ta.length === 0 || tb.length === 0) return false;
+  if (ta.length === tb.length) return ta.every((t, i) => t === tb[i]);
+
+  const [short, longRaw] = ta.length < tb.length ? [ta, tb] : [tb, ta];
+  // Leading VARIETY words name a cultivar of the same food, not a different
+  // food: "red onion" is an onion, "cherry tomatoes" are tomatoes. Without this
+  // the prefix test below rejected them, and the app told you to buy onions you
+  // already had. Deliberately narrow, and gated on the head noun, because the
+  // same adjective changes the food elsewhere: "red pepper" is not black
+  // pepper, "green onion" is a scallion, "brown sugar" is not sugar. Only the
+  // pairs listed in VARIETY_HEADS are folded.
+  const long =
+    longRaw.length > short.length &&
+    VARIETY_WORDS.has(longRaw[0]!) &&
+    VARIETY_HEADS.has(longRaw[longRaw.length - 1]!)
+      ? longRaw.slice(1)
+      : longRaw;
+  if (short.length > long.length) return false;
+  // The shorter name must be a whole-token PREFIX of the longer one: the extra
+  // words may only narrow the head ("chicken" -> "chicken breast"), never
+  // qualify it from the front ("cream" -> "sour cream").
+  for (let i = 0; i < short.length; i++) {
+    if (short[i] !== long[i]) return false;
+  }
+  if (short.join(" ").length < MIN_FUZZY_LEN) return false;
+  if (NOT_ITS_PREFIX.has(long.join(" "))) return false;
+  return long.slice(short.length).every((t) => CUT_OR_FORM_HEADS.has(t));
+}
+
+/** True when any name in `names` refers to the same ingredient as `name`. */
+export function matchesAnyName(name: string, names: Iterable<string>): boolean {
+  for (const other of names) {
+    if (ingredientNamesMatch(name, other)) return true;
+  }
+  return false;
+}
+
+/**
+ * Match a recipe ingredient name to a user-supplied one. Tolerates modifiers +
+ * crude singularization, prefers an exact normalized match, and otherwise
+ * accepts only the cut/form relation ingredientNamesMatch allows.
  */
 export function findUserMatch(
   recipeName: string,
@@ -331,10 +505,9 @@ export function findUserMatch(
   for (const u of user) {
     if (normalizeIngredientName(u.name) === target) return u;
   }
-  // Otherwise: either contains the other. "feta" matches "feta cheese", etc.
+  // Otherwise: "feta" matches "feta cheese", "chicken" matches "chicken breast".
   for (const u of user) {
-    const un = normalizeIngredientName(u.name);
-    if (un.includes(target) || target.includes(un)) return u;
+    if (ingredientNamesMatch(u.name, recipeName)) return u;
   }
   return null;
 }
@@ -428,17 +601,13 @@ export function prettyIngredient(name: string): string {
   return s;
 }
 
-/** Loose name presence: exact-normalized, else either-contains-other. */
+/** Name-only presence in the pantry, on the shared same-ingredient rule. */
 function nameInPantry(targetNorm: string, userNorms: string[]): boolean {
   if (!targetNorm) return false;
   for (const u of userNorms) {
     if (u === targetNorm) return true;
   }
-  for (const u of userNorms) {
-    if (u.length < 2) continue;
-    if (u.includes(targetNorm) || targetNorm.includes(u)) return true;
-  }
-  return false;
+  return matchesAnyName(targetNorm, userNorms);
 }
 
 // ── Nutrition per-serving (unchanged across factor) ───────────────────

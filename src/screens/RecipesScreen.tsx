@@ -1,7 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
-import type { Ingredient, NutritionStrip, Recipe } from "../types";
-import { saveRecipe } from "../features/storage";
-import { computeNutrition, formatStrip, isUsingDemoKey } from "../features/nutrition";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { Ingredient, NutritionStrip, Recipe, SavedRecipe } from "../types";
+import { saveRecipe, updateSavedRecipe } from "../features/storage";
+import {
+  computeNutrition,
+  formatStrip,
+  isUsingDemoKey,
+  type NutritionResult,
+} from "../features/nutrition";
 import { computeAvailability, scaleRecipe, type AvailabilityResult } from "../features/scaling";
 import { Icon } from "../icons";
 
@@ -21,6 +26,22 @@ type CardNutrition =
   | { kind: "partial"; strip: NutritionStrip; missedDueToRateLimit: number }
   | { kind: "rate-limited"; missedDueToRateLimit: number }
   | { kind: "empty" };
+
+/** The strip a card can contribute to a saved recipe, or null while it can't. */
+function stripOf(state: CardNutrition | null | undefined): NutritionStrip | null {
+  return state && (state.kind === "ok" || state.kind === "partial") ? state.strip : null;
+}
+
+function toCard(result: NutritionResult): CardNutrition {
+  if (result.strip && result.rateLimited) {
+    return { kind: "partial", strip: result.strip, missedDueToRateLimit: result.missedDueToRateLimit };
+  }
+  if (result.strip) return { kind: "ok", strip: result.strip };
+  if (result.rateLimited) {
+    return { kind: "rate-limited", missedDueToRateLimit: result.missedDueToRateLimit };
+  }
+  return { kind: "empty" };
+}
 
 export function RecipesScreen({ recipes, ingredients, onEditIngredients, onRestart, onCook }: Props) {
   const [savedIdx, setSavedIdx] = useState<Set<number>>(new Set());
@@ -43,57 +64,109 @@ export function RecipesScreen({ recipes, ingredients, onEditIngredients, onResta
     [recipes, ingredients],
   );
 
+  // Cards whose macros landed after they were saved and are being written to
+  // the already-saved row. Purely for the "adding macros…" line.
+  const [backfilling, setBackfilling] = useState<Set<number>>(new Set());
+  /**
+   * Each card's in-flight nutrition computation. The resolution loop below is
+   * sequential (USDA's cap is tight) and each recipe costs several round-trips,
+   * so card 3 can be 10+ seconds behind card 1 — while Save is enabled the
+   * whole time. Save reads THIS, not just the settled state, so a card the user
+   * saved early can still get its strip when the estimate lands.
+   */
+  const pendingNutrition = useRef<Array<Promise<CardNutrition> | null>>([]);
+  /**
+   * The current resolution run. Per-run rather than one shared flag: a save
+   * from the PREVIOUS run has to be able to tell that ITS lookups were aborted,
+   * even though a newer run has since started and is perfectly healthy.
+   */
+  const runRef = useRef<{ aborted: boolean }>({ aborted: false });
+
   const anyRateLimited = nutrition.some(
     (n) => n.kind === "rate-limited" || n.kind === "partial",
   );
 
   useEffect(() => {
-    let cancelled = false;
+    const run = { aborted: false };
+    runRef.current = run;
     const ctrl = new AbortController();
-    (async () => {
-      for (let i = 0; i < recipes.length; i++) {
-        if (cancelled) return;
+    // Still strictly sequential — three recipes' worth of USDA lookups fired at
+    // once is how the shared DEMO_KEY cap gets hit — but each card's eventual
+    // result is now a promise, not just a value that may not exist yet.
+    let chain: Promise<unknown> = Promise.resolve();
+    pendingNutrition.current = recipes.map((r, i) => {
+      const p = chain.then(async (): Promise<CardNutrition> => {
+        if (run.aborted) return { kind: "empty" };
+        let card: CardNutrition;
         try {
-          const result = await computeNutrition(recipes[i]!, ctrl.signal);
-          if (cancelled) return;
-          const card: CardNutrition =
-            result.strip && result.rateLimited
-              ? { kind: "partial", strip: result.strip, missedDueToRateLimit: result.missedDueToRateLimit }
-              : result.strip
-              ? { kind: "ok", strip: result.strip }
-              : result.rateLimited
-              ? { kind: "rate-limited", missedDueToRateLimit: result.missedDueToRateLimit }
-              : { kind: "empty" };
-          setNutrition((prev) => prev.map((s, j) => (j === i ? card : s)));
+          card = toCard(await computeNutrition(r, ctrl.signal));
         } catch {
-          if (cancelled) return;
-          setNutrition((prev) => prev.map((s, j) => (j === i ? { kind: "empty" as const } : s)));
+          card = { kind: "empty" };
         }
-      }
-    })();
+        if (!run.aborted) setNutrition((prev) => prev.map((s, j) => (j === i ? card : s)));
+        return card;
+      });
+      chain = p;
+      return p;
+    });
     return () => {
-      cancelled = true;
+      run.aborted = true;
       ctrl.abort();
     };
   }, [recipes]);
+
+  /**
+   * The recipe exactly as it will be persisted: scaled from the ORIGINAL
+   * (the card renders a scaled copy, but persistence must derive from the
+   * source so the factor isn't applied twice), with the strip carried THROUGH
+   * scaleRecipe so its rounded-yield correction applies to the macros too.
+   */
+  const toPersisted = (idx: number, strip: NutritionStrip | null): Recipe =>
+    scaleRecipe({ ...recipes[idx]!, nutrition: strip }, scaleFactors[idx] ?? 1);
+
+  /**
+   * The card's estimate wasn't ready when the user saved. Wait for it and patch
+   * the saved row — writing `nutrition: null` and walking away is permanent,
+   * because nothing recomputes nutrition for an already-saved recipe.
+   */
+  const backfillNutrition = async (idx: number, saved: SavedRecipe) => {
+    setBackfilling((prev) => new Set(prev).add(idx));
+    // Both captured synchronously: a later re-render must not repoint us at a
+    // different run's promises.
+    const run = runRef.current;
+    const pending = pendingNutrition.current[idx];
+    try {
+      let strip = stripOf(await pending);
+      if (!strip && run.aborted) {
+        // The screen was left before this card's turn came up, so its lookup
+        // was aborted along with the rest. The save already happened, so run
+        // this one recipe's lookup on its own rather than lose the macros.
+        strip = stripOf(toCard(await computeNutrition(recipes[idx]!)));
+      }
+      if (strip) await updateSavedRecipe(saved, toPersisted(idx, strip));
+    } catch {
+      // Best-effort: the recipe is saved either way, and the card already says
+      // the macros couldn't be worked out.
+    } finally {
+      setBackfilling((prev) => {
+        const next = new Set(prev);
+        next.delete(idx);
+        return next;
+      });
+    }
+  };
 
   const onSave = async (idx: number) => {
     setSavingIdx(idx);
     setSaveErr(null);
     try {
       const cardState = nutrition[idx];
-      const strip =
-        cardState && (cardState.kind === "ok" || cardState.kind === "partial")
-          ? cardState.strip
-          : null;
-      // Save the SCALED version — what the user actually intends to cook.
-      // Scale from the ORIGINAL recipe exactly once; the card already
-      // renders a scaled copy but persistence must derive from the source
-      // so the factor isn't applied twice.
-      const scaled = scaleRecipe(recipes[idx]!, scaleFactors[idx] ?? 1);
-      const recipeWithNutrition: Recipe = { ...scaled, nutrition: strip };
-      await saveRecipe(recipeWithNutrition);
+      const strip = stripOf(cardState);
+      const saved = await saveRecipe(toPersisted(idx, strip));
       setSavedIdx((prev) => new Set(prev).add(idx));
+      // A card that is still PENDING has an answer coming; one that is
+      // rate-limited or empty does not, and must not delay or block the save.
+      if (!strip && cardState?.kind === "pending") void backfillNutrition(idx, saved);
     } catch (err) {
       setSaveErr(err instanceof Error ? err.message : String(err));
     } finally {
@@ -164,6 +237,7 @@ export function RecipesScreen({ recipes, ingredients, onEditIngredients, onResta
               nutritionState={nutrition[i] ?? { kind: "empty" }}
               saved={savedIdx.has(i)}
               saving={savingIdx === i}
+              backfilling={backfilling.has(i)}
               anySaving={savingIdx !== null}
               onServingsChange={(delta) => adjustServings(i, delta)}
               onScaleToAvailable={() => scaleToAvailable(i)}
@@ -188,6 +262,8 @@ interface RecipeCardProps {
   nutritionState: CardNutrition;
   saved: boolean;
   saving: boolean;
+  /** Saved before its macros landed; they're being written to the saved row. */
+  backfilling: boolean;
   anySaving: boolean;
   onServingsChange: (delta: number) => void;
   onScaleToAvailable: () => void;
@@ -204,6 +280,7 @@ function RecipeCard({
   nutritionState,
   saved,
   saving,
+  backfilling,
   anySaving,
   onServingsChange,
   onScaleToAvailable,
@@ -336,6 +413,19 @@ function RecipeCard({
           </button>
         )}
       </div>
+      {/* Saving is never blocked on the estimate — including when USDA has
+          rate-limited us, where waiting would achieve nothing — so say where
+          the macros are instead of letting a save quietly store none. */}
+      {!saved && nutritionState.kind === "pending" && (
+        <div className="faint" style={{ fontSize: 12 }}>
+          Macros are still calculating — save now and they'll be added when the estimate lands.
+        </div>
+      )}
+      {saved && backfilling && (
+        <div className="faint" style={{ fontSize: 12 }}>
+          Saved. Adding macros as soon as they land…
+        </div>
+      )}
     </article>
   );
 }

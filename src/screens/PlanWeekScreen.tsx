@@ -17,6 +17,7 @@ import {
   interpretMood,
   seedConstraintsFromRecipe,
   buildOnHand,
+  canonicalTokens,
   type PlanCandidate,
 } from "../features/planWeek";
 import { planWeekRemote } from "../bridge/recipesApi";
@@ -108,6 +109,32 @@ export function PlanWeekScreen({
     });
   }, []);
 
+  /**
+   * The user's own favourites, offered alongside the catalog.
+   *
+   * Two things here are load-bearing now that selection runs server-side:
+   *   - the id is the recipe's REAL db id, not a `saved:<slug>` synthetic. The
+   *     planner resolves pins and keeps by id against the row it will hydrate;
+   *     a synthetic id matched nothing and the pin was dropped in silence.
+   *   - category is left empty rather than "saved". seedConstraintsFromRecipe
+   *     turns the seed's category into a cuisine constraint, and "saved" is not
+   *     a cuisine — it matched no recipe and quietly loosened the whole plan.
+   */
+  const savedCandidates = useMemo<PlanCandidate[]>(
+    () =>
+      saved
+        .filter((r) => r.favorite)
+        .map((r) => ({
+          id: r.slug,
+          title: r.title,
+          recipe: r,
+          category: "",
+          tags: [] as string[],
+          isFavorite: true,
+        })),
+    [saved],
+  );
+
   const candidates = useMemo<PlanCandidate[]>(() => {
     const catalog = getCatalog().map((c) => ({
       id: c.id,
@@ -117,18 +144,8 @@ export function PlanWeekScreen({
       tags: c.tags,
       isFavorite: favs.has(c.id),
     }));
-    const savedFav = saved
-      .filter((r) => r.favorite)
-      .map((r) => ({
-        id: `saved:${r.slug}`,
-        title: r.title,
-        recipe: r,
-        category: "saved",
-        tags: [] as string[],
-        isFavorite: true,
-      }));
-    return [...savedFav, ...catalog];
-  }, [saved, favs, catalogVersion]);
+    return [...savedCandidates, ...catalog];
+  }, [savedCandidates, favs, catalogVersion]);
 
   const onHand = useMemo<Ingredient[]>(
     () => buildOnHand(pantry ? ingredientsFromPantry(pantry) : [], scanned),
@@ -208,7 +225,25 @@ export function PlanWeekScreen({
         // Blocked recipes are excluded on EVERY run, not just the one where
         // the user pressed thumbs-down.
         excludeIds: [...new Set([...exclude, ...blocked])],
-        favoriteIds: [...favs],
+        // The server's pool is the PUBLIC catalog, so the user's own recipes
+        // have to be offered explicitly or they can't be picked (or pinned —
+        // "plan around this recipe" on a saved favourite used to come back
+        // without it, with nothing said). Their canonical tokens are computed
+        // here because saved rows are stored with `tokens: []` and this is
+        // where the ingredient parser lives.
+        // Seed first: the server caps how many extras it will take, and the
+        // anchored recipe must never be the one that cap drops.
+        extraCandidates: [...savedCandidates]
+          .sort((a, b) => (a.id === seed?.id ? -1 : b.id === seed?.id ? 1 : 0))
+          .map((s) => ({
+            id: s.id,
+            title: s.title,
+            category: s.category,
+            tags: s.tags,
+            tokens: canonicalTokens(s.recipe),
+          })),
+        // A saved favourite is a favourite. The index only holds CATALOG ids.
+        favoriteIds: [...favs, ...savedCandidates.map((s) => s.id)],
         ...(keep && keep.length > 0 ? { pinnedIds: keep } : {}),
         ...(moodMode === "seed" && seed?.id ? { pinnedId: seed.id } : {}),
       });
@@ -230,7 +265,23 @@ export function PlanWeekScreen({
         kept.splice(replaceAt, 0, ...fresh);
         chosen = kept;
       }
-      setPlan(planFromChosen(chosen, onHand, c, res.warnings, res.shortfall));
+      // A pin the planner couldn't use is dropped server-side (excluded, or
+      // filtered out by an avoid/dietary rule). Say so: the user asked for a
+      // week built around this recipe, and a plan that quietly doesn't contain
+      // it looks like the app ignored them. Not said when they rerolled the
+      // seed away themselves — that drop is what they just asked for.
+      const warnings = [...res.warnings];
+      if (
+        moodMode === "seed" &&
+        seed &&
+        !exclude.includes(seed.id) &&
+        !chosen.some((x) => x.id === seed.id)
+      ) {
+        warnings.push(
+          `Couldn't build the week around "${seed.title}" — it didn't fit the rest of these filters, so the plan is based on your other choices.`,
+        );
+      }
+      setPlan(planFromChosen(chosen, onHand, c, warnings, res.shortfall));
       setExcludeIds(exclude);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -528,7 +579,8 @@ function MoodStep(p: MoodProps) {
                   <div key={c.id} className="browse-item" onClick={() => p.setSeed(c)}>
                     <div className="title-block">
                       <div className="title">{c.title}</div>
-                      <div className="meta">{c.category}</div>
+                      {/* Saved recipes carry no category — see savedCandidates. */}
+                      <div className="meta">{c.category || "your recipe"}</div>
                     </div>
                   </div>
                 ))}
