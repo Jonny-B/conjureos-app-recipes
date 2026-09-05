@@ -168,16 +168,40 @@ export function scaleRecipe(recipe: Recipe, factor: number): Recipe {
   if (factor === 1 || !Number.isFinite(factor) || factor <= 0) return recipe;
   const servings = Math.max(1, Math.round(recipe.servings * factor));
   const ingredients = recipe.ingredients.map((line) => scaleLine(line, factor));
-  // Nutrition is per-serving. Scaling factor changes the recipe yield but
-  // NOT the per-serving macros (each serving still has the same macros);
-  // exception: if the user explicitly scaled servings up/down via the
-  // stepper, per-serving stays the same. If they scaled by limiting
-  // ingredient, per-serving still stays the same (each serving is still
-  // the same composition). So nutrition does NOT scale with the factor.
+  // Nutrition is per-serving, and per-serving composition IS invariant under
+  // scaling — but only while the yield scales exactly. It doesn't: servings is
+  // rounded to an integer above, so the food is divided among a different
+  // number of plates than the factor implies, and the leftover lands in each
+  // serving.
+  //
+  //   4 servings at 600 cal, factor 0.3 -> 1.2 servings rounds to 1 plate,
+  //   which now holds 4 x 0.3 x 600 = 720 cal, not 600.
+  //
+  // Reachable from "scale to my ingredients" (RecipesScreen) and the guided
+  // cook's scale-to-pantry, both of which set arbitrary fractional factors —
+  // and the wrong value was then PERSISTED to the user's library on save.
+  // Correct for the rounding: the batch total is invariant, the per-plate share
+  // is not.
+  const exactServings = recipe.servings * factor;
+  const rounding = exactServings > 0 ? exactServings / servings : 1;
   return {
     ...recipe,
     servings,
     ingredients,
+    ...(recipe.nutrition && rounding !== 1
+      ? { nutrition: scaleStripPerServing(recipe.nutrition, rounding) }
+      : {}),
+  };
+}
+
+/** Re-divide per-serving macros after the yield was rounded to whole plates. */
+function scaleStripPerServing(n: NutritionStrip, k: number): NutritionStrip {
+  return {
+    ...n,
+    calories: Math.round(n.calories * k),
+    protein: Math.round(n.protein * k),
+    fat: Math.round(n.fat * k),
+    carbs: Math.round(n.carbs * k),
   };
 }
 

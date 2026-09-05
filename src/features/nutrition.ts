@@ -212,6 +212,51 @@ const UNIT_TO_GRAMS: Record<string, number> = {
   fl: 30, // "fl oz" — handled below
 };
 
+
+/**
+ * Rewrite the catalog's dominant ingredient format so the normal parser can
+ * read it: `1 (14.5 ounce) can diced tomatoes` -> `14.5 ounce diced tomatoes`.
+ *
+ * The old parenthetical stripper was anchored to `$`, so it only removed
+ * TRAILING asides. On this format the parenthetical survived into the name,
+ * which cost twice: grams fell through to the 50g "couldn't quantify" guess
+ * instead of ~411g, and the USDA query became the literal string
+ * "(14.5 ounce) can diced tomatoes", which matches nothing — so the line
+ * counted toward the strip's total but never its matched count, dragging every
+ * such recipe's coverage under the 0.7 threshold and labelling it "rough".
+ *
+ * The parenthetical is not noise here, it is the can size, so it is multiplied
+ * through rather than discarded: outer count x inner amount, in the inner unit.
+ * The container noun is dropped — "can" is packaging, not food, and USDA
+ * matches "diced tomatoes" far better than "can diced tomatoes".
+ */
+const CONTAINER_NOUNS =
+  "cans?|jars?|packages?|pkgs?|bags?|boxes|box|containers?|bottles?|tubs?|packets?|envelopes?|cartons?";
+
+function normalizeSizedContainer(text: string): string {
+  const m = text.match(
+    new RegExp(
+      "^(\\d+(?:\\.\\d+)?)?\\s*\\(\\s*(\\d+(?:\\.\\d+)?)\\s*([a-z.]+)\\s*\\)\\s*(?:" +
+        CONTAINER_NOUNS +
+        ")?\\s*(.+)$",
+    ),
+  );
+  if (!m) return text;
+  const count = m[1] ? Number(m[1]) : 1;
+  const amount = Number(m[2]);
+  const unit = (m[3] ?? "").replace(/\.$/, "");
+  const rest = (m[4] ?? "").trim();
+  // Only rewrite when the inner unit is one we can actually weigh; otherwise
+  // leave the line alone rather than inventing a quantity.
+  if (!rest || !Number.isFinite(count) || !Number.isFinite(amount)) return text;
+  if (UNIT_TO_GRAMS[unit] === undefined) return text;
+  return `${round2(count * amount)} ${unit} ${rest}`;
+}
+
+const round2 = (n: number): number => Math.round(n * 100) / 100;
+/** Size adjectives that must not block a PER_PIECE_GRAMS lookup. */
+const SIZE_WORDS = new Set(["small", "medium", "large", "extra", "jumbo", "baby"]);
+
 const PER_PIECE_GRAMS: Record<string, number> = {
   egg: 50, eggs: 50,
   clove: 3, cloves: 3,
@@ -285,7 +330,9 @@ export function parseIngredient(line: string): ParsedIngredient | null {
   // Strip leading list marker / parenthetical asides at the end. ASCII
   // markers only (- and *); Unicode bullet stripped from the class for
   // the same encoding-safety reason as the fraction parser above.
-  const trimmed = lower.replace(/^[-*]\s*/, "").replace(/\s*\([^)]*\)\s*$/, "").trim();
+  const trimmed = normalizeSizedContainer(
+    lower.replace(/^[-*]\s*/, "").replace(/\s*\([^)]*\)\s*$/, "").trim(),
+  );
   const tokens = trimmed.split(/\s+/);
   if (tokens.length === 0) return null;
 
@@ -320,8 +367,23 @@ export function parseIngredient(line: string): ParsedIngredient | null {
       nameTokens = nameTokens.slice(1);
     } else {
       // No unit. Try per-piece against the full remaining name.
+      // The size adjectives are dropped FIRST: PER_PIECE_GRAMS is keyed on
+      // "onion"/"potato", but the lookup used to run against tokens that still
+      // carried a leading "large"/"medium"/"small" (those are only stripped
+      // further down, for the USDA query). So "2 large onions" missed the table
+      // and fell to the 50g guess — 100g instead of 300g — and the same wrong
+      // grams drove "running low: need ~Xg" and the "scale to my ingredients"
+      // factor, which was off by 3-4x on any adjective-carrying line.
+      const sized = nameTokens.filter((t) => !SIZE_WORDS.has(t));
+      const s0 = sized[0]?.replace(/\.$/, "") ?? "";
       const fullName = nameTokens.join(" ");
-      const perPiece = PER_PIECE_GRAMS[fullName] ?? PER_PIECE_GRAMS[t0] ?? PER_PIECE_GRAMS[t0Stripped];
+      const perPiece =
+        PER_PIECE_GRAMS[fullName] ??
+        PER_PIECE_GRAMS[sized.join(" ")] ??
+        PER_PIECE_GRAMS[t0] ??
+        PER_PIECE_GRAMS[t0Stripped] ??
+        PER_PIECE_GRAMS[s0] ??
+        PER_PIECE_GRAMS[s0.replace(/s$/, "")];
       if (perPiece !== undefined) {
         grams = quantity * perPiece;
         // Keep the full name for the USDA search — "eggs" is a better query than "".

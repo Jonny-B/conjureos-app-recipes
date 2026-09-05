@@ -372,7 +372,13 @@ export function PlansScreen({
     const planId = cogPlan.id;
     const items: CogItem[] = [];
     if (cogPlan.familyId) {
-      items.push({ key: "private", label: "Make private", icon: "user", onClick: () => void sharePlan(planId, null) });
+      // Only the owner may move a plan out of the family. Offering this to any
+      // member meant tapping it made someone else's plan vanish for the whole
+      // family — and it didn't land in the tapper's own list either, because
+      // ownership never moved. The server enforces this too (forbidden_reassign).
+      if (cogPlan.mine) {
+        items.push({ key: "private", label: "Make private", icon: "user", onClick: () => void sharePlan(planId, null) });
+      }
     } else {
       for (const f of families) {
         items.push({
