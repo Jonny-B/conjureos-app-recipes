@@ -127,11 +127,16 @@ function asStringArray(
 function asOptionalNutrition(v: unknown): NutritionStrip | null {
   if (v === undefined || v === null) return null;
   const obj = asObject(v);
+  // Every macro is optional in the published manifest schema (no `required`
+  // array), but this used to demand all four — so a conforming caller sending
+  // {calories: 420}, which is all a meal planner may know, had its whole
+  // addRecipe rejected with HANDLER_THREW. Missing macros default to 0 and are
+  // still range-checked when present.
   return {
-    calories: asPositiveInt(obj.calories, "nutrition.calories", 10_000),
-    protein: asPositiveInt(obj.protein, "nutrition.protein", 1000),
-    fat: asPositiveInt(obj.fat, "nutrition.fat", 1000),
-    carbs: asPositiveInt(obj.carbs, "nutrition.carbs", 1000),
+    calories: asPositiveInt(obj.calories ?? 0, "nutrition.calories", 10_000),
+    protein: asPositiveInt(obj.protein ?? 0, "nutrition.protein", 1000),
+    fat: asPositiveInt(obj.fat ?? 0, "nutrition.fat", 1000),
+    carbs: asPositiveInt(obj.carbs ?? 0, "nutrition.carbs", 1000),
     matched: asPositiveInt(obj.matched ?? 0, "nutrition.matched", 100),
     total: asPositiveInt(obj.total ?? 0, "nutrition.total", 100),
     est: true,

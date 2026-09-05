@@ -649,7 +649,10 @@ export function rateLimitResetsAt(): Date | null {
  * Format: "~520 cal · 32g P · 18g F · 48g C per serving · est."
  */
 export function formatStrip(s: NutritionStrip): string {
-  const coverageOK = s.matched / Math.max(1, s.total) >= 0.7;
-  const flag = coverageOK ? "est." : "rough";
+  // total === 0 means "we never measured coverage", not "coverage was bad".
+  // The catalog list endpoint returns rows with ingredients forced to [], so
+  // every catalog strip arrived as matched:0/total:0 and printed "rough" over
+  // hand-curated database values. Absent evidence is not evidence of a problem.
+  const flag = s.total === 0 ? "est." : s.matched / s.total >= 0.7 ? "est." : "rough";
   return `~${s.calories} cal · ${s.protein}g P · ${s.fat}g F · ${s.carbs}g C · per serving · ${flag}`;
 }

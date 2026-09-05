@@ -26,18 +26,35 @@ export async function saveRecipe(recipe: Recipe): Promise<SavedRecipe> {
   return api.addRecipe({ ...recipe, visibility: "private" });
 }
 
-export async function listSavedRecipes(): Promise<SavedRecipe[]> {
-  // Outside ConjureOS (conj-pack dev) there's no actions bridge at all.
-  // Signed in but the backend rejects (REQUIRES_AUTH when signed out, network
-  // error, etc.) is caught too: degrade to "no saved recipes" rather than
-  // throwing, so the catalog-only surfaces still render.
-  if (!isBackendAvailable()) return [];
+/**
+ * Outcome of listing the user's library. `ok: false` means the backend was
+ * reachable-in-principle but the call failed — which is NOT the same as an
+ * empty library, and must not be rendered as "you haven't saved anything".
+ *
+ * No backend at all (standalone conj-pack dev, where there is no actions
+ * bridge) IS a genuine empty: there is no library to fail to read.
+ */
+export type SavedListing = { ok: true; recipes: SavedRecipe[] } | { ok: false };
+
+export async function listSavedRecipesResult(): Promise<SavedListing> {
+  if (!isBackendAvailable()) return { ok: true, recipes: [] };
   try {
     await migrateLegacyRecipes();
-    return await api.listMine();
+    return { ok: true, recipes: await api.listMine() };
   } catch {
-    return [];
+    return { ok: false };
   }
+}
+
+/**
+ * Lenient variant for surfaces that BLEND saved recipes into a wider feed
+ * (Home, Plan-my-week). There an empty result asserts nothing to the user, so
+ * degrading is fine. A screen that says "you haven't saved any recipes yet"
+ * must use listSavedRecipesResult instead — that sentence is a claim.
+ */
+export async function listSavedRecipes(): Promise<SavedRecipe[]> {
+  const r = await listSavedRecipesResult();
+  return r.ok ? r.recipes : [];
 }
 
 export async function markMade(recipe: SavedRecipe): Promise<SavedRecipe> {

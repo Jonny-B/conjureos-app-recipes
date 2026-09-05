@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FeedRecipe, PantryItem, Recipe, RecipeSource, SavedRecipe } from "../types";
 import { getCatalog, categories, toRecipe, loadRecipeBody } from "../features/catalog";
 import {
-  listSavedRecipes,
+  listSavedRecipesResult,
   saveRecipe,
   markMade,
   deleteRecipe,
@@ -56,9 +56,19 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
 
   const catalog = useMemo(() => getCatalog(), [catalogVersion]);
 
+  // A failed library read must not render as "you haven't saved any recipes
+  // yet" — that sentence is a claim about the user's data, and getting it wrong
+  // reads exactly like data loss. Same three-state treatment PlansScreen uses.
+  const [loadFailed, setLoadFailed] = useState(false);
+
   const refresh = useCallback(async () => {
-    const [s, f] = await Promise.all([listSavedRecipes(), loadFavorites()]);
-    setSaved(s);
+    const [s, f] = await Promise.all([listSavedRecipesResult(), loadFavorites()]);
+    if (s.ok) {
+      setSaved(s.recipes);
+      setLoadFailed(false);
+    } else {
+      setLoadFailed(true);
+    }
     setFavs(f);
     setLoaded(true);
   }, []);
@@ -282,7 +292,7 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
       {!loaded ? (
         <div className="center-spinner"><div className="spinner" /></div>
       ) : ranked.length === 0 ? (
-        <EmptyState source={source} hasQuery={!!query || (source === "all" && category !== "all")} onAdd={() => setMode("write")} />
+        <EmptyState source={source} hasQuery={!!query || (source === "all" && category !== "all")} onAdd={() => setMode("write")} failed={loadFailed} onRetry={() => { setLoaded(false); void refresh(); }} />
       ) : (
         <>
           <div className="browse-list">
@@ -328,7 +338,7 @@ function matchesQuery(fi: FeedRecipe, q: string): boolean {
   return false;
 }
 
-function EmptyState({ source, hasQuery, onAdd }: { source: RecipeSource; hasQuery: boolean; onAdd: () => void }) {
+function EmptyState({ source, hasQuery, onAdd, failed, onRetry }: { source: RecipeSource; hasQuery: boolean; onAdd: () => void; failed: boolean; onRetry: () => void }) {
   if (hasQuery)
     return (
       <div className="empty-state">
@@ -344,7 +354,14 @@ function EmptyState({ source, hasQuery, onAdd }: { source: RecipeSource; hasQuer
       </div>
     );
   if (source === "mine")
-    return (
+    return failed ? (
+      <div className="empty-state">
+        <Icon name="bowl-food" className="empty-icon" />
+        <div>Couldn&apos;t load your recipes. They&apos;re still saved — this is a
+          connection problem, not a missing library.</div>
+        <button className="btn" onClick={onRetry}>Try again</button>
+      </div>
+    ) : (
       <div className="empty-state">
         <Icon name="bowl-food" className="empty-icon" />
         <div>You haven't saved any recipes yet. Save one from All, or add your own.</div>
