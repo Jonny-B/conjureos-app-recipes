@@ -35,12 +35,19 @@ export function PantryScreen({ pantry, onChange, onBack, onCook, catalogVersion 
   const [error, setError] = useState<string | null>(null);
   const [gen, setGen] = useState<Gen>({ kind: "idle" });
 
+  // Retained so a failed identify doesn't cost the user their photos — see
+  // CaptureScreen's initialPhotos. Cleared on success, so the next scan starts
+  // from an empty tray rather than re-offering shots already used.
+  const [lastPhotos, setLastPhotos] = useState<CapturedPhoto[]>([]);
+
   const onScanned = async (photos: CapturedPhoto[]) => {
     setError(null);
+    setLastPhotos(photos);
     setMode("identifying");
     try {
       const items = await identifyIngredients(photos);
       setScanned(items.map((i) => ({ ...i, confirmed: i.confirmed })));
+      setLastPhotos([]);
       setMode("confirm");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -110,6 +117,7 @@ export function PantryScreen({ pantry, onChange, onBack, onCook, catalogVersion 
         )}
         <CaptureScreen
           onIdentify={onScanned}
+          initialPhotos={lastPhotos}
           title="Add to your kitchen"
           emptyHint="Snap your fridge or shelves — I'll list what I see so you can add it in a tap."
           actionLabel={(n) => `Find items in ${n} photo${n === 1 ? "" : "s"} →`}

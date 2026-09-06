@@ -28,6 +28,15 @@ function usePointerCoarse(): boolean {
 
 interface Props {
   onIdentify: (photos: CapturedPhoto[]) => void;
+  /**
+   * Photos to start with. Every caller flips to a "working" mode while the AI
+   * call runs, which renders a DIFFERENT branch and therefore unmounts this
+   * component — taking its local photo state with it. On a failure the caller
+   * flips back, remounting a fresh CaptureScreen, and the user's photos were
+   * gone: reshoot the whole fridge because the model returned bad JSON. The
+   * caller now retains them and hands them back here.
+   */
+  initialPhotos?: CapturedPhoto[];
   /** Heading shown before any photo is added. Default: fridge-scan copy. */
   title?: string;
   /** Sub-line shown with zero photos. Default: fridge-scan copy. */
@@ -40,9 +49,9 @@ interface Props {
 
 const MAX_PHOTOS = 6;
 
-export function CaptureScreen({ onIdentify, title, emptyHint, moreHint, actionLabel }: Props) {
+export function CaptureScreen({ onIdentify, initialPhotos, title, emptyHint, moreHint, actionLabel }: Props) {
   const [dragOver, setDragOver] = useState(false);
-  const [photos, setPhotos] = useState<CapturedPhoto[]>([]);
+  const [photos, setPhotos] = useState<CapturedPhoto[]>(initialPhotos ?? []);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);

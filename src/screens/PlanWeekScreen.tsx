@@ -290,11 +290,17 @@ export function PlanWeekScreen({
     }
   };
 
+  // Retained across the identify round trip: flipping scanMode unmounts
+  // CaptureScreen, so without this a failed call lost the user's photos.
+  const [lastPhotos, setLastPhotos] = useState<CapturedPhoto[]>([]);
+
   const onScanned = async (photos: CapturedPhoto[]) => {
+    setLastPhotos(photos);
     setScanMode("identifying");
     try {
       const items = await identifyIngredients(photos);
       setScanned((prev) => buildOnHand(prev, items));
+      setLastPhotos([]);
       setScanMode("idle");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -361,7 +367,7 @@ export function PlanWeekScreen({
         <button className="btn ghost" onClick={() => setScanMode("idle")} style={{ alignSelf: "flex-start" }}>
           <Icon name="chevron-down" className="back-caret" /> Back
         </button>
-        <CaptureScreen onIdentify={onScanned} />
+        <CaptureScreen onIdentify={onScanned} initialPhotos={lastPhotos} />
       </div>
     );
   }

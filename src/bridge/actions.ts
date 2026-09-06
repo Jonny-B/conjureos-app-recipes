@@ -267,9 +267,19 @@ const MAX_IMPORT_IMAGES = 6;
  * Validate untrusted { mediaType, data } image params from another app
  * (the ConjureOS orchestrator forwards the user's attached photos here).
  * Whitelist the media type, require a non-empty base64 string, cap the
- * count. We do NOT decode/inspect the bytes; the vision model + the
- * editable-preview-on-save step are the content defenses (same posture as
- * Snap-a-recipe in the app UI).
+ * count. We do NOT decode/inspect the bytes.
+ *
+ * NOTE, corrected: this used to claim "the editable-preview-on-save step" as a
+ * content defense, "same posture as Snap-a-recipe in the app UI". That is FALSE
+ * for this path. Snap-a-recipe routes its transcription through RecipeEditor so
+ * the user checks it before saving; importRecipeFromImage saves directly,
+ * because a bridge call has no UI to present a preview in — the app may not
+ * even be open. The real posture here is: the caller holds `actions.write`,
+ * which the user granted per-app, and the model's output is sanitised by
+ * saveRecipe on the way in. A recipe the user did not vet can therefore land in
+ * their library, and the mitigation is that they can see and delete it.
+ * If a review step is ever wanted here it needs a genuine notification surface,
+ * not a comment.
  */
 function asChatImages(v: unknown): ChatImage[] {
   if (!Array.isArray(v)) {
@@ -301,6 +311,9 @@ function asChatImages(v: unknown): ChatImage[] {
  * app" with a photo: the ConjureOS orchestrator routes the user's attached
  * image here, we run the same vision transcription Snap-a-recipe uses, then
  * persist via saveRecipe. Returns the new slug so the caller can deep-link.
+ *
+ * Saves WITHOUT a review step, unlike the in-app Snap-a-recipe flow — see the
+ * note on asChatImages above.
  */
 async function importRecipeFromImage(
   rawParams?: unknown,

@@ -222,14 +222,16 @@
                   "items": {
                     "type": "string",
                     "maxLength": 80
-                  }
+                  },
+                  "maxItems": 30
                 },
                 "instructions": {
                   "type": "array",
                   "items": {
                     "type": "string",
                     "maxLength": 400
-                  }
+                  },
+                  "maxItems": 30
                 },
                 "summary": {
                   "type": "string",
@@ -294,7 +296,57 @@
       },
       "importRecipeFromImage": {
         "permission": "actions.write",
-        "description": "Transcribe a recipe from one or more attached photos (a recipe card, cookbook or magazine page, handwritten note, or screenshot) and save it to the user's recipe library. Takes images: an array of { mediaType, data } photos. THIS is the action to use when the user attaches a photo of a recipe and asks to add, save, or import it into their recipes."
+        "description": "Transcribe a recipe from one or more attached photos (a recipe card, cookbook or magazine page, handwritten note, or screenshot) and save it to the user's recipe library. Takes images: an array of { mediaType, data } photos. THIS is the action to use when the user attaches a photo of a recipe and asks to add, save, or import it into their recipes.",
+        "params": {
+          "type": "object",
+          "properties": {
+            "images": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 6,
+              "description": "Photos of the recipe, in reading order. Extra images beyond 6 are ignored.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "mediaType": {
+                    "type": "string",
+                    "enum": [
+                      "image/jpeg",
+                      "image/png",
+                      "image/webp",
+                      "image/gif"
+                    ]
+                  },
+                  "data": {
+                    "type": "string",
+                    "description": "Base64-encoded image bytes, no data: prefix."
+                  }
+                },
+                "required": [
+                  "mediaType",
+                  "data"
+                ]
+              }
+            }
+          },
+          "required": [
+            "images"
+          ]
+        },
+        "returns": {
+          "type": "object",
+          "properties": {
+            "slug": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          }
+        }
       },
       "markCooked": {
         "permission": "actions.write",
