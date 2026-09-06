@@ -324,10 +324,41 @@ export function normalizeIngredientName(s: string): string {
  */
 const NEUTRAL_MODIFIERS = new Set([
   "boneless", "skinless", "bone-in", "skin-on", "lean", "unsalted", "salted",
-  "organic", "ripe", "peeled", "softened", "melted", "packed", "plain",
+  "organic", "peeled", "softened", "melted", "packed", "plain",
   "uncooked", "all-purpose", "allpurpose", "virgin", "extra-virgin",
-  "kosher", "baby", "rolled", "heavy", "whipping",
+  "kosher", "rolled",
+  // Ordinary shelf qualifiers that don't change what the food is. Without
+  // these, a pantry holding "flour" reported "all purpose flour" as MISSING —
+  // 10 of 16 typical catalog lines failed that way, and the same predicate
+  // drives the shopping list, so it re-bought what you had.
+  "unsweetened", "sweetened", "toasted", "roasted", "instant", "smoked",
+  "quick", "canned", "jarred", "sharp", "mild", "purpose",
 ]);
+// heavy / whipping / baby / ripe were HERE and had to move. Anything in
+// NEUTRAL_MODIFIERS is stripped from BOTH names before the gated cultivar fold
+// below runs, so those four bypassed the VARIETY_HEADS whitelist entirely:
+// "cream" matched "heavy cream" and "corn" matched "baby corn", the exact
+// false-positive direction this matcher exists to prevent — and the direction
+// the commit that added the gate claimed to have closed. baby/ripe now live in
+// VARIETY_WORDS where the head-noun gate governs them; heavy/whipping are in
+// neither, so heavy cream is correctly a different ingredient from cream.
+
+/**
+ * Leading modifier PHRASES. Handled as phrases, not loose tokens, because the
+ * tokens are not individually safe: stripping "fat" would turn "chicken fat"
+ * into "chicken", and stripping "low" alone buys nothing.
+ */
+const MODIFIER_PHRASES: string[][] = [
+  ["all", "purpose"],
+  ["low", "sodium"],
+  ["low", "fat"],
+  ["reduced", "fat"],
+  ["fat", "free"],
+  ["extra", "virgin"],
+  ["part", "skim"],
+  ["finely", "chopped"],
+  ["freshly", "ground"],
+];
 
 /**
  * Trailing words that name a CUT or FORM of the food named before them, so
@@ -390,9 +421,16 @@ const TOKEN_CACHE_MAX = 5000;
 function matchTokens(name: string): string[] {
   const hit = tokenCache.get(name);
   if (hit) return hit;
-  const all = normalizeIngredientName(prettyIngredient(name))
+  let all = normalizeIngredientName(prettyIngredient(name))
     .split(" ")
     .filter((t) => t.length > 0);
+  // Strip a leading modifier phrase before anything else looks at the tokens.
+  for (const phrase of MODIFIER_PHRASES) {
+    if (all.length > phrase.length && phrase.every((w, i) => all[i] === w)) {
+      all = all.slice(phrase.length);
+      break;
+    }
+  }
   // A name made ENTIRELY of form adjectives is that food, not a modifier of one
   // ("baby" is a modifier, "baby corn" too, but a pantry line reading "baby"
   // would otherwise reduce to nothing and match every recipe or none).

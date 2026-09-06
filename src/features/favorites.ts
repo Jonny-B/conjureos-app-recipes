@@ -29,7 +29,7 @@ function parseFavs(raw: unknown): Set<string> | null {
   return new Set(doc.catalogIds.filter((x) => typeof x === "string").slice(0, MAX_IDS));
 }
 
-const FAV_DOC = { maxBytes: MAX_FILE_BYTES, empty: new Set<string>() };
+const FAV_DOC = { maxBytes: MAX_FILE_BYTES, empty: (): Set<string> => new Set() };
 
 /** Read for DISPLAY — an unreadable index renders as "no favorites". */
 export async function loadFavorites(): Promise<Set<string>> {

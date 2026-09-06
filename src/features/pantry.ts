@@ -30,7 +30,7 @@ function parsePantry(raw: unknown): PantryItem[] | null {
   return doc.items.filter(isValidItem).slice(0, MAX_ITEMS);
 }
 
-const PANTRY_DOC = { maxBytes: MAX_FILE_BYTES, empty: [] as PantryItem[] };
+const PANTRY_DOC = { maxBytes: MAX_FILE_BYTES, empty: (): PantryItem[] => [] };
 
 /**
  * Read for DISPLAY. Still degrades to an empty list, because a screen that

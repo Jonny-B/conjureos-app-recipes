@@ -44,11 +44,18 @@ export class UnreadableDocError extends Error {
 /**
  * Read and validate a JSON document. `parse` returns null to reject a payload
  * whose shape is wrong; that counts as unknown, not empty.
+ *
+ * `empty` is a FACTORY, not a value, and must stay one. It was a plain `T`,
+ * handed back BY IDENTITY on the absent-file path — and the favourites and
+ * blocked mutators add/delete on the Set they receive, so they were mutating a
+ * module-level constant. It became a cross-call accumulator: ids toggled during
+ * one first-run leaked into the next and were written to disk. Returning a
+ * fresh value per call is the whole fix.
  */
 export async function readJsonDoc<T>(
   path: string,
   parse: (raw: unknown) => T | null,
-  opts: { maxBytes: number; empty: T },
+  opts: { maxBytes: number; empty: () => T },
 ): Promise<DocLoad<T>> {
   let present: boolean;
   try {
@@ -56,7 +63,7 @@ export async function readJsonDoc<T>(
   } catch {
     return { ok: false }; // can't even tell whether it's there
   }
-  if (!present) return { ok: true, value: opts.empty };
+  if (!present) return { ok: true, value: opts.empty() };
 
   let text: string;
   try {
@@ -85,7 +92,7 @@ export async function readJsonDoc<T>(
 export async function requireJsonDoc<T>(
   path: string,
   parse: (raw: unknown) => T | null,
-  opts: { maxBytes: number; empty: T; what: string },
+  opts: { maxBytes: number; empty: () => T; what: string },
 ): Promise<T> {
   const r = await readJsonDoc(path, parse, opts);
   if (!r.ok) throw new UnreadableDocError(opts.what);

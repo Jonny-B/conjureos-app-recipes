@@ -99,10 +99,13 @@ function parseStores(raw: unknown): StoresState | null {
 }
 
 /** A file we couldn't read is NOT a first run — see loadStoresState. */
-const storesDoc = () => {
-  const d = defaultStore();
-  return { maxBytes: MAX_FILE_BYTES, empty: { stores: [d], defaultId: d.id } as StoresState };
-};
+const storesDoc = () => ({
+  maxBytes: MAX_FILE_BYTES,
+  empty: (): StoresState => {
+    const d = defaultStore();
+    return { stores: [d], defaultId: d.id };
+  },
+});
 
 /**
  * Load the user's store layouts, distinguishing a genuine first run from an
@@ -121,7 +124,7 @@ export async function loadStoresState(): Promise<DocLoad<StoresState>> {
  */
 export async function loadStores(): Promise<StoresState> {
   const r = await loadStoresState();
-  return r.ok ? r.value : storesDoc().empty;
+  return r.ok ? r.value : storesDoc().empty();
 }
 
 export async function saveStores(state: StoresState): Promise<void> {

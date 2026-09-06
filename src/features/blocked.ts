@@ -34,7 +34,7 @@ function parseBlocked(raw: unknown): Set<string> | null {
   return new Set(doc.ids.filter((x) => typeof x === "string").slice(0, MAX_IDS));
 }
 
-const BLOCKED_DOC = { maxBytes: MAX_FILE_BYTES, empty: new Set<string>() };
+const BLOCKED_DOC = { maxBytes: MAX_FILE_BYTES, empty: (): Set<string> => new Set() };
 
 /** Read for DISPLAY / filtering — unreadable behaves as "nothing blocked". */
 export async function loadBlocked(): Promise<Set<string>> {
