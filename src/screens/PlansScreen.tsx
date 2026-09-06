@@ -101,9 +101,18 @@ export function PlansScreen({
   intent = null,
   onIntentConsumed,
   onCogItems,
+  familyEpoch = 0,
 }: {
   pantry: PantryItem[] | null;
   catalogVersion?: number;
+  /**
+   * Bumped by the host when the user joins a family from OUTSIDE this screen
+   * (the invite-link prompt). Joining changes which plans exist for us, and the
+   * realtime channel we'd otherwise learn it from is listed on the profile —
+   * which we haven't reloaded yet — so without this a user who joined while
+   * sitting on the Plans tab saw nothing until they navigated away and back.
+   */
+  familyEpoch?: number;
   /** A sub-screen to open, requested from the app-header cog. */
   intent?: PlansIntent | null;
   onIntentConsumed?: () => void;
@@ -207,6 +216,15 @@ export function PlansScreen({
       await loadPlans();
     })();
   }, [loadProfile, loadPlans]);
+
+  // Reload on an external family join. Skipped on mount — the effect above
+  // already did the first load, and running both would double-fetch.
+  const mountedEpoch = useRef(familyEpoch);
+  useEffect(() => {
+    if (familyEpoch === mountedEpoch.current) return;
+    mountedEpoch.current = familyEpoch;
+    void familyChanged();
+  }, [familyEpoch, familyChanged]);
 
   // The exact channel set, as a stable string. Keying the effect on `profile`
   // tore the websocket down and rebuilt it on EVERY profile refresh (each

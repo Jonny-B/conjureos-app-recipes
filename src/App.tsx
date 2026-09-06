@@ -76,6 +76,8 @@ export function App() {
   if (role === "admin") tabs.push({ id: "admin" as Tab, label: "Admin", icon: "sliders" as IconName });
   const [tab, setTab] = useState<Tab>("home");
   const [recipeSource, setRecipeSource] = useState<RecipeSource>("all");
+  /** Bumped when a family is joined from the invite prompt — see PlansScreen. */
+  const [familyEpoch, setFamilyEpoch] = useState(0);
   const [cookMode, setCookMode] = useState<CookMode>("kitchen");
   const [cookTarget, setCookTarget] = useState<CookTarget | null>(null);
   // The tab the guided cook was launched from, so Back returns there.
@@ -229,6 +231,7 @@ export function App() {
             intent={plansIntent}
             onIntentConsumed={() => setPlansIntent(null)}
             onCogItems={setCogExtras}
+            familyEpoch={familyEpoch}
           />
         )}
         {tab === "studio" && <StudioScreen />}
@@ -308,6 +311,10 @@ export function App() {
             setPendingJoin(null);
             setCookTarget(null);
             setTab("plan");
+            // setTab alone is a no-op when Plans is already the open tab, so the
+            // new family's plans wouldn't appear until the user navigated away
+            // and back. Bump the epoch so PlansScreen reloads either way.
+            setFamilyEpoch((n) => n + 1);
           }}
         />
       )}
