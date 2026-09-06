@@ -148,9 +148,32 @@ export function setAiSortEnabled(on: boolean): void {
   }
 }
 
-/** Merge AI-learned placements (canonical → aisleId) into a store, immutably. */
+/**
+ * Cap on remembered AI placements, per store.
+ *
+ * There was no write-side bound at all, and every successfully placed item was
+ * remembered forever. That collided with the 256KB read cap: once stores.json
+ * crossed it, loadStoresState answered `ok:false` permanently, and the only
+ * control that can shrink the file — "Clear N AI-learned" — lives inside the
+ * editor that then refuses to open. An unbounded cache could therefore lock the
+ * user out of the screen that fixes it. ~2,000 entries is far more distinct
+ * grocery items than a household buys and leaves a wide margin under the cap.
+ */
+const MAX_LEARNED = 2000;
+
+/**
+ * Merge AI-learned placements (canonical → aisleId) into a store, immutably.
+ * Oldest entries are dropped first when the cap is hit — insertion order is
+ * preserved by object key order for string keys, and the newest placement is
+ * the one most likely to matter next.
+ */
 export function withLearned(store: StoreLayout, placements: Record<string, string>): StoreLayout {
-  return { ...store, learned: { ...(store.learned ?? {}), ...placements } };
+  const merged = { ...(store.learned ?? {}), ...placements };
+  const keys = Object.keys(merged);
+  if (keys.length <= MAX_LEARNED) return { ...store, learned: merged };
+  const trimmed: Record<string, string> = {};
+  for (const k of keys.slice(keys.length - MAX_LEARNED)) trimmed[k] = merged[k]!;
+  return { ...store, learned: trimmed };
 }
 
 export function readLastStoreId(): string | null {

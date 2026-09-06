@@ -15,7 +15,7 @@ import { PlanWeekScreen } from "./PlanWeekScreen";
 import { FamilyScreen } from "./FamilyScreen";
 import { StoreEditor } from "./StoreEditor";
 import {
-  loadStores,
+  loadStoresState,
   saveStores,
   groupByStore,
   readLastStoreId,
@@ -648,8 +648,21 @@ function PlanView({
   const [defaultId, setDefaultId] = useState<string>("");
   const [aiNote, setAiNote] = useState<string | null>(null);
   const askedRef = useRef<Set<string>>(new Set());
+  // Deliberately the strict loader. This component WRITES stores back (the
+  // AI-placement effect below), and loadStores fabricates a default layout when
+  // the file is unreadable — so the lenient loader here would let that synthetic
+  // default overwrite the user's real aisle orders, the exact clobber the
+  // jsonDoc split exists to prevent. Unreachable today only because the default
+  // store happens to cover every category, so nothing lands in Unsorted; one
+  // renamed aisle re-opens it.
+  const [storesUnreadable, setStoresUnreadable] = useState(false);
   useEffect(() => {
-    loadStores().then(({ stores: st, defaultId: d }) => {
+    loadStoresState().then((r) => {
+      if (!r.ok) {
+        setStoresUnreadable(true);
+        return;
+      }
+      const { stores: st, defaultId: d } = r.value;
       setStores(st);
       setDefaultId(d);
       const last = readLastStoreId();
@@ -676,7 +689,9 @@ function PlanView({
   // Placements are learned onto the store, so the same items are instant + free
   // next time. Each (store, item) is asked at most once.
   useEffect(() => {
-    if (!store || !aiSortEnabled() || unsorted.length === 0) return;
+    // storesUnreadable: skip entirely rather than pay for an AI call whose
+    // result we must not persist.
+    if (!store || storesUnreadable || !aiSortEnabled() || unsorted.length === 0) return;
     const toAsk = unsorted.filter((i) => !askedRef.current.has(`${store.id}:${i.canonical}`));
     if (toAsk.length === 0) return;
     toAsk.forEach((i) => askedRef.current.add(`${store.id}:${i.canonical}`));
@@ -701,7 +716,7 @@ function PlanView({
     return () => {
       cancelled = true;
     };
-  }, [store, unsorted, defaultId]);
+  }, [store, unsorted, defaultId, storesUnreadable]);
 
   const checked = useMemo(() => new Set(plan.checked ?? []), [plan]);
   const total = (plan.shoppingList ?? []).length;
