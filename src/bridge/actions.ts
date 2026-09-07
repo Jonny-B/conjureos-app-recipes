@@ -1,9 +1,37 @@
 /**
  * Cross-app Action Registry — exposes recipe-app capabilities to other
- * installed apps (calorie tracker, meal planner, shopping list, etc.)
- * via ConjureOS's Phase 13a action bridge.
+ * installed apps and to the orchestrator (calorie tracker, meal planner,
+ * shopping list, etc.) via ConjureOS's Phase 13a action bridge.
  *
- * Four actions:
+ * WHAT IS DELIBERATELY *NOT* HERE, and why. Grants are per-action (the kernel
+ * stores actionGrants[targetApp][actionName] and prompts for each one), so the
+ * risk is not "grant one, get all" — it is a SINGLE mistaken approval that
+ * cannot be taken back. Everything below is excluded on one of three grounds:
+ *
+ *   - Irreversible. `deleteRecipe` / `deletePlan`: there is no trash and no
+ *     undo. Worth revisiting once deletion is recoverable.
+ *   - Consequences land on people who never saw the prompt. All family
+ *     membership mutation (create / join / leave / rename / addMember):
+ *     leaving can delete the household and orphan everyone's plans, joining
+ *     grants a third party access to other people's data. One user consents,
+ *     several are affected.
+ *   - Publishing or privilege. `setVisibility` to public/unlisted and
+ *     `chefUpsert` put content somewhere a later un-publish cannot recall it;
+ *     `adminSetRole` / `adminListUsers` are operator functions, not app
+ *     capabilities, and "Allow X to change user roles?" is a prompt a user can
+ *     accept without understanding. `setUsername` is identity.
+ *
+ * Also absent: shopping-list check-off. It runs through a compare-and-swap op
+ * queue so two people shopping the same list don't overwrite each other; a
+ * bridge write bolted onto that path would reintroduce the lost-update bug it
+ * exists to prevent. It needs the queue, not a second door into the same row.
+ *
+ * The read/compute actions never persist. `planWeek` returns a PROPOSAL and
+ * `scaleSavedRecipe` returns a scaled copy — both report `saved: false` —
+ * because proposing a week and committing one to the user's library are
+ * different acts, and only the second should need a write grant.
+ *
+ * The original four:
  *
  *   listRecipes({ filter?, limit? })  →  read
  *     Returns the user's saved recipes, optionally filtered. Used by
@@ -41,6 +69,23 @@ import {
   saveRecipe,
 } from "../features/storage";
 import { extractRecipeFromImages } from "../features/customRecipe";
+import {
+  ensureCatalogLoaded,
+  searchCatalog,
+  getCatalog,
+  categories as catalogCategories,
+} from "../features/catalog";
+import {
+  loadPantry,
+  addPantryItems as addToPantryItems,
+  removePantryItem,
+  ingredientsFromPantry,
+} from "../features/pantry";
+import { loadBlocked, blockRecipe, unblockRecipe } from "../features/blocked";
+import { loadStores } from "../features/storeLayout";
+import { scaleRecipe } from "../features/scaling";
+import { planFromChosen, type PlanCandidate } from "../features/planWeek";
+import * as api from "./recipesApi";
 
 declare global {
   /**
@@ -338,6 +383,234 @@ async function markCooked(rawParams?: unknown): Promise<{ madeCount: number; las
   };
 }
 
+// ── Catalog + library reads ──────────────────────────────────────────
+
+/**
+ * Search the ~1,200-recipe catalog. Distinct from `listRecipes`, which only
+ * ever saw the user's OWN library — an orchestrator asked "find me a chilli
+ * recipe" had no way to reach the catalog at all.
+ */
+async function searchRecipes(rawParams?: unknown): Promise<{ recipes: unknown[] }> {
+  const p = asObject(rawParams ?? {});
+  const query = typeof p.query === "string" ? p.query.slice(0, 100).trim() : "";
+  const category = typeof p.category === "string" ? p.category.slice(0, 40) : "";
+  const limit = p.limit === undefined ? 20 : asPositiveInt(p.limit, "limit", 50);
+  await ensureCatalogLoaded();
+  let hits = query ? searchCatalog(query) : getCatalog();
+  if (category) hits = hits.filter((r) => r.category.toLowerCase() === category.toLowerCase());
+  return {
+    recipes: hits.slice(0, Math.max(1, limit)).map((r) => ({
+      id: r.id,
+      title: r.title,
+      category: r.category,
+      difficulty: r.difficulty,
+      cookTime: r.cookTime,
+      servings: r.servings,
+      tags: r.tags,
+      ...(r.nutrition ? { nutrition: r.nutrition } : {}),
+    })),
+  };
+}
+
+/** The catalog's category taxonomy with counts, so a caller can filter sensibly. */
+async function listCategories(): Promise<{ categories: { name: string; count: number }[] }> {
+  await ensureCatalogLoaded();
+  return { categories: catalogCategories() };
+}
+
+// ── Pantry ───────────────────────────────────────────────────────────
+
+async function getPantry(): Promise<{ items: { name: string; quantity?: string; notes?: string }[] }> {
+  const items = await loadPantry();
+  return {
+    items: items.map((i) => ({
+      name: i.name,
+      ...(i.quantity ? { quantity: i.quantity } : {}),
+      ...(i.notes ? { notes: i.notes } : {}),
+    })),
+  };
+}
+
+async function addToPantry(rawParams?: unknown): Promise<{ count: number }> {
+  const p = asObject(rawParams);
+  if (!Array.isArray(p.items)) throw new Error("params.items must be an array");
+  const incoming = p.items.slice(0, 50).map((raw, i) => {
+    const o = asObject(raw);
+    if (typeof o.name !== "string" || !o.name.trim()) {
+      throw new Error(`params.items[${i}].name must be a non-empty string`);
+    }
+    return {
+      name: o.name.slice(0, 80),
+      ...(typeof o.quantity === "string" ? { quantity: o.quantity.slice(0, 40) } : {}),
+      ...(typeof o.notes === "string" ? { notes: o.notes.slice(0, 120) } : {}),
+    };
+  });
+  const after = await addToPantryItems(incoming);
+  return { count: after.length };
+}
+
+async function removeFromPantry(rawParams?: unknown): Promise<{ count: number }> {
+  const p = asObject(rawParams);
+  if (typeof p.name !== "string" || !p.name.trim()) {
+    throw new Error("params.name must be a non-empty string");
+  }
+  const after = await removePantryItem(p.name.slice(0, 80));
+  return { count: after.length };
+}
+
+// ── Reversible marks ─────────────────────────────────────────────────
+
+async function setFavorite(rawParams?: unknown): Promise<{ slug: string; favorite: boolean }> {
+  const p = asObject(rawParams);
+  const slug = asSlug(p.slug);
+  if (typeof p.favorite !== "boolean") throw new Error("params.favorite must be a boolean");
+  const all = await listSavedRecipes();
+  const found = all.find((r) => r.slug === slug);
+  if (!found) throw new Error(`Recipe not found: ${slug}`);
+  const updated = await api.setFavorite(api.recipeIdFromPath(found.path), p.favorite);
+  return { slug, favorite: !!updated.favorite };
+}
+
+/**
+ * Thumbs-down / undo. Scoped to RECOMMENDATIONS only, exactly as in the UI:
+ * a blocked recipe stays searchable, openable and cookable, the planner just
+ * stops picking it. Reversible, which is why it's on the safe side of the line.
+ */
+async function setBlocked(rawParams?: unknown): Promise<{ id: string; blocked: boolean; count: number }> {
+  const p = asObject(rawParams);
+  if (typeof p.id !== "string" || !p.id.trim()) throw new Error("params.id must be a non-empty string");
+  if (typeof p.blocked !== "boolean") throw new Error("params.blocked must be a boolean");
+  const id = p.id.slice(0, 64);
+  const after = p.blocked ? await blockRecipe(id) : await unblockRecipe(id);
+  return { id, blocked: p.blocked, count: after.size };
+}
+
+async function getBlocked(): Promise<{ ids: string[] }> {
+  return { ids: [...(await loadBlocked())] };
+}
+
+// ── Plans (read) ─────────────────────────────────────────────────────
+
+async function listPlans(): Promise<{ plans: { id: string; title: string; shared: boolean; updatedAt: string }[] }> {
+  const plans = await api.listPlans();
+  return {
+    plans: plans.map((r) => ({
+      id: r.id,
+      title: r.title ?? "Untitled plan",
+      shared: r.familyId !== null,
+      updatedAt: r.updatedAt,
+    })),
+  };
+}
+
+async function getPlan(rawParams?: unknown): Promise<Record<string, unknown>> {
+  const p = asObject(rawParams);
+  if (typeof p.id !== "string" || !p.id.trim()) throw new Error("params.id must be a non-empty string");
+  const plans = await api.listPlans();
+  const found = plans.find((r) => r.id === p.id);
+  if (!found) throw new Error(`Plan not found: ${p.id}`);
+  return {
+    id: found.id,
+    title: found.title ?? "Untitled plan",
+    shared: found.familyId !== null,
+    picks: (found.data.picks ?? []).map((x) => ({ id: x.id, title: x.title })),
+    shoppingList: (found.data.shoppingList ?? []).map((x) => ({
+      name: x.name,
+      aisle: x.aisle,
+      ...(x.quantity ? { quantity: x.quantity } : {}),
+      recipes: x.recipes.map((r) => r.title),
+    })),
+    checked: found.data.checked ?? [],
+  };
+}
+
+// ── Compute — nothing here persists ──────────────────────────────────
+
+/**
+ * Build a week's plan and RETURN it. Deliberately does not save: an
+ * orchestrator proposing a week is a different act from committing one to the
+ * user's library, and only the second needs a write grant.
+ */
+async function planWeek(rawParams?: unknown): Promise<Record<string, unknown>> {
+  const p = asObject(rawParams ?? {});
+  const mealCount = p.mealCount === undefined ? 5 : asPositiveInt(p.mealCount, "mealCount", 7);
+  const include = asStringArray(p.includeIngredients ?? [], "includeIngredients", 20, 60);
+  const cuisines = asStringArray(p.cuisines ?? [], "cuisines", 10, 40);
+  const avoid = asStringArray(p.avoid ?? [], "avoid", 20, 60);
+  const dietary = asStringArray(p.dietary ?? [], "dietary", 10, 40);
+
+  const pantry = await loadPantry();
+  const blocked = [...(await loadBlocked())];
+  const constraints = { mealCount, includeIngredients: include, cuisines, avoid, dietary };
+  const res = await api.planWeekRemote({
+    constraints: constraints as unknown as Record<string, unknown>,
+    onHand: pantry.map((i) => i.name),
+    excludeIds: blocked,
+  });
+  const chosen: PlanCandidate[] = res.recipes.map((r) => ({
+    id: r.id, title: r.title, recipe: r, category: r.category, tags: r.tags, isFavorite: false,
+  }));
+  const plan = planFromChosen(
+    chosen,
+    ingredientsFromPantry(pantry),
+    constraints as never,
+    res.warnings,
+    res.shortfall,
+  );
+  return {
+    picks: plan.picks.map((x) => ({ id: x.id, title: x.title })),
+    shoppingList: plan.shoppingList.map((x) => ({
+      name: x.name,
+      aisle: x.aisle,
+      ...(x.quantity ? { quantity: x.quantity } : {}),
+    })),
+    shortfall: plan.shortfall,
+    warnings: plan.warnings,
+    saved: false,
+  };
+}
+
+/** Rescale a saved recipe and return it. Does not modify the stored copy. */
+async function scaleSavedRecipe(rawParams?: unknown): Promise<Record<string, unknown>> {
+  const p = asObject(rawParams);
+  const slug = asSlug(p.slug);
+  const servings = asPositiveInt(p.servings, "servings", 64);
+  if (servings < 1) throw new Error("params.servings must be at least 1");
+  const all = await listSavedRecipes();
+  const found = all.find((r) => r.slug === slug);
+  if (!found) throw new Error(`Recipe not found: ${slug}`);
+  const scaled = scaleRecipe(found, servings / Math.max(1, found.servings));
+  return {
+    slug,
+    title: scaled.title,
+    servings: scaled.servings,
+    ingredients: scaled.ingredients,
+    ...(scaled.nutrition ? { nutrition: scaled.nutrition } : {}),
+    saved: false,
+  };
+}
+
+// ── Household + stores (read-only, deliberately minimal) ─────────────
+
+/**
+ * Whether the user is in a family, and their role. Deliberately does NOT
+ * return the member list: those are OTHER people, who never saw the consent
+ * prompt this caller answered. "Are you in a family and can you share to it"
+ * is what an orchestrator actually needs.
+ */
+async function getFamily(): Promise<{ inFamily: boolean; name: string | null; role: string | null }> {
+  const profile = await api.getMyProfile();
+  const fam = profile.families?.[0];
+  return fam
+    ? { inFamily: true, name: fam.name, role: fam.role ?? "member" }
+    : { inFamily: false, name: null, role: null };
+}
+
+async function listStores(): Promise<{ stores: { id: string; name: string; aisles: number }[] }> {
+  const { stores } = await loadStores();
+  return { stores: stores.map((s) => ({ id: s.id, name: s.name, aisles: s.aisles.length })) };
+}
+
 // ── Registration ─────────────────────────────────────────────────────
 
 export async function registerActions(): Promise<void> {
@@ -353,5 +626,19 @@ export async function registerActions(): Promise<void> {
     addRecipe,
     importRecipeFromImage,
     markCooked,
+    searchRecipes,
+    listCategories,
+    getPantry,
+    addToPantry,
+    removeFromPantry,
+    setFavorite,
+    setBlocked,
+    getBlocked,
+    listPlans,
+    getPlan,
+    planWeek,
+    scaleSavedRecipe,
+    getFamily,
+    listStores,
   });
 }
