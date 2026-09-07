@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.37.0",
+  "version": "0.37.1",
   "description": "Recipes for ConjureOS: browse a catalog, keep a pantry, get suggestions ranked by what you have, and plan a week of meals that shares a shopping list.",
   "type": "module",
   "license": "MIT",
@@ -900,7 +900,7 @@
       },
       "getFamily": {
         "permission": "actions.read",
-        "description": "Whether the user belongs to a household and what their role is. Deliberately does not return the member list.",
+        "description": "The households the user belongs to, with their role in each. Does not return the member list or the invite code.",
         "params": {
           "type": "object",
           "properties": {}
@@ -911,11 +911,26 @@
             "inFamily": {
               "type": "boolean"
             },
-            "name": {
-              "type": "string"
-            },
-            "role": {
-              "type": "string"
+            "families": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "owner",
+                      "member"
+                    ]
+                  }
+                }
+              }
             }
           }
         }
@@ -946,6 +961,39 @@
                   }
                 }
               }
+            }
+          }
+        }
+      },
+      "renameFamily": {
+        "permission": "actions.write",
+        "description": "Rename a household the user OWNS. Owner-only (the server rejects a non-owner) and reversible. Does not change who is in the family or what they can see — use the app for that.",
+        "params": {
+          "type": "object",
+          "properties": {
+            "familyId": {
+              "type": "string",
+              "maxLength": 64,
+              "description": "From getFamily."
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 60
+            }
+          },
+          "required": [
+            "familyId",
+            "name"
+          ]
+        },
+        "returns": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
             }
           }
         }

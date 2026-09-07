@@ -10,11 +10,13 @@
  *
  *   - Irreversible. `deleteRecipe` / `deletePlan`: there is no trash and no
  *     undo. Worth revisiting once deletion is recoverable.
- *   - Consequences land on people who never saw the prompt. All family
- *     membership mutation (create / join / leave / rename / addMember):
- *     leaving can delete the household and orphan everyone's plans, joining
- *     grants a third party access to other people's data. One user consents,
- *     several are affected.
+ *   - Consequences land on people who never saw the prompt. Family
+ *     membership mutation (join / leave / addMember): leaving can delete the
+ *     household and orphan everyone's plans, joining grants a third party
+ *     access to other people's data. One user consents, several are affected.
+ *     `renameFamily` is the exception and IS exposed — owner-only, reversible,
+ *     and it changes nobody's access. `createFamily` stays out only because
+ *     its undo is `leaveFamily`, which is excluded: a door with no way back.
  *   - Publishing or privilege. `setVisibility` to public/unlisted and
  *     `chefUpsert` put content somewhere a later un-publish cannot recall it;
  *     `adminSetRole` / `adminListUsers` are operator functions, not app
@@ -593,17 +595,56 @@ async function scaleSavedRecipe(rawParams?: unknown): Promise<Record<string, unk
 // ── Household + stores (read-only, deliberately minimal) ─────────────
 
 /**
- * Whether the user is in a family, and their role. Deliberately does NOT
- * return the member list: those are OTHER people, who never saw the consent
- * prompt this caller answered. "Are you in a family and can you share to it"
- * is what an orchestrator actually needs.
+ * The user's households: id, name, and THEIR role in each. Deliberately does
+ * NOT return the member list — those are other people, who never saw the
+ * consent prompt this caller answered. Nor the invite code, which is a
+ * credential: anyone holding it can join, so it is not a field a third-party
+ * app gets to read.
+ *
+ * A user can be in up to three, so this is a list rather than a single family.
  */
-async function getFamily(): Promise<{ inFamily: boolean; name: string | null; role: string | null }> {
+async function getFamily(): Promise<{
+  inFamily: boolean;
+  families: { id: string; name: string; role: string }[];
+}> {
   const profile = await api.getMyProfile();
-  const fam = profile.families?.[0];
-  return fam
-    ? { inFamily: true, name: fam.name, role: fam.role ?? "member" }
-    : { inFamily: false, name: null, role: null };
+  const families = (profile.families ?? []).map((f) => ({
+    id: f.id,
+    name: f.name,
+    role: f.role ?? "member",
+  }));
+  return { inFamily: families.length > 0, families };
+}
+
+/**
+ * Rename a household the user OWNS.
+ *
+ * The one family mutation that is safe to expose, and it took a question to
+ * see it — the first pass excluded "all family mutation" as one lump, which
+ * was too coarse. Rename fails none of the three tests the others fail: the
+ * server enforces owner-only (a member gets 403 `not_owner`), it is reversible
+ * by renaming back, and it changes nobody's ACCESS to anything. Compare
+ * `leaveFamily`, which can delete the household and orphan everyone's plans,
+ * or `addFamilyMember`, which hands a third party the keys.
+ *
+ * `createFamily` stays out for a different reason: its only undo is
+ * `leaveFamily`, which is on the excluded list, so exposing it would add a door
+ * with no way back through the bridge.
+ */
+async function renameFamily(rawParams?: unknown): Promise<{ id: string; name: string }> {
+  const p = asObject(rawParams);
+  if (typeof p.familyId !== "string" || !p.familyId.trim()) {
+    throw new Error("params.familyId must be a non-empty string");
+  }
+  const name = typeof p.name === "string" ? p.name.trim().slice(0, 60) : "";
+  if (!name) throw new Error("params.name must be a non-empty string");
+  // Checked here for a clear error; the server re-checks and is authoritative.
+  const profile = await api.getMyProfile();
+  const fam = (profile.families ?? []).find((f) => f.id === p.familyId);
+  if (!fam) throw new Error("You're not a member of that family.");
+  if (fam.role !== "owner") throw new Error("Only the family's owner can rename it.");
+  const updated = await api.renameFamily(p.familyId, name);
+  return { id: updated.id, name: updated.name };
 }
 
 async function listStores(): Promise<{ stores: { id: string; name: string; aisles: number }[] }> {
@@ -639,6 +680,7 @@ export async function registerActions(): Promise<void> {
     planWeek,
     scaleSavedRecipe,
     getFamily,
+    renameFamily,
     listStores,
   });
 }
