@@ -42,8 +42,11 @@ export async function loadBlocked(): Promise<Set<string>> {
   return r.ok ? r.value : new Set();
 }
 
-/** Read for a read-modify-write. Throws rather than clearing the block list. */
-async function loadBlockedForWrite(): Promise<Set<string>> {
+/**
+ * Read for a read-modify-write, and for the action bridge — see the matching
+ * note on `loadPantryForWrite`. Throws rather than clearing the block list.
+ */
+export async function loadBlockedForWrite(): Promise<Set<string>> {
   return requireJsonDoc(BLOCKED_PATH, parseBlocked, { ...BLOCKED_DOC, what: "blocked list" });
 }
 

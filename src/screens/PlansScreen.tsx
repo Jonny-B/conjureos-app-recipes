@@ -123,7 +123,18 @@ export function PlansScreen({
   const [plans, setPlans] = useState<Loaded<PlanRecord[]>>({ status: "loading" });
   const [scope, setScope] = useState<Scope>(() => readLastView()?.scope ?? "my");
   const [mode, setMode] = useState<Mode>("landing");
-  const [viewing, setViewing] = useState(0);
+  /**
+   * Which plan the landing is showing, tracked by ID rather than by position.
+   *
+   * It used to be an index, reset to 0 by an effect keyed on `[scope, planList]`
+   * — and every shopping-list tick hands back a NEW plans array (the writer's
+   * onRecord maps over it), so ticking an item on any plan but the newest
+   * snapped you to the newest one mid-shop. Keyed on identity, a tick is
+   * invisible: the id you were looking at is still in the list. `null` means
+   * "the newest", which is also where an id that's no longer present resolves
+   * to, so a plan deleted underneath us degrades the same way it always did.
+   */
+  const [viewingId, setViewingId] = useState<string | null>(null);
   /** A failed share / delete. Rendered on the landing; cleared on the next try. */
   const [actionError, setActionError] = useState<string | null>(null);
   // The last-viewed plan id to restore once, after the first plans load.
@@ -288,18 +299,22 @@ export function PlansScreen({
   );
 
   const active = scope === "my" ? myPlans : familyPlans;
-  // When plans/scope change: restore the last-viewed plan once (on first load),
-  // otherwise snap to the most recent.
+  const viewingIdx = viewingId ? active.findIndex((p) => p.id === viewingId) : -1;
+  const viewing = viewingIdx >= 0 ? viewingIdx : 0;
+
+  // Restore the last-viewed plan, once, after the first load that contains it.
   useEffect(() => {
-    if (restoreRef.current && planList) {
-      const idx = active.findIndex((p) => p.id === restoreRef.current);
-      restoreRef.current = null;
-      setViewing(idx >= 0 ? idx : 0);
-    } else {
-      setViewing(0);
-    }
+    if (!restoreRef.current || !planList) return;
+    const id = restoreRef.current;
+    restoreRef.current = null;
+    if (active.some((p) => p.id === id)) setViewingId(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope, planList]);
+  }, [planList]);
+
+  // The two scope tabs are separate lists; switching starts at the newest.
+  useEffect(() => {
+    setViewingId(null);
+  }, [scope]);
 
   // Persist where the user is, so the next visit reopens here.
   const currentId = (active[viewing] ?? active[0])?.id ?? null;
@@ -376,7 +391,11 @@ export function PlansScreen({
     await loadPlans();
     setScope(familyId ? "family" : "my");
   };
+  /** A delete waiting on the user's yes — see the cog item that sets it. */
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; shared: boolean } | null>(null);
+
   const removePlan = async (planId: string) => {
+    setConfirmDelete(null);
     setActionError(null);
     setPlans((prev) =>
       prev.status === "ok" ? { ...prev, value: prev.value.filter((p) => p.id !== planId) } : prev,
@@ -428,7 +447,18 @@ export function PlansScreen({
         });
       }
     }
-    items.push({ key: "delete", label: "Delete plan", icon: "trash-can", danger: true, onClick: () => void removePlan(planId) });
+    // Deletion ASKS first. A shared plan is a week of someone else's meals and
+    // their half-ticked shopping list, there is no trash and no undo, and this
+    // sat one tap deep in a sheet with no confirmation at all — while
+    // reassignment, right above it, was locked to the owner. Personal plans go
+    // through the same gate; it costs one tap and the plan is equally gone.
+    items.push({
+      key: "delete",
+      label: "Delete plan",
+      icon: "trash-can",
+      danger: true,
+      onClick: () => setConfirmDelete({ id: planId, shared: !!cogPlan.familyId }),
+    });
     onCogItems(items);
     return () => onCogItems([]);
     // `familyKey` (not families.length) so renaming a family relabels
@@ -497,6 +527,22 @@ export function PlansScreen({
           <span>{actionError}</span>
         </div>
       )}
+      {confirmDelete && (
+        <div className="status-banner warn plan-confirm">
+          <Icon name="triangle-exclamation" />
+          <span>
+            {confirmDelete.shared
+              ? "Delete this plan for the whole family? Their meals and shopping list go with it, and there's no undo."
+              : "Delete this plan? There's no undo."}
+          </span>
+          <button className="btn secondary" type="button" onClick={() => setConfirmDelete(null)}>
+            Keep it
+          </button>
+          <button className="btn danger" type="button" onClick={() => void removePlan(confirmDelete.id)}>
+            Delete
+          </button>
+        </div>
+      )}
       <div className="plans-tabs-row">
         <div className="seg" role="tablist" aria-label="Plan scope">
           <button role="tab" aria-selected={scope === "my"} className={`seg-btn${scope === "my" ? " active" : ""}`} onClick={() => setScope("my")}>
@@ -559,7 +605,7 @@ export function PlansScreen({
                         key={p.id}
                         rec={p}
                         familyName={p.familyId ? familyName(p.familyId) : null}
-                        onOpen={() => setViewing(i)}
+                        onOpen={() => setViewingId(p.id)}
                       />
                     ),
                   )}
@@ -678,10 +724,25 @@ function PlanView({
     setStoreId(id);
     writeLastStoreId(id);
   };
-  const groups = useMemo(
-    () => (store ? groupByStore(plan.shoppingList ?? [], store) : []),
-    [plan, store],
-  );
+  /**
+   * Grouped by aisle when we have a store layout; a single flat group when we
+   * don't.
+   *
+   * With no store this returned `[]` while `total` still counted the items, so
+   * the render took the "we have items" branch and mapped an empty array: the
+   * header said "12 to buy", the store bar said "My store", and there was
+   * nothing underneath it. That state is reachable whenever the store file is
+   * unreadable — and briefly on every load, before the layout resolves.
+   * `doPrint` already handles exactly this with an ungrouped fallback and a
+   * comment explaining why; the on-screen list never got the same treatment.
+   */
+  const groups = useMemo(() => {
+    const list = plan.shoppingList ?? [];
+    if (store) return groupByStore(list, store);
+    return list.length > 0
+      ? [{ aisleId: UNSORTED, aisleName: "Shopping list", items: list }]
+      : [];
+  }, [plan, store]);
   const unsorted = useMemo(() => groups.find((g) => g.aisleId === UNSORTED)?.items ?? [], [groups]);
 
   // Whenever a list has items the store layout doesn't cover, hand the layout to
@@ -694,14 +755,31 @@ function PlanView({
     if (!store || storesUnreadable || !aiSortEnabled() || unsorted.length === 0) return;
     const toAsk = unsorted.filter((i) => !askedRef.current.has(`${store.id}:${i.canonical}`));
     if (toAsk.length === 0) return;
-    toAsk.forEach((i) => askedRef.current.add(`${store.id}:${i.canonical}`));
+    const keys = toAsk.map((i) => `${store.id}:${i.canonical}`);
+    keys.forEach((k) => askedRef.current.add(k));
     let cancelled = false;
     void (async () => {
-      const placements = await inferAislePlacements(
-        toAsk.map((i) => ({ name: i.name, canonical: i.canonical })),
-        store,
-      );
-      if (cancelled || Object.keys(placements).length === 0) return;
+      // "Asked" has to mean ANSWERED. Marking before the call and never
+      // unmarking meant one network blip stranded those items in Unsorted for
+      // the rest of the session, with no note and no way to retry — the effect
+      // simply never looked at them again. On a failure (or an empty answer)
+      // the marks come off, so the next render asks once more.
+      let placements: Record<string, string> = {};
+      try {
+        placements = await inferAislePlacements(
+          toAsk.map((i) => ({ name: i.name, canonical: i.canonical })),
+          store,
+        );
+      } catch {
+        placements = {};
+      }
+      if (cancelled) return;
+      if (Object.keys(placements).length === 0) {
+        keys.forEach((k) => askedRef.current.delete(k));
+        return;
+      }
+      // Items the model DID look at but declined to place stay marked: it
+      // answered, it just had no aisle for them, and re-asking buys nothing.
       // The write lives outside the state updater: React may invoke an updater
       // more than once for the same change (StrictMode does it deliberately),
       // and each extra invocation would be another VFS write + sync push.
@@ -837,6 +915,16 @@ function PlanView({
         {aiNote && (
           <div className="store-ai-note">
             <Icon name="wand" /> {aiNote}
+          </div>
+        )}
+
+        {storesUnreadable && total > 0 && (
+          <div className="status-banner error">
+            <Icon name="triangle-exclamation" />
+            <span>
+              Couldn't read your store layouts, so this list isn't sorted by aisle.
+              Everything you need is still here.
+            </span>
           </div>
         )}
 

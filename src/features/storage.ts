@@ -36,10 +36,30 @@ export async function saveRecipe(recipe: Recipe): Promise<SavedRecipe> {
  */
 export type SavedListing = { ok: true; recipes: SavedRecipe[] } | { ok: false };
 
+/**
+ * At most one legacy import per app load, however many times we list.
+ *
+ * Listing is a READ, and it is polled: Home, the library screen and the plan
+ * builder each call it, and they re-call on focus. The import used to run on
+ * every one of those. It is supposed to be one-shot, but it only marks itself
+ * done when EVERY row landed — so one backend hiccup (or a failed flag write)
+ * left the door open and the next poll re-imported the rows that HAD landed.
+ * Five polls turned one legacy recipe into five copies of it.
+ *
+ * Two guards, because they cover different windows: this promise stops the
+ * repeat within a session, and the per-title check inside the import stops it
+ * across sessions. Neither alone is enough.
+ */
+let legacyImport: Promise<void> | null = null;
+
 export async function listSavedRecipesResult(): Promise<SavedListing> {
   if (!isBackendAvailable()) return { ok: true, recipes: [] };
   try {
-    await migrateLegacyRecipes();
+    // `migrateLegacyRecipes` swallows its own failures, but memoize the settled
+    // promise defensively: a rejection cached here would make every subsequent
+    // listing report a failed read.
+    legacyImport ??= migrateLegacyRecipes().catch(() => {});
+    await legacyImport;
     return { ok: true, recipes: await api.listMine() };
   } catch {
     return { ok: false };
@@ -109,6 +129,26 @@ async function migrateLegacyRecipes(): Promise<void> {
     }
     const entries = await vfs.ls(RECIPES_DIR).catch(() => [] as string[]);
     const mdFiles = entries.filter((e) => e.endsWith(".md"));
+    if (mdFiles.length === 0) {
+      await markMigrated();
+      return;
+    }
+
+    // What's already in the library, so a retry re-imports only what's missing.
+    //
+    // The flag is deliberately held open when a row fails (see below), which
+    // means a retry re-walks the SAME .md files — including the ones that
+    // succeeded last time. Without this set, every retry re-added them, and a
+    // user whose backend flaked once ended up with a library of duplicates.
+    // A failed listing is not an empty library: we cannot dedupe against
+    // nothing, so bail and leave the flag open rather than import blind.
+    let existing: Set<string>;
+    try {
+      existing = new Set((await api.listMine()).map((r) => importKey(r.title)));
+    } catch {
+      return;
+    }
+
     // A file we can't read or parse is skipped FOREVER — retrying won't fix it.
     // A file the BACKEND refused is a different thing: that's transient, and it
     // must hold the flag open so a later launch retries. Lumping both into one
@@ -125,8 +165,11 @@ async function migrateLegacyRecipes(): Promise<void> {
         continue; // unreadable file — nothing a retry would change
       }
       if (!parsed) continue; // unparseable — same
+      const key = importKey(parsed.title);
+      if (existing.has(key)) continue; // already imported on an earlier attempt
       try {
         const added = await api.addRecipe({ ...toPlainRecipe(parsed), visibility: "private" });
+        existing.add(key);
         if (parsed.favorite) {
           await api.setFavorite(recipeIdFromPath(added.path), true).catch(() => {});
         }
@@ -138,6 +181,17 @@ async function migrateLegacyRecipes(): Promise<void> {
   } catch {
     /* leave the flag unset; a later launch retries */
   }
+}
+
+/**
+ * Dedupe key for the legacy import. Title only, case- and punctuation-folded:
+ * the markdown round-trip does not preserve enough for a content hash to be
+ * stable, and two DIFFERENT legacy recipes sharing a title is a far cheaper
+ * mistake (one skipped import, recoverable from the .md still on disk) than
+ * re-importing the same one on every retry.
+ */
+function importKey(title: string): string {
+  return title.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 async function markMigrated(): Promise<void> {

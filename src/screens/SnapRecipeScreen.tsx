@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { CapturedPhoto, Recipe } from "../types";
 import { extractRecipeFromPhotos } from "../features/customRecipe";
 import { CaptureScreen } from "./CaptureScreen";
@@ -31,7 +31,12 @@ export function SnapRecipeScreen({
   // re-photograph a cookbook page because the model returned bad JSON.
   const [lastPhotos, setLastPhotos] = useState<CapturedPhoto[]>([]);
 
+  /** Synchronous re-entrancy guard — see the note in PantryScreen. */
+  const aiInFlight = useRef(false);
+
   const onPhotos = async (photos: CapturedPhoto[]) => {
+    if (aiInFlight.current) return;
+    aiInFlight.current = true;
     setError(null);
     setLastPhotos(photos);
     setStage("reading");
@@ -44,6 +49,8 @@ export function SnapRecipeScreen({
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setStage("capture");
+    } finally {
+      aiInFlight.current = false;
     }
   };
 

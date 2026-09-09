@@ -1478,6 +1478,19 @@ select {
   color: #ffb0c0;
 }
 
+/* A question, not a failure — same shape as .error, warmer, and it wraps so
+   the two buttons drop below the sentence on a phone. */
+.status-banner.warn {
+  background: rgba(255, 190, 92, 0.09);
+  border-color: rgba(255, 190, 92, 0.45);
+  color: #ffd9a0;
+}
+.plan-confirm {
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.plan-confirm > span { flex: 1 1 240px; min-width: 0; }
+
 .spinner {
   width: 16px;
   height: 16px;
@@ -3457,6 +3470,22 @@ select {
   transition: opacity var(--cui-duration) var(--cui-ease);
 }
 .admin-row.busy { opacity: 0.5; pointer-events: none; }
+/* The self-demotion warning sits BELOW the row it belongs to, so the row has
+   to wrap; without the basis it squeezes in beside the dropdown. */
+.admin-row { flex-wrap: wrap; }
+.admin-confirm {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-1);
+}
+.admin-confirm > span { flex: 1 1 220px; min-width: 0; }
 .admin-id { min-width: 0; }
 .admin-name {
   font-weight: 600;

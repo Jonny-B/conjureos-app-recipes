@@ -42,8 +42,25 @@ export function AdminScreen({ myEmail }: { myEmail: string | null }) {
     return () => clearTimeout(t);
   }, [query, load]);
 
-  const changeRole = async (u: AppUser, role: AppRole) => {
+  /**
+   * Dropped role changes that still need a yes: `{userId, role}`.
+   *
+   * The dropdown fires on selection, so demoting yourself out of admin was a
+   * single tap with no confirmation and no way back — the Admin tab unmounts
+   * and the control that would restore you is inside it. Leaving a family, a
+   * comparably heavy act, warns clearly first; this didn't. Only a change to
+   * your OWN row is gated, so ordinary role management stays one tap.
+   */
+  const [confirmRole, setConfirmRole] = useState<{ userId: string; role: AppRole } | null>(null);
+
+  const changeRole = async (u: AppUser, role: AppRole, confirmed = false) => {
     if (role === u.role) return;
+    const isMe = !!myEmail && !!u.email && u.email.toLowerCase() === myEmail.toLowerCase();
+    if (isMe && role !== "admin" && !confirmed) {
+      setConfirmRole({ userId: u.userId, role });
+      return;
+    }
+    setConfirmRole(null);
     setBusy(u.userId);
     setError(null);
     try {
@@ -106,11 +123,36 @@ export function AdminScreen({ myEmail }: { myEmail: string | null }) {
                 <div className="admin-role">
                   <Dropdown
                     options={ROLE_OPTIONS}
-                    value={u.role}
-                    onChange={(role) => changeRole(u, role)}
+                    value={confirmRole?.userId === u.userId ? confirmRole.role : u.role}
+                    onChange={(role) => void changeRole(u, role)}
                     ariaLabel={`Role for ${u.email ?? u.userId}`}
                   />
                 </div>
+                {confirmRole?.userId === u.userId && (
+                  <div className="admin-confirm">
+                    <Icon name="triangle-exclamation" />
+                    <span>
+                      This is your own account. Setting yourself to{" "}
+                      <strong>{confirmRole.role}</strong> closes the Admin tab, and you
+                      won't be able to reopen it — another admin would have to
+                      restore you.
+                    </span>
+                    <button
+                      className="btn secondary"
+                      type="button"
+                      onClick={() => setConfirmRole(null)}
+                    >
+                      Keep admin
+                    </button>
+                    <button
+                      className="btn danger"
+                      type="button"
+                      onClick={() => void changeRole(u, confirmRole.role, true)}
+                    >
+                      Step down
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}

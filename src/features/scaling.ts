@@ -120,6 +120,13 @@ function parseNumericToken(token: string): number | null {
  * over decimals for the common cookbook values (halves, thirds, quarters,
  * eighths) so "1.5 cups" reads as "1 1/2 cups" not "1.5 cups".
  */
+/**
+ * The smallest amount this formatter can render as a fraction. Anything
+ * positive below it has no honest numeric form here — see `scaleLine`, which
+ * words it instead of printing a number that means "none".
+ */
+export const SMALLEST_RENDERABLE = 1 / 16;
+
 export function formatScaledNumber(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return "0";
   // Round to the nearest 1/8 to surface clean fractions, but only when
@@ -150,6 +157,25 @@ export function scaleLine(line: string, factor: number): string {
   const parsed = parseDisplayQuantity(line);
   if (parsed.count === null) return line;
   const scaled = parsed.count * factor;
+  // A REQUIRED ingredient must never scale down to the word "0".
+  //
+  // formatScaledNumber falls through to `${Math.floor(n)}` once the fraction
+  // is under 0.02, and to a "0.00"-trimmed decimal below that — so scaling a
+  // 40-serving recipe to 1 turned "1 tsp baking powder" into "0 tsp baking
+  // powder". The guided cook renders that as a step, and a cook following it
+  // adds no leavening at all. Reachable from the stepper mid-cook and from
+  // scale-to-my-ingredients, and the wrong line is what gets saved.
+  //
+  // "less than 1/16" is the honest statement: too little to measure, not zero.
+  // Left as a phrase rather than a number so no downstream parser mistakes it
+  // for an amount.
+  if (scaled > 0 && scaled < SMALLEST_RENDERABLE) {
+    // The unit is dropped, not kept: at this size it carries no information
+    // ("a trace of tsp baking powder" is not a sentence), and the ingredient
+    // name alone is what the cook needs to see on the line.
+    const what = parsed.rest || parsed.unit;
+    return what ? `a trace of ${what}` : line;
+  }
   const parts: string[] = [formatScaledNumber(scaled)];
   if (parsed.unit) parts.push(parsed.unit);
   if (parsed.rest) parts.push(parsed.rest);
@@ -425,11 +451,24 @@ function matchTokens(name: string): string[] {
     .split(" ")
     .filter((t) => t.length > 0);
   // Strip a leading modifier phrase before anything else looks at the tokens.
-  for (const phrase of MODIFIER_PHRASES) {
-    if (all.length > phrase.length && phrase.every((w, i) => all[i] === w)) {
-      all = all.slice(phrase.length);
-      break;
+  // Keep stripping while leading phrases match, not just once. Real labels
+  // stack them — "low fat part skim ricotta cheese" is two phrases deep, and
+  // the single-pass version left "part skim ricotta cheese", which then failed
+  // to match a pantry holding plain "ricotta". The card told the cook to buy
+  // ricotta they already had, and the shopping list added it.
+  //
+  // Bounded by MODIFIER_PHRASES.length: every pass that changes anything
+  // shortens `all`, and a pass that changes nothing exits.
+  for (let pass = 0; pass < MODIFIER_PHRASES.length; pass++) {
+    let stripped = false;
+    for (const phrase of MODIFIER_PHRASES) {
+      if (all.length > phrase.length && phrase.every((w, i) => all[i] === w)) {
+        all = all.slice(phrase.length);
+        stripped = true;
+        break;
+      }
     }
+    if (!stripped) break;
   }
   // A name made ENTIRELY of form adjectives is that food, not a modifier of one
   // ("baby" is a modifier, "baby corn" too, but a pantry line reading "baby"
@@ -585,6 +624,38 @@ export function computeCoverage(
     .map((i) => normalizeIngredientName(parseIngredient(i.name)?.name ?? i.name))
     .filter((n) => n.length > 0);
 
+  // Catalog rows arrive SLIM: `ingredients` is empty until the recipe is
+  // opened, and the body fetch is deliberate (it's ~66% of the payload). This
+  // function walked `recipe.ingredients`, so every unopened catalog row scored
+  // 0 have / 0 total — which the row chip then rendered green as "0/0 have",
+  // and which made "what can I make from my pantry" quietly rank the entire
+  // catalog at the same neutral score. `tokens` is the same information, in
+  // canonical form, precomputed at build time for exactly this purpose; it
+  // just was never wired in. No quantities there, so this path can only
+  // answer have / missing, never "short" — which is the honest limit of what
+  // a slim row knows.
+  if (recipe.ingredients.length === 0) {
+    const tokens = (recipe as Recipe & { tokens?: string[] }).tokens ?? [];
+    if (tokens.length === 0) return emptyCoverage();
+    const haveNames: string[] = [];
+    const missingNames: string[] = [];
+    for (const t of tokens) {
+      if (nameInPantry(normalizeIngredientName(t), userNorms)) haveNames.push(t);
+      else missingNames.push(t);
+    }
+    const total = tokens.length;
+    return {
+      total,
+      have: haveNames.length,
+      short: 0,
+      missing: missingNames.length,
+      haveNames,
+      shortNames: [],
+      missingNames,
+      score: (haveNames.length - missingNames.length) / Math.max(1, total),
+    };
+  }
+
   const avail = computeAvailability(recipe, userIngredients);
   const ratioByLine = new Map<string, number>();
   for (const m of avail.matches) ratioByLine.set(m.recipeLine, m.ratio);
@@ -637,6 +708,18 @@ export function prettyIngredient(name: string): string {
   let s = name.replace(/^\([^)]*\)\s*/, "").replace(LEADING_NOISE, "").trim();
   if (!s) s = name.trim();
   return s;
+}
+
+/**
+ * "We know nothing about this recipe's ingredients." `total: 0` is the signal
+ * every renderer must check before drawing a coverage verdict — see
+ * `CoverageChips`, which used to paint this state as a completed recipe.
+ */
+function emptyCoverage(): CoverageResult {
+  return {
+    total: 0, have: 0, short: 0, missing: 0,
+    haveNames: [], shortNames: [], missingNames: [], score: 0,
+  };
 }
 
 /** Name-only presence in the pantry, on the shared same-ingredient rule. */

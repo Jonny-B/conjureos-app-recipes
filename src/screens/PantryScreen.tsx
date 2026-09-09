@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import type { CapturedPhoto, Ingredient, PantryItem, Recipe, SavedRecipe } from "../types";
 import {
   addPantryItem,
@@ -41,6 +41,8 @@ export function PantryScreen({ pantry, onChange, onBack, onCook, catalogVersion 
   const [lastPhotos, setLastPhotos] = useState<CapturedPhoto[]>([]);
 
   const onScanned = async (photos: CapturedPhoto[]) => {
+    if (aiInFlight.current) return;
+    aiInFlight.current = true;
     setError(null);
     setLastPhotos(photos);
     setMode("identifying");
@@ -52,6 +54,8 @@ export function PantryScreen({ pantry, onChange, onBack, onCook, catalogVersion 
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setMode("capture");
+    } finally {
+      aiInFlight.current = false;
     }
   };
 
@@ -67,9 +71,21 @@ export function PantryScreen({ pantry, onChange, onBack, onCook, catalogVersion 
     setMode("list");
   };
 
+  /**
+   * Re-entrancy guard for the model calls on this screen.
+   *
+   * The button that starts a generation swaps the screen for a spinner, so it
+   * LOOKS guarded — but the swap is a state update, and two taps inside the
+   * same frame both get through and both bill a request. A ref settles it
+   * synchronously, which is the property state can't offer here. Two other
+   * AI buttons in this app already gate on a `busy` flag; these didn't.
+   */
+  const aiInFlight = useRef(false);
+
   const inventWithAI = async () => {
     const ings = ingredientsFromPantry(pantry ?? []);
-    if (ings.length === 0) return;
+    if (ings.length === 0 || aiInFlight.current) return;
+    aiInFlight.current = true;
     setError(null);
     setGen({ kind: "generating" });
     try {
@@ -78,6 +94,8 @@ export function PantryScreen({ pantry, onChange, onBack, onCook, catalogVersion 
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setGen({ kind: "idle" });
+    } finally {
+      aiInFlight.current = false;
     }
   };
 

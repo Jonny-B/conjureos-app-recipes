@@ -42,8 +42,16 @@ export async function loadPantry(): Promise<PantryItem[]> {
   return r.ok ? r.value : [];
 }
 
-/** Read for a read-modify-write. Throws rather than returning a false empty. */
-async function loadPantryForWrite(): Promise<PantryItem[]> {
+/**
+ * Read for a read-modify-write, and for any caller that ANSWERS with the
+ * result rather than rendering it. Throws rather than returning a false empty.
+ *
+ * Exported because the cross-app action bridge needs it: a screen that can't
+ * read the pantry can shrug and draw nothing, but `getPantry` returning
+ * `{items: []}` is a sentence — it tells an orchestrator the kitchen is bare,
+ * and the orchestrator goes and buys everything.
+ */
+export async function loadPantryForWrite(): Promise<PantryItem[]> {
   return requireJsonDoc(PANTRY_PATH, parsePantry, { ...PANTRY_DOC, what: "pantry" });
 }
 

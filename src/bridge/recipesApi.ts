@@ -605,6 +605,23 @@ export async function joinFamily(inviteCode: string): Promise<AppFamily> {
   return r.family;
 }
 
+/**
+ * Mint a new invite code for a family, invalidating every link shared so far.
+ * Owner-only (the backend re-checks). The only way to retire the six-character
+ * codes issued before the code was widened.
+ */
+export async function rotateInviteCode(familyId: string): Promise<AppFamily> {
+  if (!isBackendAvailable()) {
+    const fam = devProfile.families.find((f) => f.id === familyId);
+    if (!fam) throw new Error("family not found");
+    fam.inviteCode = "DEV" + Math.floor(Math.random() * 900 + 100);
+    return fam;
+  }
+  const r = await invokeRaw<{ family?: AppFamily }>("rotateInviteCode", { familyId });
+  if (!r.family) throw new Error("reset failed");
+  return r.family;
+}
+
 export async function getFamilyInfo(familyId: string): Promise<{ family: AppFamily; members: FamilyMember[] }> {
   if (!isBackendAvailable()) {
     const fam = devProfile.families.find((f) => f.id === familyId)!;

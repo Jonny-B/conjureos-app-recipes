@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type {
   CapturedPhoto,
   Ingredient,
@@ -86,6 +86,8 @@ export function PlanWeekScreen({
   // back is a trap on a touch target this small — one mis-tap and the recipe is
   // gone from every future plan with nothing to show you it happened.
   const [lastBlocked, setLastBlocked] = useState<{ id: string; title: string } | null>(null);
+  /** Set when a thumbs-down (or its undo) didn't reach the durable index. */
+  const [blockWarning, setBlockWarning] = useState<string | null>(null);
 
   const [scanned, setScanned] = useState<Ingredient[]>([]);
   const [scanMode, setScanMode] = useState<"idle" | "capture" | "identifying">("idle");
@@ -208,14 +210,24 @@ export function PlanWeekScreen({
    * holds it). The server returns the picks hydrated; we build the shopping
    * list locally from just those, with the same tested code as before.
    */
+  /**
+   * Returns whether a plan actually came back. Callers that ADVANCE the wizard
+   * must check it: `onPlan` used to `await runPlan([])` and then step to
+   * "review" unconditionally, and because this function swallows its own
+   * error, a failed first plan moved you to a step whose body is
+   * `step === "review" && plan` — with plan still null, that renders nothing.
+   * No picks, no error, and no Back button, because Back lives inside the
+   * component that didn't mount. The only way out discarded the mood and
+   * pantry the user had just entered.
+   */
   const runPlan = async (
     exclude: string[],
     c = constraints,
     keep?: string[],
     /** Slot the replacement should occupy, so a rerolled meal doesn't jump to the end. */
     replaceAt?: number,
-  ) => {
-    if (!c) return;
+  ): Promise<boolean> => {
+    if (!c) return false;
     setPlanning(true);
     setError(null);
     try {
@@ -283,8 +295,10 @@ export function PlanWeekScreen({
       }
       setPlan(planFromChosen(chosen, onHand, c, warnings, res.shortfall));
       setExcludeIds(exclude);
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      return false;
     } finally {
       setPlanning(false);
     }
@@ -294,7 +308,12 @@ export function PlanWeekScreen({
   // CaptureScreen, so without this a failed call lost the user's photos.
   const [lastPhotos, setLastPhotos] = useState<CapturedPhoto[]>([]);
 
+  /** Synchronous re-entrancy guard — see the note in PantryScreen. */
+  const identifyInFlight = useRef(false);
+
   const onScanned = async (photos: CapturedPhoto[]) => {
+    if (identifyInFlight.current) return;
+    identifyInFlight.current = true;
     setLastPhotos(photos);
     setScanMode("identifying");
     try {
@@ -305,6 +324,8 @@ export function PlanWeekScreen({
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setScanMode("idle");
+    } finally {
+      identifyInFlight.current = false;
     }
   };
 
@@ -329,7 +350,21 @@ export function PlanWeekScreen({
    */
   const blockPick = async (id: string) => {
     const title = (plan?.picks ?? []).find((p) => p.id === id)?.title ?? "That meal";
-    setBlocked(await blockRecipe(id).catch(() => new Set([...blocked, id])));
+    // The block is meant to be DURABLE and cross-device. The old `.catch`
+    // fabricated a client-only Set and carried on, and the "won't suggest
+    // that again" banner showed anyway — so the user was told a permanent
+    // preference had been recorded when it would vanish on the next reload.
+    // A failure still swaps the meal out of this plan (that part is local and
+    // works), it just says what didn't stick.
+    try {
+      setBlocked(await blockRecipe(id));
+      setBlockWarning(null);
+    } catch {
+      setBlocked(new Set([...blocked, id]));
+      setBlockWarning(
+        `Swapped "${title}" out of this plan, but couldn't save the thumbs-down — it may be suggested again later.`,
+      );
+    }
     setLastBlocked({ id, title });
     const all = (plan?.picks ?? []).map((p) => p.id);
     const at = all.indexOf(id);
@@ -340,7 +375,13 @@ export function PlanWeekScreen({
    *  just makes the recipe eligible for future suggestions again. */
   const undoBlock = async () => {
     if (!lastBlocked) return;
-    setBlocked(await unblockRecipe(lastBlocked.id).catch(() => blocked));
+    try {
+      setBlocked(await unblockRecipe(lastBlocked.id));
+      setBlockWarning(null);
+    } catch {
+      setBlockWarning("Couldn't undo that thumbs-down — try again in a moment.");
+      return; // keep lastBlocked so the Undo button is still there to retry
+    }
     setLastBlocked(null);
   };
 
@@ -401,6 +442,13 @@ export function PlanWeekScreen({
         </div>
       )}
 
+      {blockWarning && (
+        <div className="status-banner warn">
+          <Icon name="triangle-exclamation" />
+          <span>{blockWarning}</span>
+        </div>
+      )}
+
       {step === "mood" && (
         <MoodStep
           mode={moodMode}
@@ -434,8 +482,9 @@ export function PlanWeekScreen({
           }}
           onBack={() => setStep("mood")}
           onPlan={async () => {
-            await runPlan([]);
-            setStep("review");
+            // Only on success — a failure keeps you on this step, where the
+            // error banner is visible and Plan can simply be pressed again.
+            if (await runPlan([])) setStep("review");
           }}
         />
       )}

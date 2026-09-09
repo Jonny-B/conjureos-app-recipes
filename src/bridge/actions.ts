@@ -3,10 +3,21 @@
  * installed apps and to the orchestrator (calorie tracker, meal planner,
  * shopping list, etc.) via ConjureOS's Phase 13a action bridge.
  *
- * WHAT IS DELIBERATELY *NOT* HERE, and why. Grants are per-action (the kernel
- * stores actionGrants[targetApp][actionName] and prompts for each one), so the
- * risk is not "grant one, get all" — it is a SINGLE mistaken approval that
- * cannot be taken back. Everything below is excluded on one of three grounds:
+ * WHO CAN CALL THESE, and what that means for the exclusions below.
+ *
+ * Two kinds of caller reach this registry, and only one of them is prompted.
+ * Another installed APP is: the kernel stores
+ * actionGrants[targetApp][actionName] and asks per action. The ORCHESTRATOR is
+ * not — `actionRegistry` gates on `callerAppPath !== null`, and the
+ * orchestrator's is null, so it invokes everything here with no dialog at all.
+ * That is a deliberate kernel decision (it is trusted shell code, not a
+ * sandboxed third party) and this file does not try to relitigate it.
+ *
+ * It does mean the exclusion list below cannot rest on "the user will be
+ * asked" — for the consumer this work was built for, they won't be. Each
+ * exclusion has to stand on the act itself being one no automated caller
+ * should perform unattended, which is how they are argued here. Everything
+ * below is excluded on one of three grounds:
  *
  *   - Irreversible. `deleteRecipe` / `deletePlan`: there is no trash and no
  *     undo. Worth revisiting once deletion is recoverable.
@@ -27,6 +38,16 @@
  * queue so two people shopping the same list don't overwrite each other; a
  * bridge write bolted onto that path would reintroduce the lost-update bug it
  * exists to prevent. It needs the queue, not a second door into the same row.
+ *
+ * ONE THING THE READS DO EXPOSE, stated plainly rather than left implied:
+ * `listPlans` / `getPlan` return your family's shared plans alongside your own,
+ * because the server's listPlans unions them and the app's Plans tab shows
+ * exactly the same set. A caller granted plan reads therefore sees meals,
+ * shopping lists and tick state entered by other members of your household.
+ * That is not the "affects people who never consented" case above — a family
+ * plan is shared deliberately, by people who chose to share it, and hiding it
+ * here would make the bridge disagree with the screen. Recorded because the
+ * policy paragraph above reads like it would forbid this, and it doesn't.
  *
  * The read/compute actions never persist. `planWeek` returns a PROPOSAL and
  * `scaleSavedRecipe` returns a scaled copy — both report `saved: false` —
@@ -66,25 +87,27 @@ import type {
 } from "../types";
 import type { ChatImage } from "./ai";
 import {
-  listSavedRecipes,
+  listSavedRecipesResult,
   markMade,
   saveRecipe,
 } from "../features/storage";
 import { extractRecipeFromImages } from "../features/customRecipe";
 import {
   ensureCatalogLoaded,
+  isCatalogLoaded,
   searchCatalog,
   getCatalog,
   categories as catalogCategories,
 } from "../features/catalog";
 import {
   loadPantry,
+  loadPantryForWrite,
   addPantryItems as addToPantryItems,
   removePantryItem,
   ingredientsFromPantry,
 } from "../features/pantry";
-import { loadBlocked, blockRecipe, unblockRecipe } from "../features/blocked";
-import { loadStores } from "../features/storeLayout";
+import { loadBlocked, loadBlockedForWrite, blockRecipe, unblockRecipe } from "../features/blocked";
+import { loadStoresState } from "../features/storeLayout";
 import { scaleRecipe } from "../features/scaling";
 import { planFromChosen, type PlanCandidate } from "../features/planWeek";
 import * as api from "./recipesApi";
@@ -171,6 +194,28 @@ function asStringArray(
   return out;
 }
 
+/**
+ * Same checks, but an absent or empty array is a legitimate answer.
+ *
+ * `asStringArray` rejects empty, which is right for addRecipe's ingredients —
+ * a recipe with no ingredients is a caller bug. It is exactly wrong for
+ * planWeek's four OPTIONAL filter arrays: passing `?? []` for an omitted
+ * field ran that empty array straight into the "cannot be empty" throw, so
+ * `planWeek()` with no params, and every call that set fewer than all four,
+ * failed. Only a caller who happened to fill in all of includeIngredients,
+ * cuisines, avoid AND dietary got a plan back.
+ */
+function asOptionalStringArray(
+  v: unknown,
+  field: string,
+  maxItems: number,
+  maxLineLen: number,
+): string[] {
+  if (v === undefined || v === null) return [];
+  if (Array.isArray(v) && v.length === 0) return [];
+  return asStringArray(v, field, maxItems, maxLineLen);
+}
+
 function asOptionalNutrition(v: unknown): NutritionStrip | null {
   if (v === undefined || v === null) return null;
   const obj = asObject(v);
@@ -190,15 +235,52 @@ function asOptionalNutrition(v: unknown): NutritionStrip | null {
   };
 }
 
+/**
+ * A slug, REJECTED rather than repaired when it isn't one.
+ *
+ * This used to lowercase and strip every character outside [a-z0-9-], which
+ * silently turns one identifier into a different valid identifier: a caller
+ * asking about `chicken_pie!` was answered about `chickenpie`, and a caller
+ * asking about a recipe that doesn't exist could be answered about one that
+ * does. Case-folding is a real normalization and stays; anything else is a
+ * caller bug, and saying so beats guessing what they meant.
+ */
 function asSlug(v: unknown): string {
-  const raw = asString(v, "slug", 80);
-  // Slugs are URL-safe: lowercase letters, digits, hyphens.
-  const cleaned = raw.toLowerCase().replace(/[^a-z0-9-]/g, "");
-  if (!cleaned) throw new Error("params.slug invalid after sanitization");
-  return cleaned;
+  const raw = asString(v, "slug", 80).toLowerCase();
+  if (!/^[a-z0-9-]+$/.test(raw)) {
+    throw new Error("params.slug must contain only letters, digits and hyphens");
+  }
+  return raw;
 }
 
 // ── Handlers ─────────────────────────────────────────────────────────
+
+/**
+ * Every read action answers through one of these.
+ *
+ * A screen that can't reach the backend draws a spinner and the user
+ * understands. An ACTION that can't reach the backend and answers `[]` has
+ * told its caller something false, and the caller acts on it: an orchestrator
+ * reading `{items: []}` from `getPantry` concludes the kitchen is empty and
+ * shops for everything; one reading `{ids: []}` from `getBlocked` re-suggests
+ * the dish you thumbed down. `storage.ts` documents this distinction at
+ * length and the lenient loaders it warns about are the ones these handlers
+ * were calling. Failing loudly is the only honest answer across a bridge.
+ */
+const UNAVAILABLE = "Your recipe library isn't reachable right now — nothing was read. Try again in a moment.";
+
+async function requireLibrary(): Promise<SavedRecipe[]> {
+  const r = await listSavedRecipesResult();
+  if (!r.ok) throw new Error(UNAVAILABLE);
+  return r.recipes;
+}
+
+async function requireCatalog(): Promise<void> {
+  await ensureCatalogLoaded();
+  if (!isCatalogLoaded()) {
+    throw new Error("The recipe catalog isn't reachable right now — try again in a moment.");
+  }
+}
 
 interface ListedRecipe {
   slug: string;
@@ -225,7 +307,7 @@ async function listRecipes(rawParams?: unknown): Promise<{ recipes: ListedRecipe
       limit = Math.min(500, asPositiveInt(p.limit, "limit", 500));
     }
   }
-  const all = await listSavedRecipes();
+  const all = await requireLibrary();
   const matches = filter
     ? all.filter((r) => {
         if (r.title.toLowerCase().includes(filter!)) return true;
@@ -259,7 +341,7 @@ function projectListed(r: SavedRecipe): ListedRecipe {
 async function getRecipe(rawParams?: unknown): Promise<{ recipe: SavedRecipe | null }> {
   const p = asObject(rawParams);
   const slug = asSlug(p.slug);
-  const all = await listSavedRecipes();
+  const all = await requireLibrary();
   const found = all.find((r) => r.slug === slug);
   return { recipe: found ?? null };
 }
@@ -375,7 +457,7 @@ async function importRecipeFromImage(
 async function markCooked(rawParams?: unknown): Promise<{ madeCount: number; lastMadeAt: string }> {
   const p = asObject(rawParams);
   const slug = asSlug(p.slug);
-  const all = await listSavedRecipes();
+  const all = await requireLibrary();
   const found = all.find((r) => r.slug === slug);
   if (!found) throw new Error(`Recipe not found: ${slug}`);
   const updated = await markMade(found);
@@ -397,7 +479,7 @@ async function searchRecipes(rawParams?: unknown): Promise<{ recipes: unknown[] 
   const query = typeof p.query === "string" ? p.query.slice(0, 100).trim() : "";
   const category = typeof p.category === "string" ? p.category.slice(0, 40) : "";
   const limit = p.limit === undefined ? 20 : asPositiveInt(p.limit, "limit", 50);
-  await ensureCatalogLoaded();
+  await requireCatalog();
   let hits = query ? searchCatalog(query) : getCatalog();
   if (category) hits = hits.filter((r) => r.category.toLowerCase() === category.toLowerCase());
   return {
@@ -416,14 +498,14 @@ async function searchRecipes(rawParams?: unknown): Promise<{ recipes: unknown[] 
 
 /** The catalog's category taxonomy with counts, so a caller can filter sensibly. */
 async function listCategories(): Promise<{ categories: { name: string; count: number }[] }> {
-  await ensureCatalogLoaded();
+  await requireCatalog();
   return { categories: catalogCategories() };
 }
 
 // ── Pantry ───────────────────────────────────────────────────────────
 
 async function getPantry(): Promise<{ items: { name: string; quantity?: string; notes?: string }[] }> {
-  const items = await loadPantry();
+  const items = await loadPantryForWrite();
   return {
     items: items.map((i) => ({
       name: i.name,
@@ -436,15 +518,26 @@ async function getPantry(): Promise<{ items: { name: string; quantity?: string; 
 async function addToPantry(rawParams?: unknown): Promise<{ count: number }> {
   const p = asObject(rawParams);
   if (!Array.isArray(p.items)) throw new Error("params.items must be an array");
-  const incoming = p.items.slice(0, 50).map((raw, i) => {
+  // Over-limit input is REFUSED, not quietly trimmed. Sending 60 items and
+  // getting back a success with 50 of them stored — no error, no warning, the
+  // count buried in a field the caller has no reason to diff — is how an
+  // orchestrator's shopping run silently lost ten ingredients.
+  if (p.items.length > 50) {
+    throw new Error(`params.items has ${p.items.length} entries; the limit is 50`);
+  }
+  const incoming = p.items.map((raw, i) => {
     const o = asObject(raw);
     if (typeof o.name !== "string" || !o.name.trim()) {
       throw new Error(`params.items[${i}].name must be a non-empty string`);
     }
     return {
-      name: o.name.slice(0, 80),
-      ...(typeof o.quantity === "string" ? { quantity: o.quantity.slice(0, 40) } : {}),
-      ...(typeof o.notes === "string" ? { notes: o.notes.slice(0, 120) } : {}),
+      name: asString(o.name, `items[${i}].name`, 80),
+      ...(typeof o.quantity === "string"
+        ? { quantity: asString(o.quantity, `items[${i}].quantity`, 40) }
+        : {}),
+      ...(typeof o.notes === "string"
+        ? { notes: asString(o.notes, `items[${i}].notes`, 120) }
+        : {}),
     };
   });
   const after = await addToPantryItems(incoming);
@@ -456,7 +549,7 @@ async function removeFromPantry(rawParams?: unknown): Promise<{ count: number }>
   if (typeof p.name !== "string" || !p.name.trim()) {
     throw new Error("params.name must be a non-empty string");
   }
-  const after = await removePantryItem(p.name.slice(0, 80));
+  const after = await removePantryItem(asString(p.name, "name", 80));
   return { count: after.length };
 }
 
@@ -466,7 +559,7 @@ async function setFavorite(rawParams?: unknown): Promise<{ slug: string; favorit
   const p = asObject(rawParams);
   const slug = asSlug(p.slug);
   if (typeof p.favorite !== "boolean") throw new Error("params.favorite must be a boolean");
-  const all = await listSavedRecipes();
+  const all = await requireLibrary();
   const found = all.find((r) => r.slug === slug);
   if (!found) throw new Error(`Recipe not found: ${slug}`);
   const updated = await api.setFavorite(api.recipeIdFromPath(found.path), p.favorite);
@@ -482,13 +575,16 @@ async function setBlocked(rawParams?: unknown): Promise<{ id: string; blocked: b
   const p = asObject(rawParams);
   if (typeof p.id !== "string" || !p.id.trim()) throw new Error("params.id must be a non-empty string");
   if (typeof p.blocked !== "boolean") throw new Error("params.blocked must be a boolean");
-  const id = p.id.slice(0, 64);
+  // Truncating here doesn't lose data, it CHANGES the target: a 200-character
+  // id cut to 64 is a different id, and the block landed on some other recipe
+  // (or on nothing) while the caller was told it worked.
+  const id = asString(p.id, "id", 64);
   const after = p.blocked ? await blockRecipe(id) : await unblockRecipe(id);
   return { id, blocked: p.blocked, count: after.size };
 }
 
 async function getBlocked(): Promise<{ ids: string[] }> {
-  return { ids: [...(await loadBlocked())] };
+  return { ids: [...(await loadBlockedForWrite())] };
 }
 
 // ── Plans (read) ─────────────────────────────────────────────────────
@@ -536,11 +632,17 @@ async function getPlan(rawParams?: unknown): Promise<Record<string, unknown>> {
 async function planWeek(rawParams?: unknown): Promise<Record<string, unknown>> {
   const p = asObject(rawParams ?? {});
   const mealCount = p.mealCount === undefined ? 5 : asPositiveInt(p.mealCount, "mealCount", 7);
-  const include = asStringArray(p.includeIngredients ?? [], "includeIngredients", 20, 60);
-  const cuisines = asStringArray(p.cuisines ?? [], "cuisines", 10, 40);
-  const avoid = asStringArray(p.avoid ?? [], "avoid", 20, 60);
-  const dietary = asStringArray(p.dietary ?? [], "dietary", 10, 40);
+  const include = asOptionalStringArray(p.includeIngredients, "includeIngredients", 20, 60);
+  const cuisines = asOptionalStringArray(p.cuisines, "cuisines", 10, 40);
+  const avoid = asOptionalStringArray(p.avoid, "avoid", 20, 60);
+  const dietary = asOptionalStringArray(p.dietary, "dietary", 10, 40);
 
+  // Lenient on purpose, unlike every read action above. Those REPORT state, so
+  // a false empty is a false statement. This one CONSUMES state to build a
+  // proposal, and both failure directions are safe: an unread pantry means the
+  // plan assumes nothing on hand and over-shops, an unread block list means a
+  // thumbed-down recipe can resurface. Killing the whole week's plan because a
+  // dot-file hiccupped would be the worse trade.
   const pantry = await loadPantry();
   const blocked = [...(await loadBlocked())];
   const constraints = { mealCount, includeIngredients: include, cuisines, avoid, dietary };
@@ -578,7 +680,7 @@ async function scaleSavedRecipe(rawParams?: unknown): Promise<Record<string, unk
   const slug = asSlug(p.slug);
   const servings = asPositiveInt(p.servings, "servings", 64);
   if (servings < 1) throw new Error("params.servings must be at least 1");
-  const all = await listSavedRecipes();
+  const all = await requireLibrary();
   const found = all.find((r) => r.slug === slug);
   if (!found) throw new Error(`Recipe not found: ${slug}`);
   const scaled = scaleRecipe(found, servings / Math.max(1, found.servings));
@@ -648,7 +750,12 @@ async function renameFamily(rawParams?: unknown): Promise<{ id: string; name: st
 }
 
 async function listStores(): Promise<{ stores: { id: string; name: string; aisles: number }[] }> {
-  const { stores } = await loadStores();
+  // Strict: the lenient loader's fallback is not an empty list, it is a
+  // FABRICATED default store with six aisles. Answering an orchestrator with
+  // a store the user has never seen is worse than answering with nothing.
+  const state = await loadStoresState();
+  if (!state.ok) throw new Error("Couldn't read your store layouts — nothing was read.");
+  const { stores } = state.value;
   return { stores: stores.map((s) => ({ id: s.id, name: s.name, aisles: s.aisles.length })) };
 }
 

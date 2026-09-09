@@ -51,6 +51,11 @@ export function RecipeRow({
 }
 
 export function CoverageChips({ cov }: { cov: CoverageResult }) {
+  // `total === 0` means we couldn't read the recipe's ingredients at all, not
+  // that you own all of them — the same misread that made the nutrition strip
+  // claim a confident estimate off zero matches. Rendering it drew a green
+  // "0/0 have — complete" badge on every unopened catalog recipe.
+  if (cov.total === 0) return null;
   const chips = [
     ...cov.missingNames.map((n) => ({ t: "miss" as const, n })),
     ...cov.shortNames.map((n) => ({ t: "short" as const, n })),
