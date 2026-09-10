@@ -94,15 +94,35 @@ def parse(slug, h):
     m = re.search(r"\d+", y)
     rec["servings"] = int(m.group(0)) if m else 0
 
-    # Ingredients: <ul class="... ingredients ..."> ; the <span class="notes">
-    # parenthetical is part of the line and is kept.
+    # Ingredients live in one or MORE <ul class="... ingredients ...">.
+    #
+    # Recipes with components ("For the Dressing:", "For the Salad:") emit an
+    # empty first <ul> and then one <ul> per group, with a <b> label between
+    # them. Reading only the first list returned zero ingredients for those —
+    # 43 of 1,124, every one of them a grouped recipe, which is why the
+    # failures looked systematic rather than random.
+    #
+    # The group label is preserved as a TRAILING parenthetical rather than a
+    # prefix or a bare line: `parseIngredient` strips a trailing "(...)" before
+    # tokenizing, so the cook still reads "1 cup mayonnaise (for the dressing)"
+    # while the pantry matcher still sees "mayonnaise".
     ing = []
-    mu = re.search(r'<ul[^>]*class="[^"]*ingredients[^"]*"[^>]*>(.*?)</ul>', flat, re.S)
-    if mu:
-        for li in re.findall(r"<li[^>]*>(.*?)</li>", mu.group(1), re.S):
+    section = ""
+    for chunk in re.finditer(
+        r'<b>\s*([^<]{2,60}?)\s*</b>|<ul[^>]*class="[^"]*ingredients[^"]*"[^>]*>(.*?)</ul>',
+        flat, re.S,
+    ):
+        label, block = chunk.group(1), chunk.group(2)
+        if label is not None:
+            section = re.sub(r"[:\s]+$", "", txt(label)).strip()
+            continue
+        for li in re.findall(r"<li[^>]*>(.*?)</li>", block or "", re.S):
             t = txt(li)
-            if t:
-                ing.append(t)
+            if not t:
+                continue
+            if section and not t.endswith(")"):
+                t = f"{t} ({section.lower()})"
+            ing.append(t)
     rec["ingredients"] = ing
 
     # Directions: the <ol>/<ul> that follows the Directions heading.
