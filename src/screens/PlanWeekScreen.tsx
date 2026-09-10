@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type {
   CapturedPhoto,
   Ingredient,
@@ -17,6 +17,7 @@ import {
   interpretMood,
   seedConstraintsFromRecipe,
   buildOnHand,
+  canonicalTokens,
   type PlanCandidate,
 } from "../features/planWeek";
 import { planWeekRemote } from "../bridge/recipesApi";
@@ -85,6 +86,8 @@ export function PlanWeekScreen({
   // back is a trap on a touch target this small — one mis-tap and the recipe is
   // gone from every future plan with nothing to show you it happened.
   const [lastBlocked, setLastBlocked] = useState<{ id: string; title: string } | null>(null);
+  /** Set when a thumbs-down (or its undo) didn't reach the durable index. */
+  const [blockWarning, setBlockWarning] = useState<string | null>(null);
 
   const [scanned, setScanned] = useState<Ingredient[]>([]);
   const [scanMode, setScanMode] = useState<"idle" | "capture" | "identifying">("idle");
@@ -108,6 +111,32 @@ export function PlanWeekScreen({
     });
   }, []);
 
+  /**
+   * The user's own favourites, offered alongside the catalog.
+   *
+   * Two things here are load-bearing now that selection runs server-side:
+   *   - the id is the recipe's REAL db id, not a `saved:<slug>` synthetic. The
+   *     planner resolves pins and keeps by id against the row it will hydrate;
+   *     a synthetic id matched nothing and the pin was dropped in silence.
+   *   - category is left empty rather than "saved". seedConstraintsFromRecipe
+   *     turns the seed's category into a cuisine constraint, and "saved" is not
+   *     a cuisine — it matched no recipe and quietly loosened the whole plan.
+   */
+  const savedCandidates = useMemo<PlanCandidate[]>(
+    () =>
+      saved
+        .filter((r) => r.favorite)
+        .map((r) => ({
+          id: r.slug,
+          title: r.title,
+          recipe: r,
+          category: "",
+          tags: [] as string[],
+          isFavorite: true,
+        })),
+    [saved],
+  );
+
   const candidates = useMemo<PlanCandidate[]>(() => {
     const catalog = getCatalog().map((c) => ({
       id: c.id,
@@ -117,18 +146,8 @@ export function PlanWeekScreen({
       tags: c.tags,
       isFavorite: favs.has(c.id),
     }));
-    const savedFav = saved
-      .filter((r) => r.favorite)
-      .map((r) => ({
-        id: `saved:${r.slug}`,
-        title: r.title,
-        recipe: r,
-        category: "saved",
-        tags: [] as string[],
-        isFavorite: true,
-      }));
-    return [...savedFav, ...catalog];
-  }, [saved, favs, catalogVersion]);
+    return [...savedCandidates, ...catalog];
+  }, [savedCandidates, favs, catalogVersion]);
 
   const onHand = useMemo<Ingredient[]>(
     () => buildOnHand(pantry ? ingredientsFromPantry(pantry) : [], scanned),
@@ -191,14 +210,24 @@ export function PlanWeekScreen({
    * holds it). The server returns the picks hydrated; we build the shopping
    * list locally from just those, with the same tested code as before.
    */
+  /**
+   * Returns whether a plan actually came back. Callers that ADVANCE the wizard
+   * must check it: `onPlan` used to `await runPlan([])` and then step to
+   * "review" unconditionally, and because this function swallows its own
+   * error, a failed first plan moved you to a step whose body is
+   * `step === "review" && plan` — with plan still null, that renders nothing.
+   * No picks, no error, and no Back button, because Back lives inside the
+   * component that didn't mount. The only way out discarded the mood and
+   * pantry the user had just entered.
+   */
   const runPlan = async (
     exclude: string[],
     c = constraints,
     keep?: string[],
     /** Slot the replacement should occupy, so a rerolled meal doesn't jump to the end. */
     replaceAt?: number,
-  ) => {
-    if (!c) return;
+  ): Promise<boolean> => {
+    if (!c) return false;
     setPlanning(true);
     setError(null);
     try {
@@ -208,7 +237,25 @@ export function PlanWeekScreen({
         // Blocked recipes are excluded on EVERY run, not just the one where
         // the user pressed thumbs-down.
         excludeIds: [...new Set([...exclude, ...blocked])],
-        favoriteIds: [...favs],
+        // The server's pool is the PUBLIC catalog, so the user's own recipes
+        // have to be offered explicitly or they can't be picked (or pinned —
+        // "plan around this recipe" on a saved favourite used to come back
+        // without it, with nothing said). Their canonical tokens are computed
+        // here because saved rows are stored with `tokens: []` and this is
+        // where the ingredient parser lives.
+        // Seed first: the server caps how many extras it will take, and the
+        // anchored recipe must never be the one that cap drops.
+        extraCandidates: [...savedCandidates]
+          .sort((a, b) => (a.id === seed?.id ? -1 : b.id === seed?.id ? 1 : 0))
+          .map((s) => ({
+            id: s.id,
+            title: s.title,
+            category: s.category,
+            tags: s.tags,
+            tokens: canonicalTokens(s.recipe),
+          })),
+        // A saved favourite is a favourite. The index only holds CATALOG ids.
+        favoriteIds: [...favs, ...savedCandidates.map((s) => s.id)],
         ...(keep && keep.length > 0 ? { pinnedIds: keep } : {}),
         ...(moodMode === "seed" && seed?.id ? { pinnedId: seed.id } : {}),
       });
@@ -230,24 +277,55 @@ export function PlanWeekScreen({
         kept.splice(replaceAt, 0, ...fresh);
         chosen = kept;
       }
-      setPlan(planFromChosen(chosen, onHand, c, res.warnings, res.shortfall));
+      // A pin the planner couldn't use is dropped server-side (excluded, or
+      // filtered out by an avoid/dietary rule). Say so: the user asked for a
+      // week built around this recipe, and a plan that quietly doesn't contain
+      // it looks like the app ignored them. Not said when they rerolled the
+      // seed away themselves — that drop is what they just asked for.
+      const warnings = [...res.warnings];
+      if (
+        moodMode === "seed" &&
+        seed &&
+        !exclude.includes(seed.id) &&
+        !chosen.some((x) => x.id === seed.id)
+      ) {
+        warnings.push(
+          `Couldn't build the week around "${seed.title}" — it didn't fit the rest of these filters, so the plan is based on your other choices.`,
+        );
+      }
+      setPlan(planFromChosen(chosen, onHand, c, warnings, res.shortfall));
       setExcludeIds(exclude);
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      return false;
     } finally {
       setPlanning(false);
     }
   };
 
+  // Retained across the identify round trip: flipping scanMode unmounts
+  // CaptureScreen, so without this a failed call lost the user's photos.
+  const [lastPhotos, setLastPhotos] = useState<CapturedPhoto[]>([]);
+
+  /** Synchronous re-entrancy guard — see the note in PantryScreen. */
+  const identifyInFlight = useRef(false);
+
   const onScanned = async (photos: CapturedPhoto[]) => {
+    if (identifyInFlight.current) return;
+    identifyInFlight.current = true;
+    setLastPhotos(photos);
     setScanMode("identifying");
     try {
       const items = await identifyIngredients(photos);
       setScanned((prev) => buildOnHand(prev, items));
+      setLastPhotos([]);
       setScanMode("idle");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setScanMode("idle");
+    } finally {
+      identifyInFlight.current = false;
     }
   };
 
@@ -272,7 +350,21 @@ export function PlanWeekScreen({
    */
   const blockPick = async (id: string) => {
     const title = (plan?.picks ?? []).find((p) => p.id === id)?.title ?? "That meal";
-    setBlocked(await blockRecipe(id).catch(() => new Set([...blocked, id])));
+    // The block is meant to be DURABLE and cross-device. The old `.catch`
+    // fabricated a client-only Set and carried on, and the "won't suggest
+    // that again" banner showed anyway — so the user was told a permanent
+    // preference had been recorded when it would vanish on the next reload.
+    // A failure still swaps the meal out of this plan (that part is local and
+    // works), it just says what didn't stick.
+    try {
+      setBlocked(await blockRecipe(id));
+      setBlockWarning(null);
+    } catch {
+      setBlocked(new Set([...blocked, id]));
+      setBlockWarning(
+        `Swapped "${title}" out of this plan, but couldn't save the thumbs-down — it may be suggested again later.`,
+      );
+    }
     setLastBlocked({ id, title });
     const all = (plan?.picks ?? []).map((p) => p.id);
     const at = all.indexOf(id);
@@ -283,7 +375,13 @@ export function PlanWeekScreen({
    *  just makes the recipe eligible for future suggestions again. */
   const undoBlock = async () => {
     if (!lastBlocked) return;
-    setBlocked(await unblockRecipe(lastBlocked.id).catch(() => blocked));
+    try {
+      setBlocked(await unblockRecipe(lastBlocked.id));
+      setBlockWarning(null);
+    } catch {
+      setBlockWarning("Couldn't undo that thumbs-down — try again in a moment.");
+      return; // keep lastBlocked so the Undo button is still there to retry
+    }
     setLastBlocked(null);
   };
 
@@ -310,7 +408,7 @@ export function PlanWeekScreen({
         <button className="btn ghost" onClick={() => setScanMode("idle")} style={{ alignSelf: "flex-start" }}>
           <Icon name="chevron-down" className="back-caret" /> Back
         </button>
-        <CaptureScreen onIdentify={onScanned} />
+        <CaptureScreen onIdentify={onScanned} initialPhotos={lastPhotos} />
       </div>
     );
   }
@@ -341,6 +439,13 @@ export function PlanWeekScreen({
         <div className="status-banner error">
           <Icon name="triangle-exclamation" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {blockWarning && (
+        <div className="status-banner warn">
+          <Icon name="triangle-exclamation" />
+          <span>{blockWarning}</span>
         </div>
       )}
 
@@ -377,8 +482,9 @@ export function PlanWeekScreen({
           }}
           onBack={() => setStep("mood")}
           onPlan={async () => {
-            await runPlan([]);
-            setStep("review");
+            // Only on success — a failure keeps you on this step, where the
+            // error banner is visible and Plan can simply be pressed again.
+            if (await runPlan([])) setStep("review");
           }}
         />
       )}
@@ -525,12 +631,18 @@ function MoodStep(p: MoodProps) {
               </div>
               <div className="browse-list">
                 {p.seedResults.map((c) => (
-                  <div key={c.id} className="browse-item" onClick={() => p.setSeed(c)}>
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="browse-item"
+                    onClick={() => p.setSeed(c)}
+                  >
                     <div className="title-block">
                       <div className="title">{c.title}</div>
-                      <div className="meta">{c.category}</div>
+                      {/* Saved recipes carry no category — see savedCandidates. */}
+                      <div className="meta">{c.category || "your recipe"}</div>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </>

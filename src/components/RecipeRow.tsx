@@ -1,6 +1,7 @@
 import type { FeedRecipe } from "../types";
 import type { CoverageResult } from "../features/scaling";
 import { prettyIngredient } from "../features/scaling";
+import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
 import { Icon } from "../icons";
 
 /**
@@ -20,8 +21,11 @@ export function RecipeRow({
   const r = fi.recipe;
   const category = fi.kind === "catalog" ? fi.recipe.category : null;
   return (
-    <div className="browse-item" onClick={onOpen}>
-      {r.imageUrl && (
+    // A button, not a div-with-onClick: every recipe row in the app is this
+    // component, so the whole feed was keyboard-unreachable. `type="button"`
+    // matters because these do appear inside forms.
+    <button type="button" className="browse-item" onClick={onOpen}>
+      {RECIPE_PHOTOS_ENABLED && r.imageUrl && (
         <div className="browse-thumb">
           <img src={r.imageUrl} alt="" loading="lazy" />
         </div>
@@ -45,11 +49,16 @@ export function RecipeRow({
         </div>
         {cov && <CoverageChips cov={cov} />}
       </div>
-    </div>
+    </button>
   );
 }
 
 export function CoverageChips({ cov }: { cov: CoverageResult }) {
+  // `total === 0` means we couldn't read the recipe's ingredients at all, not
+  // that you own all of them — the same misread that made the nutrition strip
+  // claim a confident estimate off zero matches. Rendering it drew a green
+  // "0/0 have — complete" badge on every unopened catalog recipe.
+  if (cov.total === 0) return null;
   const chips = [
     ...cov.missingNames.map((n) => ({ t: "miss" as const, n })),
     ...cov.shortNames.map((n) => ({ t: "short" as const, n })),

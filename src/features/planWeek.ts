@@ -20,6 +20,7 @@ import {
   prettyIngredient,
   parseDisplayQuantity,
   formatScaledNumber,
+  matchesAnyName,
 } from "./scaling";
 import { sanitizeName } from "./vision";
 import type {
@@ -70,6 +71,19 @@ const CLONE_JACCARD = 0.9;
  */
 function canonOf(name: string): string {
   return normalizeIngredientName(prettyIngredient(name));
+}
+
+/**
+ * Is this canonical ingredient covered by what's on hand? Exact set membership
+ * first (the common case), then the shared same-ingredient rule from scaling.ts.
+ *
+ * The two used to disagree: the recipe card's coverage strip matched loosely
+ * while the shopping list required an exact canonical hit, so the list could
+ * tell you to buy an ingredient the detail screen had just counted as "have".
+ * One rule, both places.
+ */
+function onHandHas(canonical: string, onHandSet: Set<string>): boolean {
+  return onHandSet.has(canonical) || matchesAnyName(canonical, onHandSet);
 }
 
 /** Unique canonical ingredient names for a recipe (drops trace/unparseable). */
@@ -262,7 +276,7 @@ export function planFromChosen(
   }));
   const picks: PlannedRecipe[] = scored.map((s) => {
     const covered: string[] = [];
-    for (const t of s.tokens) if (onHandSet.has(t)) covered.push(t);
+    for (const t of s.tokens) if (onHandHas(t, onHandSet)) covered.push(t);
     return {
       id: s.c.id,
       title: s.c.title,
@@ -307,7 +321,7 @@ export function buildShoppingList(
       const p = parseIngredient(line);
       if (!p) continue;
       const canonical = canonOf(p.name);
-      if (!canonical || onHandSet.has(canonical)) continue; // already have it
+      if (!canonical || onHandHas(canonical, onHandSet)) continue; // already have it
       if (TRACE_RE.test(canonical)) continue; // staples nobody shops a list for
       if (seen.has(canonical)) continue; // one recipe counts a canonical once
       seen.add(canonical);
@@ -376,7 +390,7 @@ function fillMarginal(chosen: Scored[], onHandSet: Set<string>, picks: PlannedRe
   chosen.forEach((s, idx) => {
     const marginal: string[] = [];
     for (const t of s.tokens) {
-      if (onHandSet.has(t)) continue;
+      if (onHandHas(t, onHandSet)) continue;
       if (!bought.has(t)) {
         marginal.push(t);
         bought.add(t);

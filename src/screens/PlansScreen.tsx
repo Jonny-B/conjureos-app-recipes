@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PantryItem, WeekPlan } from "../types";
 import { importVfsPlansOnce, planTitle } from "../features/planStorage";
+import { PlanWriter } from "../features/planSync";
 import {
   deletePlanRecord,
   getMyProfile,
@@ -14,7 +15,7 @@ import { PlanWeekScreen } from "./PlanWeekScreen";
 import { FamilyScreen } from "./FamilyScreen";
 import { StoreEditor } from "./StoreEditor";
 import {
-  loadStores,
+  loadStoresState,
   saveStores,
   groupByStore,
   readLastStoreId,
@@ -100,9 +101,18 @@ export function PlansScreen({
   intent = null,
   onIntentConsumed,
   onCogItems,
+  familyEpoch = 0,
 }: {
   pantry: PantryItem[] | null;
   catalogVersion?: number;
+  /**
+   * Bumped by the host when the user joins a family from OUTSIDE this screen
+   * (the invite-link prompt). Joining changes which plans exist for us, and the
+   * realtime channel we'd otherwise learn it from is listed on the profile —
+   * which we haven't reloaded yet — so without this a user who joined while
+   * sitting on the Plans tab saw nothing until they navigated away and back.
+   */
+  familyEpoch?: number;
   /** A sub-screen to open, requested from the app-header cog. */
   intent?: PlansIntent | null;
   onIntentConsumed?: () => void;
@@ -113,7 +123,18 @@ export function PlansScreen({
   const [plans, setPlans] = useState<Loaded<PlanRecord[]>>({ status: "loading" });
   const [scope, setScope] = useState<Scope>(() => readLastView()?.scope ?? "my");
   const [mode, setMode] = useState<Mode>("landing");
-  const [viewing, setViewing] = useState(0);
+  /**
+   * Which plan the landing is showing, tracked by ID rather than by position.
+   *
+   * It used to be an index, reset to 0 by an effect keyed on `[scope, planList]`
+   * — and every shopping-list tick hands back a NEW plans array (the writer's
+   * onRecord maps over it), so ticking an item on any plan but the newest
+   * snapped you to the newest one mid-shop. Keyed on identity, a tick is
+   * invisible: the id you were looking at is still in the list. `null` means
+   * "the newest", which is also where an id that's no longer present resolves
+   * to, so a plan deleted underneath us degrades the same way it always did.
+   */
+  const [viewingId, setViewingId] = useState<string | null>(null);
   /** A failed share / delete. Rendered on the landing; cleared on the next try. */
   const [actionError, setActionError] = useState<string | null>(null);
   // The last-viewed plan id to restore once, after the first plans load.
@@ -121,9 +142,36 @@ export function PlansScreen({
   const rt = useRef<RealtimeHandle | null>(null);
   const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /**
+   * Shopping-list ticks go through here, not through a whole-blob save per tap
+   * — see features/planSync.ts for why (lost ticks, and two shoppers erasing
+   * each other). Created once per mount; `overlay` replays anything still
+   * queued on top of whatever the server just told us.
+   */
+  const writerRef = useRef<PlanWriter | null>(null);
+  if (!writerRef.current) {
+    writerRef.current = new PlanWriter({
+      save: (a) => savePlanRecord(a),
+      onRecord: (rec) =>
+        setPlans((prev) =>
+          prev.status === "ok"
+            ? { ...prev, value: prev.value.map((p) => (p.id === rec.id ? rec : p)) }
+            : prev,
+        ),
+      onError: (e) => {
+        setActionError(`Couldn't save your shopping list — ${errText(e)}`);
+        void loadPlansRef.current?.();
+      },
+    });
+  }
+  const writer = writerRef.current;
+
   const loadPlans = useCallback(async () => {
     try {
-      setPlans({ status: "ok", value: await listPlans() });
+      // Replay un-acknowledged ticks over the fetched rows: a realtime refetch
+      // fires ~400ms after any family edit, and without this it would paint the
+      // pre-tap list over a tap the server hasn't confirmed yet.
+      setPlans({ status: "ok", value: (await listPlans()).map((p) => writer.overlay(p)) });
     } catch (e) {
       // A failed REFETCH must never blank a list we already have. The realtime
       // refetch fires exactly when another family member edits a plan, so one
@@ -133,7 +181,13 @@ export function PlansScreen({
         prev.status === "ok" ? { ...prev, stale: true } : { status: "error", message: errText(e) },
       );
     }
+    // `writer` comes from a ref and never changes identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // The writer outlives the render that built it, so it reaches the CURRENT
+  // loadPlans through a ref instead of capturing the first render's copy.
+  const loadPlansRef = useRef<(() => Promise<void>) | null>(null);
+  loadPlansRef.current = loadPlans;
   const loadProfile = useCallback(async () => {
     try {
       const p = await getMyProfile();
@@ -173,6 +227,15 @@ export function PlansScreen({
       await loadPlans();
     })();
   }, [loadProfile, loadPlans]);
+
+  // Reload on an external family join. Skipped on mount — the effect above
+  // already did the first load, and running both would double-fetch.
+  const mountedEpoch = useRef(familyEpoch);
+  useEffect(() => {
+    if (familyEpoch === mountedEpoch.current) return;
+    mountedEpoch.current = familyEpoch;
+    void familyChanged();
+  }, [familyEpoch, familyChanged]);
 
   // The exact channel set, as a stable string. Keying the effect on `profile`
   // tore the websocket down and rebuilt it on EVERY profile refresh (each
@@ -236,18 +299,22 @@ export function PlansScreen({
   );
 
   const active = scope === "my" ? myPlans : familyPlans;
-  // When plans/scope change: restore the last-viewed plan once (on first load),
-  // otherwise snap to the most recent.
+  const viewingIdx = viewingId ? active.findIndex((p) => p.id === viewingId) : -1;
+  const viewing = viewingIdx >= 0 ? viewingIdx : 0;
+
+  // Restore the last-viewed plan, once, after the first load that contains it.
   useEffect(() => {
-    if (restoreRef.current && planList) {
-      const idx = active.findIndex((p) => p.id === restoreRef.current);
-      restoreRef.current = null;
-      setViewing(idx >= 0 ? idx : 0);
-    } else {
-      setViewing(0);
-    }
+    if (!restoreRef.current || !planList) return;
+    const id = restoreRef.current;
+    restoreRef.current = null;
+    if (active.some((p) => p.id === id)) setViewingId(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope, planList]);
+  }, [planList]);
+
+  // The two scope tabs are separate lists; switching starts at the newest.
+  useEffect(() => {
+    setViewingId(null);
+  }, [scope]);
 
   // Persist where the user is, so the next visit reopens here.
   const currentId = (active[viewing] ?? active[0])?.id ?? null;
@@ -261,13 +328,6 @@ export function PlansScreen({
   // created in (the header-cog actions).
   const plansRef = useRef<PlanRecord[] | null>(null);
   plansRef.current = planList;
-
-  const patchLocal = (rec: PlanRecord) =>
-    setPlans((prev) =>
-      prev.status === "ok"
-        ? { ...prev, value: prev.value.map((p) => (p.id === rec.id ? rec : p)) }
-        : prev,
-    );
 
   /**
    * Where a new plan lands, PRE-SELECTED for the wizard's final step — not
@@ -298,21 +358,15 @@ export function PlansScreen({
     await loadPlans();
   };
 
-  const saveData = async (rec: PlanRecord, data: WeekPlan) => {
-    patchLocal({ ...rec, data });
-    try {
-      const saved = await savePlanRecord({ id: rec.id, plan: data });
-      patchLocal(saved);
-    } catch {
-      await loadPlans();
-    }
-  };
+  // Ticks are OPS, not blob writes. `rec` here is what's on screen (server
+  // state + anything still queued), so the toggle reads the box the user just
+  // looked at, and the op that goes out sets that item to a value rather than
+  // uploading a whole list built from data that may already be stale.
   const toggleChecked = (rec: PlanRecord, canonical: string) => {
-    const set = new Set(rec.data.checked ?? []);
-    set.has(canonical) ? set.delete(canonical) : set.add(canonical);
-    return saveData(rec, { ...rec.data, checked: [...set] });
+    const checked = new Set(rec.data.checked ?? []);
+    writer.push(rec, { kind: "setChecked", canonical, value: !checked.has(canonical) });
   };
-  const uncheckAll = (rec: PlanRecord) => saveData(rec, { ...rec.data, checked: [] });
+  const uncheckAll = (rec: PlanRecord) => writer.push(rec, { kind: "uncheckAll" });
 
   // Both take an ID, not a record. The header-cog effect below only re-runs
   // when the plan's id/scope changes, so a captured record goes stale the
@@ -337,7 +391,11 @@ export function PlansScreen({
     await loadPlans();
     setScope(familyId ? "family" : "my");
   };
+  /** A delete waiting on the user's yes — see the cog item that sets it. */
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; shared: boolean } | null>(null);
+
   const removePlan = async (planId: string) => {
+    setConfirmDelete(null);
     setActionError(null);
     setPlans((prev) =>
       prev.status === "ok" ? { ...prev, value: prev.value.filter((p) => p.id !== planId) } : prev,
@@ -372,7 +430,13 @@ export function PlansScreen({
     const planId = cogPlan.id;
     const items: CogItem[] = [];
     if (cogPlan.familyId) {
-      items.push({ key: "private", label: "Make private", icon: "user", onClick: () => void sharePlan(planId, null) });
+      // Only the owner may move a plan out of the family. Offering this to any
+      // member meant tapping it made someone else's plan vanish for the whole
+      // family — and it didn't land in the tapper's own list either, because
+      // ownership never moved. The server enforces this too (forbidden_reassign).
+      if (cogPlan.mine) {
+        items.push({ key: "private", label: "Make private", icon: "user", onClick: () => void sharePlan(planId, null) });
+      }
     } else {
       for (const f of families) {
         items.push({
@@ -383,7 +447,18 @@ export function PlansScreen({
         });
       }
     }
-    items.push({ key: "delete", label: "Delete plan", icon: "trash-can", danger: true, onClick: () => void removePlan(planId) });
+    // Deletion ASKS first. A shared plan is a week of someone else's meals and
+    // their half-ticked shopping list, there is no trash and no undo, and this
+    // sat one tap deep in a sheet with no confirmation at all — while
+    // reassignment, right above it, was locked to the owner. Personal plans go
+    // through the same gate; it costs one tap and the plan is equally gone.
+    items.push({
+      key: "delete",
+      label: "Delete plan",
+      icon: "trash-can",
+      danger: true,
+      onClick: () => setConfirmDelete({ id: planId, shared: !!cogPlan.familyId }),
+    });
     onCogItems(items);
     return () => onCogItems([]);
     // `familyKey` (not families.length) so renaming a family relabels
@@ -452,6 +527,22 @@ export function PlansScreen({
           <span>{actionError}</span>
         </div>
       )}
+      {confirmDelete && (
+        <div className="status-banner warn plan-confirm">
+          <Icon name="triangle-exclamation" />
+          <span>
+            {confirmDelete.shared
+              ? "Delete this plan for the whole family? Their meals and shopping list go with it, and there's no undo."
+              : "Delete this plan? There's no undo."}
+          </span>
+          <button className="btn secondary" type="button" onClick={() => setConfirmDelete(null)}>
+            Keep it
+          </button>
+          <button className="btn danger" type="button" onClick={() => void removePlan(confirmDelete.id)}>
+            Delete
+          </button>
+        </div>
+      )}
       <div className="plans-tabs-row">
         <div className="seg" role="tablist" aria-label="Plan scope">
           <button role="tab" aria-selected={scope === "my"} className={`seg-btn${scope === "my" ? " active" : ""}`} onClick={() => setScope("my")}>
@@ -514,7 +605,7 @@ export function PlansScreen({
                         key={p.id}
                         rec={p}
                         familyName={p.familyId ? familyName(p.familyId) : null}
-                        onOpen={() => setViewing(i)}
+                        onOpen={() => setViewingId(p.id)}
                       />
                     ),
                   )}
@@ -603,8 +694,21 @@ function PlanView({
   const [defaultId, setDefaultId] = useState<string>("");
   const [aiNote, setAiNote] = useState<string | null>(null);
   const askedRef = useRef<Set<string>>(new Set());
+  // Deliberately the strict loader. This component WRITES stores back (the
+  // AI-placement effect below), and loadStores fabricates a default layout when
+  // the file is unreadable — so the lenient loader here would let that synthetic
+  // default overwrite the user's real aisle orders, the exact clobber the
+  // jsonDoc split exists to prevent. Unreachable today only because the default
+  // store happens to cover every category, so nothing lands in Unsorted; one
+  // renamed aisle re-opens it.
+  const [storesUnreadable, setStoresUnreadable] = useState(false);
   useEffect(() => {
-    loadStores().then(({ stores: st, defaultId: d }) => {
+    loadStoresState().then((r) => {
+      if (!r.ok) {
+        setStoresUnreadable(true);
+        return;
+      }
+      const { stores: st, defaultId: d } = r.value;
       setStores(st);
       setDefaultId(d);
       const last = readLastStoreId();
@@ -620,10 +724,25 @@ function PlanView({
     setStoreId(id);
     writeLastStoreId(id);
   };
-  const groups = useMemo(
-    () => (store ? groupByStore(plan.shoppingList ?? [], store) : []),
-    [plan, store],
-  );
+  /**
+   * Grouped by aisle when we have a store layout; a single flat group when we
+   * don't.
+   *
+   * With no store this returned `[]` while `total` still counted the items, so
+   * the render took the "we have items" branch and mapped an empty array: the
+   * header said "12 to buy", the store bar said "My store", and there was
+   * nothing underneath it. That state is reachable whenever the store file is
+   * unreadable — and briefly on every load, before the layout resolves.
+   * `doPrint` already handles exactly this with an ungrouped fallback and a
+   * comment explaining why; the on-screen list never got the same treatment.
+   */
+  const groups = useMemo(() => {
+    const list = plan.shoppingList ?? [];
+    if (store) return groupByStore(list, store);
+    return list.length > 0
+      ? [{ aisleId: UNSORTED, aisleName: "Shopping list", items: list }]
+      : [];
+  }, [plan, store]);
   const unsorted = useMemo(() => groups.find((g) => g.aisleId === UNSORTED)?.items ?? [], [groups]);
 
   // Whenever a list has items the store layout doesn't cover, hand the layout to
@@ -631,17 +750,36 @@ function PlanView({
   // Placements are learned onto the store, so the same items are instant + free
   // next time. Each (store, item) is asked at most once.
   useEffect(() => {
-    if (!store || !aiSortEnabled() || unsorted.length === 0) return;
+    // storesUnreadable: skip entirely rather than pay for an AI call whose
+    // result we must not persist.
+    if (!store || storesUnreadable || !aiSortEnabled() || unsorted.length === 0) return;
     const toAsk = unsorted.filter((i) => !askedRef.current.has(`${store.id}:${i.canonical}`));
     if (toAsk.length === 0) return;
-    toAsk.forEach((i) => askedRef.current.add(`${store.id}:${i.canonical}`));
+    const keys = toAsk.map((i) => `${store.id}:${i.canonical}`);
+    keys.forEach((k) => askedRef.current.add(k));
     let cancelled = false;
     void (async () => {
-      const placements = await inferAislePlacements(
-        toAsk.map((i) => ({ name: i.name, canonical: i.canonical })),
-        store,
-      );
-      if (cancelled || Object.keys(placements).length === 0) return;
+      // "Asked" has to mean ANSWERED. Marking before the call and never
+      // unmarking meant one network blip stranded those items in Unsorted for
+      // the rest of the session, with no note and no way to retry — the effect
+      // simply never looked at them again. On a failure (or an empty answer)
+      // the marks come off, so the next render asks once more.
+      let placements: Record<string, string> = {};
+      try {
+        placements = await inferAislePlacements(
+          toAsk.map((i) => ({ name: i.name, canonical: i.canonical })),
+          store,
+        );
+      } catch {
+        placements = {};
+      }
+      if (cancelled) return;
+      if (Object.keys(placements).length === 0) {
+        keys.forEach((k) => askedRef.current.delete(k));
+        return;
+      }
+      // Items the model DID look at but declined to place stay marked: it
+      // answered, it just had no aisle for them, and re-asking buys nothing.
       // The write lives outside the state updater: React may invoke an updater
       // more than once for the same change (StrictMode does it deliberately),
       // and each extra invocation would be another VFS write + sync push.
@@ -656,7 +794,7 @@ function PlanView({
     return () => {
       cancelled = true;
     };
-  }, [store, unsorted, defaultId]);
+  }, [store, unsorted, defaultId, storesUnreadable]);
 
   const checked = useMemo(() => new Set(plan.checked ?? []), [plan]);
   const total = (plan.shoppingList ?? []).length;
@@ -780,6 +918,16 @@ function PlanView({
           </div>
         )}
 
+        {storesUnreadable && total > 0 && (
+          <div className="status-banner error">
+            <Icon name="triangle-exclamation" />
+            <span>
+              Couldn't read your store layouts, so this list isn't sorted by aisle.
+              Everything you need is still here.
+            </span>
+          </div>
+        )}
+
         {total === 0 ? (
           <div className="empty-state">
             <Icon name="check" className="empty-icon" />
@@ -821,7 +969,7 @@ function PlanView({
 function PlanRow({ rec, familyName, onOpen }: { rec: PlanRecord; familyName: string | null; onOpen: () => void }) {
   const titles = (rec.data.picks ?? []).map((p) => p.title).join(", ");
   return (
-    <div className="browse-item" onClick={onOpen}>
+    <button type="button" className="browse-item" onClick={onOpen}>
       <div className="browse-thumb plan-row-icon">
         <Icon name="calendar-days" />
       </div>
@@ -835,7 +983,7 @@ function PlanRow({ rec, familyName, onOpen }: { rec: PlanRecord; familyName: str
           {titles ? ` · ${titles}` : ""}
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 

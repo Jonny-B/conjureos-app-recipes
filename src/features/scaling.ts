@@ -120,6 +120,13 @@ function parseNumericToken(token: string): number | null {
  * over decimals for the common cookbook values (halves, thirds, quarters,
  * eighths) so "1.5 cups" reads as "1 1/2 cups" not "1.5 cups".
  */
+/**
+ * The smallest amount this formatter can render as a fraction. Anything
+ * positive below it has no honest numeric form here — see `scaleLine`, which
+ * words it instead of printing a number that means "none".
+ */
+export const SMALLEST_RENDERABLE = 1 / 16;
+
 export function formatScaledNumber(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return "0";
   // Round to the nearest 1/8 to surface clean fractions, but only when
@@ -150,6 +157,25 @@ export function scaleLine(line: string, factor: number): string {
   const parsed = parseDisplayQuantity(line);
   if (parsed.count === null) return line;
   const scaled = parsed.count * factor;
+  // A REQUIRED ingredient must never scale down to the word "0".
+  //
+  // formatScaledNumber falls through to `${Math.floor(n)}` once the fraction
+  // is under 0.02, and to a "0.00"-trimmed decimal below that — so scaling a
+  // 40-serving recipe to 1 turned "1 tsp baking powder" into "0 tsp baking
+  // powder". The guided cook renders that as a step, and a cook following it
+  // adds no leavening at all. Reachable from the stepper mid-cook and from
+  // scale-to-my-ingredients, and the wrong line is what gets saved.
+  //
+  // "less than 1/16" is the honest statement: too little to measure, not zero.
+  // Left as a phrase rather than a number so no downstream parser mistakes it
+  // for an amount.
+  if (scaled > 0 && scaled < SMALLEST_RENDERABLE) {
+    // The unit is dropped, not kept: at this size it carries no information
+    // ("a trace of tsp baking powder" is not a sentence), and the ingredient
+    // name alone is what the cook needs to see on the line.
+    const what = parsed.rest || parsed.unit;
+    return what ? `a trace of ${what}` : line;
+  }
   const parts: string[] = [formatScaledNumber(scaled)];
   if (parsed.unit) parts.push(parsed.unit);
   if (parsed.rest) parts.push(parsed.rest);
@@ -168,16 +194,40 @@ export function scaleRecipe(recipe: Recipe, factor: number): Recipe {
   if (factor === 1 || !Number.isFinite(factor) || factor <= 0) return recipe;
   const servings = Math.max(1, Math.round(recipe.servings * factor));
   const ingredients = recipe.ingredients.map((line) => scaleLine(line, factor));
-  // Nutrition is per-serving. Scaling factor changes the recipe yield but
-  // NOT the per-serving macros (each serving still has the same macros);
-  // exception: if the user explicitly scaled servings up/down via the
-  // stepper, per-serving stays the same. If they scaled by limiting
-  // ingredient, per-serving still stays the same (each serving is still
-  // the same composition). So nutrition does NOT scale with the factor.
+  // Nutrition is per-serving, and per-serving composition IS invariant under
+  // scaling — but only while the yield scales exactly. It doesn't: servings is
+  // rounded to an integer above, so the food is divided among a different
+  // number of plates than the factor implies, and the leftover lands in each
+  // serving.
+  //
+  //   4 servings at 600 cal, factor 0.3 -> 1.2 servings rounds to 1 plate,
+  //   which now holds 4 x 0.3 x 600 = 720 cal, not 600.
+  //
+  // Reachable from "scale to my ingredients" (RecipesScreen) and the guided
+  // cook's scale-to-pantry, both of which set arbitrary fractional factors —
+  // and the wrong value was then PERSISTED to the user's library on save.
+  // Correct for the rounding: the batch total is invariant, the per-plate share
+  // is not.
+  const exactServings = recipe.servings * factor;
+  const rounding = exactServings > 0 ? exactServings / servings : 1;
   return {
     ...recipe,
     servings,
     ingredients,
+    ...(recipe.nutrition && rounding !== 1
+      ? { nutrition: scaleStripPerServing(recipe.nutrition, rounding) }
+      : {}),
+  };
+}
+
+/** Re-divide per-serving macros after the yield was rounded to whole plates. */
+function scaleStripPerServing(n: NutritionStrip, k: number): NutritionStrip {
+  return {
+    ...n,
+    calories: Math.round(n.calories * k),
+    protein: Math.round(n.protein * k),
+    fat: Math.round(n.fat * k),
+    carbs: Math.round(n.carbs * k),
   };
 }
 
@@ -291,10 +341,235 @@ export function normalizeIngredientName(s: string): string {
     .replace(/s$/, "");
 }
 
+// ── "same ingredient?" ────────────────────────────────────────────────
+
 /**
- * Match a recipe ingredient name to a user-supplied one. Tolerates
- * modifiers + crude singularization, prefers exact match, falls back to
- * directional substring (either contains the other).
+ * Adjectives that describe a FORM of the same food rather than a different
+ * food. Dropped from both names before comparing, so a pantry "chicken breast"
+ * still meets a recipe's "boneless skinless chicken breasts".
+ */
+const NEUTRAL_MODIFIERS = new Set([
+  "boneless", "skinless", "bone-in", "skin-on", "lean", "unsalted", "salted",
+  "organic", "peeled", "softened", "melted", "packed", "plain",
+  "uncooked", "all-purpose", "allpurpose", "virgin", "extra-virgin",
+  "kosher", "rolled",
+  // Ordinary shelf qualifiers that don't change what the food is. Without
+  // these, a pantry holding "flour" reported "all purpose flour" as MISSING —
+  // 10 of 16 typical catalog lines failed that way, and the same predicate
+  // drives the shopping list, so it re-bought what you had.
+  "unsweetened", "sweetened", "toasted", "roasted", "instant", "smoked",
+  "quick", "canned", "jarred", "sharp", "mild", "purpose",
+]);
+// heavy / whipping / baby / ripe were HERE and had to move. Anything in
+// NEUTRAL_MODIFIERS is stripped from BOTH names before the gated cultivar fold
+// below runs, so those four bypassed the VARIETY_HEADS whitelist entirely:
+// "cream" matched "heavy cream" and "corn" matched "baby corn", the exact
+// false-positive direction this matcher exists to prevent — and the direction
+// the commit that added the gate claimed to have closed. baby/ripe now live in
+// VARIETY_WORDS where the head-noun gate governs them; heavy/whipping are in
+// neither, so heavy cream is correctly a different ingredient from cream.
+
+/**
+ * Leading modifier PHRASES. Handled as phrases, not loose tokens, because the
+ * tokens are not individually safe: stripping "fat" would turn "chicken fat"
+ * into "chicken", and stripping "low" alone buys nothing.
+ */
+const MODIFIER_PHRASES: string[][] = [
+  ["all", "purpose"],
+  ["low", "sodium"],
+  ["low", "fat"],
+  ["reduced", "fat"],
+  ["fat", "free"],
+  ["extra", "virgin"],
+  ["part", "skim"],
+  ["finely", "chopped"],
+  ["freshly", "ground"],
+];
+
+/**
+ * Trailing words that name a CUT or FORM of the food named before them, so
+ * dropping them leaves the SAME ingredient: a chicken breast is chicken, feta
+ * cheese is feta.
+ *
+ * Deliberately excludes every word that names a food MADE FROM the one before
+ * it — broth, stock, crumbs, oil, sauce, powder, juice, butter, flour, milk.
+ * That class is the whole reason this list exists: "chicken" is not "chicken
+ * broth" and "bread" is not "bread crumbs", and the old either-contains-the-
+ * other test said they were.
+ */
+const CUT_OR_FORM_HEADS = new Set(
+  [
+    "breast", "thigh", "drumstick", "wing", "leg", "fillet", "filet", "cutlet",
+    "loin", "tenderloin", "tender", "shoulder", "rib", "ribeye", "chop",
+    "steak", "chuck", "brisket", "sirloin", "flank", "skirt", "shank", "rump",
+    "roast", "mince", "meat", "cheese", "leaf", "leave", "sprig", "clove",
+    "half", "halve", "piece", "chunk", "slice", "strip", "cube", "wedge",
+    "floret", "stalk", "stem", "bulb", "kernel",
+  ].map(reduceToken),
+);
+
+/**
+ * Compounds whose head IS in CUT_OR_FORM_HEADS but which are a different food
+ * from their own prefix. Cream cheese is not cream.
+ */
+const NOT_ITS_PREFIX = new Set(["cream cheese", "head cheese"].map((s) => s.split(" ").map(reduceToken).join(" ")));
+
+/** Shortest name we'll fuzzy-match at all. Blocks "ice"/"oil"-scale collisions. */
+const MIN_FUZZY_LEN = 3;
+
+/**
+ * Fold one token to a comparison form. This has to absorb TWO plural spellings
+ * of the same word, because the input may arrive raw ("tomatoes") or already
+ * through normalizeIngredientName, whose crude `/s$/` strip leaves "tomatoe".
+ * Both must land on "tomato" or the two spellings stop matching each other.
+ */
+function reduceToken(t: string): string {
+  let s = t;
+  if (s.length > 4 && s.endsWith("ies")) return `${s.slice(0, -3)}y`; // berries -> berry
+  if (s.length > 3 && s.endsWith("s") && !s.endsWith("ss")) s = s.slice(0, -1);
+  // What's left of an "-es" plural (or of normalizeIngredientName's strip):
+  // "tomatoe" -> "tomato", "dishe" -> "dish", "boxe" -> "box".
+  if (s.length > 3 && /(?:o|ch|sh|s|x|z)e$/.test(s)) s = s.slice(0, -1);
+  return s;
+}
+
+/**
+ * The comparison form of a name: leading measure/container noise off
+ * (prettyIngredient), modifier stopwords off (normalizeIngredientName), form
+ * adjectives off, every token folded. Same pipeline planWeek's canonOf uses,
+ * so canonical shopping-list keys and pantry names meet on the same ground.
+ */
+// Ingredient names repeat heavily (the browse screen scores a pantry against
+// every recipe in the catalog), and this runs per pair, so memoize the folding.
+const tokenCache = new Map<string, string[]>();
+const TOKEN_CACHE_MAX = 5000;
+
+function matchTokens(name: string): string[] {
+  const hit = tokenCache.get(name);
+  if (hit) return hit;
+  let all = normalizeIngredientName(prettyIngredient(name))
+    .split(" ")
+    .filter((t) => t.length > 0);
+  // Strip a leading modifier phrase before anything else looks at the tokens.
+  // Keep stripping while leading phrases match, not just once. Real labels
+  // stack them — "low fat part skim ricotta cheese" is two phrases deep, and
+  // the single-pass version left "part skim ricotta cheese", which then failed
+  // to match a pantry holding plain "ricotta". The card told the cook to buy
+  // ricotta they already had, and the shopping list added it.
+  //
+  // Bounded by MODIFIER_PHRASES.length: every pass that changes anything
+  // shortens `all`, and a pass that changes nothing exits.
+  for (let pass = 0; pass < MODIFIER_PHRASES.length; pass++) {
+    let stripped = false;
+    for (const phrase of MODIFIER_PHRASES) {
+      if (all.length > phrase.length && phrase.every((w, i) => all[i] === w)) {
+        all = all.slice(phrase.length);
+        stripped = true;
+        break;
+      }
+    }
+    if (!stripped) break;
+  }
+  // A name made ENTIRELY of form adjectives is that food, not a modifier of one
+  // ("baby" is a modifier, "baby corn" too, but a pantry line reading "baby"
+  // would otherwise reduce to nothing and match every recipe or none).
+  const kept = all.filter((t) => !NEUTRAL_MODIFIERS.has(t));
+  const out = (kept.length > 0 ? kept : all).map(reduceToken);
+  if (tokenCache.size < TOKEN_CACHE_MAX) tokenCache.set(name, out);
+  return out;
+}
+
+/**
+ * Do these two ingredient names refer to the same thing? The single definition
+ * of that question — the pantry-coverage matcher, the "scale to my ingredients"
+ * matcher and the shopping-list merge all route through here, so the detail
+ * screen can't claim you have something the shopping list then tells you to buy.
+ *
+ * Matching is loose about morphology and about a trailing cut/form word, and
+ * STRICT about everything else:
+ *
+ *   rice / ice            -> no  (not a whole token)
+ *   buttermilk / milk     -> no  (not a whole token)
+ *   eggplant / egg        -> no  (not a whole token)
+ *   olive oil / oil       -> no  (the shared token isn't the head of both)
+ *   sour cream / cream    -> no  (ditto)
+ *   chicken broth/chicken -> no  ("broth" is a food made FROM chicken)
+ *   bread crumbs / bread  -> no  (ditto)
+ *   chicken breasts / chicken -> YES (a cut of the same food)
+ *   feta cheese / feta        -> YES (a category word, not a new food)
+ *   tomatoes / tomato         -> YES (reduceToken folds both spellings)
+ *
+ * The old rule was `a.includes(b) || b.includes(a)` on raw normalized strings,
+ * guarded only by a 2-character minimum. A pantry holding literally "ice" and
+ * "oil" satisfied a recipe needing rice and olive oil, and the recipe card said
+ * "You have everything for this".
+ */
+/**
+ * Cultivar/size words that don't change what the food IS — but only in front of
+ * a head noun listed in VARIETY_HEADS. Kept tiny on purpose: a false positive
+ * here puts the user in the kitchen without an ingredient the app promised.
+ * Notably ABSENT: "brown" (brown sugar isn't sugar), "green"/"spring" (a green
+ * onion is a scallion), "sour"/"heavy"/"double" (creams), and every plant-milk
+ * word.
+ */
+const VARIETY_WORDS = new Set([
+  "red", "white", "yellow", "purple", "cherry", "grape", "plum", "roma",
+  "russet", "baby", "ripe",
+]);
+// "sweet" is deliberately NOT here: a sweet potato is a different vegetable
+// from a potato, so folding it would promise the cook an ingredient they don't
+// have — the exact failure this whole matcher exists to prevent.
+
+/** Head nouns whose varieties are interchangeable enough to match. */
+const VARIETY_HEADS = new Set([
+  "onion", "tomato", "potato", "apple", "spinach", "lettuce", "cabbage",
+  "mushroom", "grape", "carrot", "bean",
+]);
+
+export function ingredientNamesMatch(a: string, b: string): boolean {
+  const ta = matchTokens(a);
+  const tb = matchTokens(b);
+  if (ta.length === 0 || tb.length === 0) return false;
+  if (ta.length === tb.length) return ta.every((t, i) => t === tb[i]);
+
+  const [short, longRaw] = ta.length < tb.length ? [ta, tb] : [tb, ta];
+  // Leading VARIETY words name a cultivar of the same food, not a different
+  // food: "red onion" is an onion, "cherry tomatoes" are tomatoes. Without this
+  // the prefix test below rejected them, and the app told you to buy onions you
+  // already had. Deliberately narrow, and gated on the head noun, because the
+  // same adjective changes the food elsewhere: "red pepper" is not black
+  // pepper, "green onion" is a scallion, "brown sugar" is not sugar. Only the
+  // pairs listed in VARIETY_HEADS are folded.
+  const long =
+    longRaw.length > short.length &&
+    VARIETY_WORDS.has(longRaw[0]!) &&
+    VARIETY_HEADS.has(longRaw[longRaw.length - 1]!)
+      ? longRaw.slice(1)
+      : longRaw;
+  if (short.length > long.length) return false;
+  // The shorter name must be a whole-token PREFIX of the longer one: the extra
+  // words may only narrow the head ("chicken" -> "chicken breast"), never
+  // qualify it from the front ("cream" -> "sour cream").
+  for (let i = 0; i < short.length; i++) {
+    if (short[i] !== long[i]) return false;
+  }
+  if (short.join(" ").length < MIN_FUZZY_LEN) return false;
+  if (NOT_ITS_PREFIX.has(long.join(" "))) return false;
+  return long.slice(short.length).every((t) => CUT_OR_FORM_HEADS.has(t));
+}
+
+/** True when any name in `names` refers to the same ingredient as `name`. */
+export function matchesAnyName(name: string, names: Iterable<string>): boolean {
+  for (const other of names) {
+    if (ingredientNamesMatch(name, other)) return true;
+  }
+  return false;
+}
+
+/**
+ * Match a recipe ingredient name to a user-supplied one. Tolerates modifiers +
+ * crude singularization, prefers an exact normalized match, and otherwise
+ * accepts only the cut/form relation ingredientNamesMatch allows.
  */
 export function findUserMatch(
   recipeName: string,
@@ -307,10 +582,9 @@ export function findUserMatch(
   for (const u of user) {
     if (normalizeIngredientName(u.name) === target) return u;
   }
-  // Otherwise: either contains the other. "feta" matches "feta cheese", etc.
+  // Otherwise: "feta" matches "feta cheese", "chicken" matches "chicken breast".
   for (const u of user) {
-    const un = normalizeIngredientName(u.name);
-    if (un.includes(target) || target.includes(un)) return u;
+    if (ingredientNamesMatch(u.name, recipeName)) return u;
   }
   return null;
 }
@@ -342,13 +616,70 @@ export interface CoverageResult {
  * Here we layer a name-only presence path on top: quantified-both -> ratio
  * decides have/short; matched-by-name-only -> have; no match -> missing.
  */
+/**
+ * Normalized pantry names, cached against the array they came from.
+ *
+ * `computeCoverage` is called once per recipe, and Home calls it across the
+ * WHOLE catalog — ~1,200 times with the identical pantry array. The pantry
+ * array is a stable `useMemo` result at every caller, so a WeakMap on its
+ * identity turns 1,200 normalizations into one, with no signature change and
+ * no way for a stale entry to outlive the array being rebuilt.
+ *
+ * Measured, rather than assumed: on a 1,200-recipe pass with full ingredient
+ * lines this is worth ~10% (63ms vs 70ms), not the ~45% the audit estimated —
+ * the ingredient-side matching dominates. Kept because it is free and correct,
+ * but the real fix for the favourite-toggle stutter was hoisting coverage out
+ * of the memo that `favs` invalidates (see HomeScreen's `covByKey`).
+ */
+const userNormCache = new WeakMap<object, string[]>();
+
+function normalizedPantry(userIngredients: Ingredient[]): string[] {
+  const hit = userNormCache.get(userIngredients);
+  if (hit) return hit;
+  const norms = userIngredients
+    .map((i) => normalizeIngredientName(parseIngredient(i.name)?.name ?? i.name))
+    .filter((n) => n.length > 0);
+  userNormCache.set(userIngredients, norms);
+  return norms;
+}
+
 export function computeCoverage(
   recipe: Recipe,
   userIngredients: Ingredient[],
 ): CoverageResult {
-  const userNorms = userIngredients
-    .map((i) => normalizeIngredientName(parseIngredient(i.name)?.name ?? i.name))
-    .filter((n) => n.length > 0);
+  const userNorms = normalizedPantry(userIngredients);
+
+  // Catalog rows arrive SLIM: `ingredients` is empty until the recipe is
+  // opened, and the body fetch is deliberate (it's ~66% of the payload). This
+  // function walked `recipe.ingredients`, so every unopened catalog row scored
+  // 0 have / 0 total — which the row chip then rendered green as "0/0 have",
+  // and which made "what can I make from my pantry" quietly rank the entire
+  // catalog at the same neutral score. `tokens` is the same information, in
+  // canonical form, precomputed at build time for exactly this purpose; it
+  // just was never wired in. No quantities there, so this path can only
+  // answer have / missing, never "short" — which is the honest limit of what
+  // a slim row knows.
+  if (recipe.ingredients.length === 0) {
+    const tokens = (recipe as Recipe & { tokens?: string[] }).tokens ?? [];
+    if (tokens.length === 0) return emptyCoverage();
+    const haveNames: string[] = [];
+    const missingNames: string[] = [];
+    for (const t of tokens) {
+      if (nameInPantry(normalizeIngredientName(t), userNorms)) haveNames.push(t);
+      else missingNames.push(t);
+    }
+    const total = tokens.length;
+    return {
+      total,
+      have: haveNames.length,
+      short: 0,
+      missing: missingNames.length,
+      haveNames,
+      shortNames: [],
+      missingNames,
+      score: (haveNames.length - missingNames.length) / Math.max(1, total),
+    };
+  }
 
   const avail = computeAvailability(recipe, userIngredients);
   const ratioByLine = new Map<string, number>();
@@ -404,17 +735,25 @@ export function prettyIngredient(name: string): string {
   return s;
 }
 
-/** Loose name presence: exact-normalized, else either-contains-other. */
+/**
+ * "We know nothing about this recipe's ingredients." `total: 0` is the signal
+ * every renderer must check before drawing a coverage verdict — see
+ * `CoverageChips`, which used to paint this state as a completed recipe.
+ */
+function emptyCoverage(): CoverageResult {
+  return {
+    total: 0, have: 0, short: 0, missing: 0,
+    haveNames: [], shortNames: [], missingNames: [], score: 0,
+  };
+}
+
+/** Name-only presence in the pantry, on the shared same-ingredient rule. */
 function nameInPantry(targetNorm: string, userNorms: string[]): boolean {
   if (!targetNorm) return false;
   for (const u of userNorms) {
     if (u === targetNorm) return true;
   }
-  for (const u of userNorms) {
-    if (u.length < 2) continue;
-    if (u.includes(targetNorm) || targetNorm.includes(u)) return true;
-  }
-  return false;
+  return matchesAnyName(targetNorm, userNorms);
 }
 
 // ── Nutrition per-serving (unchanged across factor) ───────────────────

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { CapturedPhoto, Recipe } from "../types";
 import { extractRecipeFromPhotos } from "../features/customRecipe";
 import { CaptureScreen } from "./CaptureScreen";
@@ -26,17 +26,31 @@ export function SnapRecipeScreen({
   const [nonce, setNonce] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  // Retained across the read round trip: setStage unmounts CaptureScreen, so a
+  // failed extraction used to send the user back to an empty tray — having to
+  // re-photograph a cookbook page because the model returned bad JSON.
+  const [lastPhotos, setLastPhotos] = useState<CapturedPhoto[]>([]);
+
+  /** Synchronous re-entrancy guard — see the note in PantryScreen. */
+  const aiInFlight = useRef(false);
+
   const onPhotos = async (photos: CapturedPhoto[]) => {
+    if (aiInFlight.current) return;
+    aiInFlight.current = true;
     setError(null);
+    setLastPhotos(photos);
     setStage("reading");
     try {
       const r = await extractRecipeFromPhotos(photos);
       setRecipe(r);
       setNonce((n) => n + 1);
+      setLastPhotos([]);
       setStage("editing");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setStage("capture");
+    } finally {
+      aiInFlight.current = false;
     }
   };
 
@@ -86,6 +100,7 @@ export function SnapRecipeScreen({
       )}
       <CaptureScreen
         onIdentify={onPhotos}
+        initialPhotos={lastPhotos}
         title="Snap a recipe"
         emptyHint="Photograph or upload a recipe: a recipe card, a cookbook or magazine page, a handwritten note, or a screenshot. I'll read it and turn it into a saved recipe you can edit."
         moreHint="Multi-page recipe? Add a shot of each page (ingredients, then method) and I'll merge them into one."

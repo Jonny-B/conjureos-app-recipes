@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CoverageResult } from "../features/scaling";
 import type { CatalogRecipe, FeedRecipe, PantryItem, Recipe, SavedRecipe } from "../types";
-import { getCatalog, toRecipe, loadRecipeBody } from "../features/catalog";
+import { getCatalog, toRecipe, loadRecipeBody, withRecipeBody } from "../features/catalog";
 import {
   listSavedRecipes,
   saveRecipe,
@@ -17,6 +17,12 @@ import { RecipeDetail } from "./RecipeDetail";
 import { CHEF_NAME } from "./StudioScreen";
 import { fetchChefLatest } from "../bridge/recipesApi";
 import { Icon, type IconName } from "../icons";
+import {
+  clearCookSession,
+  loadCookSession,
+  type CookSession,
+} from "../features/cookSession";
+import { ErrorBanner, useActionError } from "../components/ErrorBanner";
 
 type NavTab = "cook" | "recipes" | "plan";
 
@@ -42,6 +48,19 @@ interface Scored {
   reason: string;
 }
 
+/** "3 of 7 steps · serves 4" — enough to recognise what you're going back to. */
+function resumeSummary(s: CookSession): string {
+  const total = s.recipe.instructions.length;
+  const bits: string[] = [];
+  if (total > 0) bits.push(`${s.steps.length} of ${total} steps`);
+  else if (s.ingredients.length > 0) bits.push(`${s.ingredients.length} gathered`);
+  if (s.factor !== 1) {
+    const base = s.recipe.servings > 0 ? s.recipe.servings : 1;
+    bits.push(`serves ${Math.max(1, Math.round(base * s.factor))}`);
+  }
+  return bits.join(" · ");
+}
+
 function keyOf(fi: FeedRecipe): string {
   return fi.kind === "catalog" ? `c:${fi.id}` : `s:${fi.recipe.path}`;
 }
@@ -53,6 +72,16 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
   const [shuffle, setShuffle] = useState(0);
   const [selected, setSelected] = useState<FeedRecipe | null>(null);
   const [chefPick, setChefPick] = useState<CatalogRecipe | null>(null);
+  /**
+   * A cook left running, if there is one.
+   *
+   * There is no Cook tab in the bottom bar (the two entry points live on Home
+   * and the guided cook is reached by tapping a recipe), so without this card
+   * a persisted session would have nowhere to be resumed FROM — the state
+   * would survive and still be unreachable. Read on mount and whenever Home
+   * comes back into view, which is exactly when a cook has just been left.
+   */
+  const [resumable, setResumable] = useState<CookSession | null>(null);
 
   const refresh = useCallback(async () => {
     const [s, f] = await Promise.all([listSavedRecipes(), loadFavorites()]);
@@ -62,6 +91,7 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
   }, []);
   useEffect(() => {
     refresh();
+    setResumable(loadCookSession());
   }, [refresh]);
   // Chef Payson's newest promoted recipe (best-effort; absent if none/offline).
   useEffect(() => {
@@ -77,9 +107,23 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
   // Daily seed: reshuffles equal-scored ties once a day so "Tonight's pick"
   // (and the idea lists) feel fresh day-to-day instead of frozen.
   const seed = daySeed();
+  /**
+   * Coverage is computed once per recipe and kept separate from scoring.
+   *
+   * It used to live inside `buildScored`, whose deps included `favs` — so
+   * tapping one heart re-ran computeCoverage across the entire ~1,200-recipe
+   * catalog. Favouriting changes a 0.4 term in the score; it cannot change how
+   * much of a recipe your pantry covers, and the two have no business sharing
+   * a memo. (The other half of that cost was re-normalizing the same pantry
+   * per call — see `normalizedPantry` in scaling.ts.)
+   */
+  const covByKey = useMemo(
+    () => buildCoverage(catalog, saved, pantryIng, hasPantry),
+    [catalog, saved, pantryIng, hasPantry],
+  );
   const scored = useMemo(
-    () => buildScored(catalog, saved, favs, pantryIng, hasPantry, seed),
-    [catalog, saved, favs, pantryIng, hasPantry, seed],
+    () => buildScored(catalog, saved, favs, covByKey, seed),
+    [catalog, saved, favs, covByKey, seed],
   );
 
   const favoriteItems = useMemo(() => scored.filter((s) => s.fi.favorite), [scored]);
@@ -103,29 +147,44 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
   );
 
   // ── recipe detail (self-contained, mirrors the feed) ─────────────────
-  const onToggleFavorite = async (fi: FeedRecipe) => {
-    if (fi.kind === "catalog") setFavs(await toggleCatalogFavorite(fi.id));
-    else {
-      const u = await setSavedFavorite(fi.recipe, !fi.recipe.favorite);
+  // Every mutation below goes through `run` so a failure reaches the user
+  // rather than the console — see components/ErrorBanner.
+  const { error: actionError, clear: clearActionError, run } = useActionError();
+  const onToggleFavorite = (fi: FeedRecipe) =>
+    run(async () => {
+      if (fi.kind === "catalog") setFavs(await toggleCatalogFavorite(fi.id));
+      else {
+        const u = await setSavedFavorite(fi.recipe, !fi.recipe.favorite);
+        setSaved((p) => p.map((r) => (r.path === u.path ? u : r)));
+      }
+    });
+  /**
+   * Open a feed row. Goes through `withRecipeBody` because catalog rows ship
+   * slim — Home's four open buttons handed the detail screen a recipe with no
+   * ingredients and no instructions, and the cook flow (which needs
+   * `totalSteps > 0` to ever say you're done) could not complete one.
+   */
+  const openRecipe = (fi: FeedRecipe) => run(async () => setSelected(await withRecipeBody(fi)));
+
+  const onSaveToLibrary = (fi: FeedRecipe) =>
+    run(async () => {
+      if (fi.kind !== "catalog") return;
+      await saveRecipe(toRecipe(await loadRecipeBody(fi.recipe)));
+      await refresh();
+    });
+  const onMade = (fi: FeedRecipe) =>
+    run(async () => {
+      if (fi.kind !== "saved") return;
+      const u = await markMade(fi.recipe);
       setSaved((p) => p.map((r) => (r.path === u.path ? u : r)));
-    }
-  };
-  const onSaveToLibrary = async (fi: FeedRecipe) => {
-    if (fi.kind !== "catalog") return;
-    await saveRecipe(toRecipe(await loadRecipeBody(fi.recipe)));
-    await refresh();
-  };
-  const onMade = async (fi: FeedRecipe) => {
-    if (fi.kind !== "saved") return;
-    const u = await markMade(fi.recipe);
-    setSaved((p) => p.map((r) => (r.path === u.path ? u : r)));
-  };
-  const onDelete = async (fi: FeedRecipe) => {
-    if (fi.kind !== "saved") return;
-    await deleteRecipe(fi.recipe);
-    setSaved((p) => p.filter((r) => r.path !== fi.recipe.path));
-    setSelected(null);
-  };
+    });
+  const onDelete = (fi: FeedRecipe) =>
+    run(async () => {
+      if (fi.kind !== "saved") return;
+      await deleteRecipe(fi.recipe);
+      setSaved((p) => p.filter((r) => r.path !== fi.recipe.path));
+      setSelected(null);
+    });
 
   const resolved = useMemo<FeedRecipe | null>(() => {
     if (!selected) return null;
@@ -141,17 +200,20 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
       resolved.kind === "catalog" &&
       saved.some((s) => s.title.toLowerCase() === resolved.recipe.title.toLowerCase());
     return (
-      <RecipeDetail
-        feed={resolved}
-        pantry={pantry}
-        inLibrary={inLibrary}
-        onCook={onCook}
-        onBack={() => setSelected(null)}
-        onToggleFavorite={() => onToggleFavorite(resolved)}
-        onSaveToLibrary={() => onSaveToLibrary(resolved)}
-        onMade={() => onMade(resolved)}
-        onDelete={() => onDelete(resolved)}
-      />
+      <>
+        <ErrorBanner error={actionError} onDismiss={clearActionError} />
+        <RecipeDetail
+          feed={resolved}
+          pantry={pantry}
+          inLibrary={inLibrary}
+          onCook={onCook}
+          onBack={() => setSelected(null)}
+          onToggleFavorite={() => onToggleFavorite(resolved)}
+          onSaveToLibrary={() => onSaveToLibrary(resolved)}
+          onMade={() => onMade(resolved)}
+          onDelete={() => onDelete(resolved)}
+        />
+      </>
     );
   }
 
@@ -165,15 +227,49 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
 
   return (
     <div className="home-screen">
+      <ErrorBanner error={actionError} onDismiss={clearActionError} />
       <div className="home-greeting">
         <h2>{greeting()}</h2>
         <div className="muted">{tagline(favoriteItems.length, readyToCook, hasPantry)}</div>
       </div>
 
+      {resumable && (
+        <div className="resume-cook">
+          <button
+            className="resume-cook-main"
+            onClick={() =>
+              onCook(
+                resumable.recipe,
+                saved.find((r) => r.path === resumable.savedPath) ?? null,
+              )
+            }
+          >
+            <Icon name="utensils" />
+            <span className="resume-cook-text">
+              <strong>Still cooking</strong>
+              <span className="resume-cook-title">{resumable.recipe.title}</span>
+              <span className="muted">{resumeSummary(resumable)}</span>
+            </span>
+            <Icon name="chevron-down" className="resume-cook-go" />
+          </button>
+          <button
+            className="icon-btn"
+            aria-label="Forget this cook"
+            title="Forget this cook"
+            onClick={() => {
+              clearCookSession(resumable.key);
+              setResumable(null);
+            }}
+          >
+            <Icon name="xmark" />
+          </button>
+        </div>
+      )}
+
       {hero && (
         <HeroPick
           scored={hero}
-          onView={() => setSelected(hero.fi)}
+          onView={() => void openRecipe(hero.fi)}
           onShuffle={() => setShuffle((s) => s + 1)}
           canShuffle={heroPoolSize > 1}
         />
@@ -183,7 +279,12 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
         <button
           className="chef-promo"
           onClick={() =>
-            setSelected({ kind: "catalog", id: chefPick.id, recipe: chefPick, favorite: favs.has(chefPick.id) })
+            void openRecipe({
+              kind: "catalog",
+              id: chefPick.id,
+              recipe: chefPick,
+              favorite: favs.has(chefPick.id),
+            })
           }
         >
           <span className="chef-promo-eyebrow">
@@ -232,7 +333,7 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
                 key={keyOf(s.fi)}
                 fi={s.fi}
                 cov={hasPantry ? s.cov ?? undefined : undefined}
-                onOpen={() => setSelected(s.fi)}
+                onOpen={() => void openRecipe(s.fi)}
               />
             ))}
           </div>
@@ -252,7 +353,7 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
               key={keyOf(s.fi)}
               fi={s.fi}
               cov={hasPantry ? s.cov ?? undefined : undefined}
-              onOpen={() => setSelected(s.fi)}
+              onOpen={() => void openRecipe(s.fi)}
             />
           ))}
         </div>
@@ -391,21 +492,42 @@ function QuickAction({
 
 // ── recommendation engine ─────────────────────────────────────────────
 
+/** Every feed row, in one place, so coverage and scoring iterate the same set. */
+function feedItems(catalog: CatalogRecipe[], saved: SavedRecipe[], favs: Set<string>): FeedRecipe[] {
+  const items: FeedRecipe[] = [];
+  for (const r of saved) if (r.favorite) items.push({ kind: "saved", recipe: r, favorite: true });
+  for (const c of catalog) items.push({ kind: "catalog", id: c.id, recipe: c, favorite: favs.has(c.id) });
+  return items;
+}
+
+/** Coverage per row key. Depends on the catalog and the pantry — never on favourites. */
+function buildCoverage(
+  catalog: CatalogRecipe[],
+  saved: SavedRecipe[],
+  pantryIng: ReturnType<typeof ingredientsFromPantry>,
+  hasPantry: boolean,
+): Map<string, CoverageResult | null> {
+  const out = new Map<string, CoverageResult | null>();
+  if (!hasPantry) return out;
+  // `favs` is irrelevant to coverage, so an empty set is fine for keying here.
+  for (const fi of feedItems(catalog, saved, new Set())) {
+    out.set(keyOf(fi), computeCoverage(fi.recipe, pantryIng));
+  }
+  return out;
+}
+
 function buildScored(
   catalog: CatalogRecipe[],
   saved: SavedRecipe[],
   favs: Set<string>,
-  pantryIng: ReturnType<typeof ingredientsFromPantry>,
-  hasPantry: boolean,
+  covByKey: Map<string, CoverageResult | null>,
   seed: number,
 ): Scored[] {
-  const items: FeedRecipe[] = [];
-  for (const r of saved) if (r.favorite) items.push({ kind: "saved", recipe: r, favorite: true });
-  for (const c of catalog) items.push({ kind: "catalog", id: c.id, recipe: c, favorite: favs.has(c.id) });
+  const items = feedItems(catalog, saved, favs);
 
   const scored = items.map<Scored>((fi) => {
     const recipe = fi.recipe;
-    const cov = hasPantry ? computeCoverage(recipe, pantryIng) : null;
+    const cov = covByKey.get(keyOf(fi)) ?? null;
     let score = 0;
     if (cov) score += cov.score; // -1..1, dominant signal when a pantry exists
     if (fi.favorite) score += 0.4;

@@ -14,7 +14,7 @@ import { vfs } from "./bridge/vfs";
 import { joinFamily } from "./bridge/recipesApi";
 import { ensureCatalogLoaded } from "./features/catalog";
 import { loadPantry, ingredientsFromPantry } from "./features/pantry";
-import { markMade, saveRecipe } from "./features/storage";
+import { markMade, unmarkMade, saveRecipe } from "./features/storage";
 import { useWhoami } from "./hooks/useWhoami";
 import { useRole } from "./hooks/useRole";
 import { Icon } from "./icons";
@@ -76,6 +76,8 @@ export function App() {
   if (role === "admin") tabs.push({ id: "admin" as Tab, label: "Admin", icon: "sliders" as IconName });
   const [tab, setTab] = useState<Tab>("home");
   const [recipeSource, setRecipeSource] = useState<RecipeSource>("all");
+  /** Bumped when a family is joined from the invite prompt — see PlansScreen. */
+  const [familyEpoch, setFamilyEpoch] = useState(0);
   const [cookMode, setCookMode] = useState<CookMode>("kitchen");
   const [cookTarget, setCookTarget] = useState<CookTarget | null>(null);
   // The tab the guided cook was launched from, so Back returns there.
@@ -212,11 +214,24 @@ export function App() {
             </div>
             {cookTarget && (
               <GuidedCook
+                // `key` remounts the cook when the recipe changes, so its
+                // lazy state initializers re-read the stored session instead
+                // of carrying the previous recipe's ticks into this one.
+                key={cookTarget.saved?.path ?? cookTarget.recipe.title}
                 recipe={cookTarget.recipe}
                 pantry={pantry}
                 saved={!!cookTarget.saved}
+                savedPath={cookTarget.saved?.path ?? null}
                 onBack={endCook}
                 onMade={() => (cookTarget.saved ? markMade(cookTarget.saved).then(() => {}) : Promise.resolve())}
+                // `cookTarget.saved` is the row as it was BEFORE the mark (we
+                // never refresh it here), so its lastMadeAt is exactly the
+                // value the undo needs to restore.
+                onUnmade={
+                  cookTarget.saved
+                    ? () => unmarkMade(cookTarget.saved!).then(() => {})
+                    : undefined
+                }
                 onSave={(r) => saveRecipe(r).then(() => {})}
               />
             )}
@@ -229,6 +244,7 @@ export function App() {
             intent={plansIntent}
             onIntentConsumed={() => setPlansIntent(null)}
             onCogItems={setCogExtras}
+            familyEpoch={familyEpoch}
           />
         )}
         {tab === "studio" && <StudioScreen />}
@@ -308,6 +324,10 @@ export function App() {
             setPendingJoin(null);
             setCookTarget(null);
             setTab("plan");
+            // setTab alone is a no-op when Plans is already the open tab, so the
+            // new family's plans wouldn't appear until the user navigated away
+            // and back. Bump the epoch so PlansScreen reloads either way.
+            setFamilyEpoch((n) => n + 1);
           }}
         />
       )}

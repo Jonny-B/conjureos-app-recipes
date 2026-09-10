@@ -18,6 +18,18 @@ import type { CatalogRecipe, Recipe } from "../types";
 let catalog: CatalogRecipe[] = [];
 let loaded = false;
 let inflight: Promise<boolean> | null = null;
+/**
+ * When the next attempt is allowed after a failure.
+ *
+ * `loaded` latches only on SUCCESS, so while the backend is down every caller
+ * that says "make sure the catalog is here" started a fresh full fetch — and a
+ * full fetch is up to a hundred POSTs, paging until a short page arrives. One
+ * orchestrator polling `searchRecipes` was enough to turn an outage into a
+ * flood. Backing off means a down backend costs one attempt every few seconds
+ * instead of one per call.
+ */
+let retryAfter = 0;
+const RETRY_COOLDOWN_MS = 15_000;
 
 /** Full recipe bodies, filled lazily as recipes are opened. Memory only. */
 const bodies = new Map<string, { ingredients: string[]; instructions: string[] }>();
@@ -39,12 +51,16 @@ export function isCatalogLoaded(): boolean {
 export async function ensureCatalogLoaded(force = false): Promise<boolean> {
   if (loaded && !force) return false;
   if (inflight) return inflight;
+  // A `force` refresh is a deliberate act (pull-to-refresh, a version bump) and
+  // ignores the cooldown; the implicit "make sure it's loaded" calls respect it.
+  if (!force && Date.now() < retryAfter) return false;
   inflight = (async () => {
     try {
       const rows = await fetchCatalog();
       if (rows.length > 0) {
         catalog = rows;
         loaded = true;
+        retryAfter = 0;
         return true;
       }
     } catch {
@@ -52,6 +68,7 @@ export async function ensureCatalogLoaded(force = false): Promise<boolean> {
     } finally {
       inflight = null;
     }
+    retryAfter = Date.now() + RETRY_COOLDOWN_MS;
     return false;
   })();
   return inflight;
@@ -81,6 +98,23 @@ export async function loadRecipeBody<T extends { id?: string; ingredients: strin
     /* leave the row as-is; the detail screen renders what it has */
   }
   return c;
+}
+
+/**
+ * Prepare a feed row for the detail screen: same row, body filled in.
+ *
+ * Every "open this recipe" path needs this, and every one of them that forgot
+ * it rendered a detail screen with empty INGREDIENTS and INSTRUCTIONS headings
+ * — and, because the cook flow gates completion on `totalSteps > 0`, a recipe
+ * you could never finish cooking. Browse learned that lesson; Home and Pantry
+ * had four call sites between them that still handed over the slim row. It's a
+ * one-liner, which is exactly why it kept being skipped, so it lives here and
+ * the screens call it instead of remembering.
+ */
+export async function withRecipeBody<T extends { recipe: { id?: string; ingredients: string[]; instructions: string[] } }>(
+  fi: T,
+): Promise<T> {
+  return { ...fi, recipe: await loadRecipeBody(fi.recipe) };
 }
 
 export function getCatalogRecipe(id: string): CatalogRecipe | undefined {

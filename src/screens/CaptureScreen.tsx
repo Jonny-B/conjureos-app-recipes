@@ -28,6 +28,15 @@ function usePointerCoarse(): boolean {
 
 interface Props {
   onIdentify: (photos: CapturedPhoto[]) => void;
+  /**
+   * Photos to start with. Every caller flips to a "working" mode while the AI
+   * call runs, which renders a DIFFERENT branch and therefore unmounts this
+   * component — taking its local photo state with it. On a failure the caller
+   * flips back, remounting a fresh CaptureScreen, and the user's photos were
+   * gone: reshoot the whole fridge because the model returned bad JSON. The
+   * caller now retains them and hands them back here.
+   */
+  initialPhotos?: CapturedPhoto[];
   /** Heading shown before any photo is added. Default: fridge-scan copy. */
   title?: string;
   /** Sub-line shown with zero photos. Default: fridge-scan copy. */
@@ -40,9 +49,9 @@ interface Props {
 
 const MAX_PHOTOS = 6;
 
-export function CaptureScreen({ onIdentify, title, emptyHint, moreHint, actionLabel }: Props) {
+export function CaptureScreen({ onIdentify, initialPhotos, title, emptyHint, moreHint, actionLabel }: Props) {
   const [dragOver, setDragOver] = useState(false);
-  const [photos, setPhotos] = useState<CapturedPhoto[]>([]);
+  const [photos, setPhotos] = useState<CapturedPhoto[]>(initialPhotos ?? []);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -51,8 +60,24 @@ export function CaptureScreen({ onIdentify, title, emptyHint, moreHint, actionLa
 
   const addFiles = async (files: FileList | File[]) => {
     setErr(null);
-    const incoming = Array.from(files);
-    if (incoming.length === 0) return;
+    const all = Array.from(files);
+    if (all.length === 0) return;
+    // `accept="image/*"` filters the PICKER and nothing else — a drag-and-drop
+    // hands us whatever was dragged. A dropped PDF got as far as the image
+    // decoder and surfaced a raw engine error, which reads like the app broke
+    // rather than like the file was wrong.
+    const incoming = all.filter((f) => f.type.startsWith("image/"));
+    if (incoming.length === 0) {
+      setErr(
+        all.length === 1
+          ? "That's not an image — drop a photo (JPG, PNG, HEIC or WebP)."
+          : "None of those are images — drop photos (JPG, PNG, HEIC or WebP).",
+      );
+      return;
+    }
+    if (incoming.length < all.length) {
+      setErr(`Skipped ${all.length - incoming.length} file(s) that aren't images.`);
+    }
     const room = MAX_PHOTOS - photos.length;
     if (room <= 0) {
       setErr(`Up to ${MAX_PHOTOS} photos per session — remove one to add another.`);

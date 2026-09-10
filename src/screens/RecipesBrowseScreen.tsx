@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FeedRecipe, PantryItem, Recipe, RecipeSource, SavedRecipe } from "../types";
-import { getCatalog, categories, toRecipe, loadRecipeBody } from "../features/catalog";
+import { getCatalog, categories, toRecipe, loadRecipeBody, withRecipeBody } from "../features/catalog";
 import {
-  listSavedRecipes,
+  listSavedRecipesResult,
   saveRecipe,
   markMade,
   deleteRecipe,
@@ -17,6 +17,7 @@ import { SnapRecipeScreen } from "./SnapRecipeScreen";
 import { ingredientsFromPantry } from "../features/pantry";
 import { computeCoverage } from "../features/scaling";
 import { Icon } from "../icons";
+import { ErrorBanner, useActionError } from "../components/ErrorBanner";
 
 interface Props {
   /** Which slice to show: all recipes, just the user's saved ones, or favorites. */
@@ -56,9 +57,19 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
 
   const catalog = useMemo(() => getCatalog(), [catalogVersion]);
 
+  // A failed library read must not render as "you haven't saved any recipes
+  // yet" — that sentence is a claim about the user's data, and getting it wrong
+  // reads exactly like data loss. Same three-state treatment PlansScreen uses.
+  const [loadFailed, setLoadFailed] = useState(false);
+
   const refresh = useCallback(async () => {
-    const [s, f] = await Promise.all([listSavedRecipes(), loadFavorites()]);
-    setSaved(s);
+    const [s, f] = await Promise.all([listSavedRecipesResult(), loadFavorites()]);
+    if (s.ok) {
+      setSaved(s.recipes);
+      setLoadFailed(false);
+    } else {
+      setLoadFailed(true);
+    }
     setFavs(f);
     setLoaded(true);
   }, []);
@@ -121,29 +132,37 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
   const activeFilters = source === "all" && category !== "all" ? 1 : 0;
 
   // ── mutations ──────────────────────────────────────────────────────
-  const onToggleFavorite = async (fi: FeedRecipe) => {
-    if (fi.kind === "catalog") setFavs(await toggleCatalogFavorite(fi.id));
-    else {
-      const updated = await setSavedFavorite(fi.recipe, !fi.recipe.favorite);
-      setSaved((prev) => prev.map((r) => (r.path === updated.path ? updated : r)));
-    }
-  };
-  const onSaveToLibrary = async (fi: FeedRecipe) => {
-    if (fi.kind !== "catalog") return;
-    await saveRecipe(toRecipe(await loadRecipeBody(fi.recipe)));
-    await refresh();
-  };
-  const onMade = async (fi: FeedRecipe) => {
-    if (fi.kind !== "saved") return;
-    const u = await markMade(fi.recipe);
-    setSaved((prev) => prev.map((r) => (r.path === u.path ? u : r)));
-  };
-  const onDelete = async (fi: FeedRecipe) => {
-    if (fi.kind !== "saved") return;
-    await deleteRecipe(fi.recipe);
-    setSaved((prev) => prev.filter((r) => r.path !== fi.recipe.path));
-    setSelected(null);
-  };
+  // All four go through `run` so a failure surfaces in the banner instead of
+  // the console — see components/ErrorBanner. Delete is the one that hurt
+  // most: the confirm dialog just sat there when the call rejected.
+  const { error: actionError, clear: clearActionError, run } = useActionError();
+  const onToggleFavorite = (fi: FeedRecipe) =>
+    run(async () => {
+      if (fi.kind === "catalog") setFavs(await toggleCatalogFavorite(fi.id));
+      else {
+        const updated = await setSavedFavorite(fi.recipe, !fi.recipe.favorite);
+        setSaved((prev) => prev.map((r) => (r.path === updated.path ? updated : r)));
+      }
+    });
+  const onSaveToLibrary = (fi: FeedRecipe) =>
+    run(async () => {
+      if (fi.kind !== "catalog") return;
+      await saveRecipe(toRecipe(await loadRecipeBody(fi.recipe)));
+      await refresh();
+    });
+  const onMade = (fi: FeedRecipe) =>
+    run(async () => {
+      if (fi.kind !== "saved") return;
+      const u = await markMade(fi.recipe);
+      setSaved((prev) => prev.map((r) => (r.path === u.path ? u : r)));
+    });
+  const onDelete = (fi: FeedRecipe) =>
+    run(async () => {
+      if (fi.kind !== "saved") return;
+      await deleteRecipe(fi.recipe);
+      setSaved((prev) => prev.filter((r) => r.path !== fi.recipe.path));
+      setSelected(null);
+    });
 
   const resolvedSelected = useMemo<FeedRecipe | null>(() => {
     if (!selected) return null;
@@ -177,22 +196,26 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
       resolvedSelected.kind === "catalog" &&
       saved.some((s) => s.title.toLowerCase() === resolvedSelected.recipe.title.toLowerCase());
     return (
-      <RecipeDetail
-        feed={resolvedSelected}
-        pantry={pantry}
-        inLibrary={inLibrary}
-        onCook={onCook}
-        onBack={() => setSelected(null)}
-        onToggleFavorite={() => onToggleFavorite(resolvedSelected)}
-        onSaveToLibrary={() => onSaveToLibrary(resolvedSelected)}
-        onMade={() => onMade(resolvedSelected)}
-        onDelete={() => onDelete(resolvedSelected)}
-      />
+      <>
+        <ErrorBanner error={actionError} onDismiss={clearActionError} />
+        <RecipeDetail
+          feed={resolvedSelected}
+          pantry={pantry}
+          inLibrary={inLibrary}
+          onCook={onCook}
+          onBack={() => setSelected(null)}
+          onToggleFavorite={() => onToggleFavorite(resolvedSelected)}
+          onSaveToLibrary={() => onSaveToLibrary(resolvedSelected)}
+          onMade={() => onMade(resolvedSelected)}
+          onDelete={() => onDelete(resolvedSelected)}
+        />
+      </>
     );
   }
 
   return (
     <div className="browse-screen">
+      <ErrorBanner error={actionError} onDismiss={clearActionError} />
       {/* Ours vs. yours: the primary switch for the whole tab. */}
       <div className="seg" role="tablist" aria-label="Which recipes">
         {SOURCE_TABS.map((t) => (
@@ -282,7 +305,7 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
       {!loaded ? (
         <div className="center-spinner"><div className="spinner" /></div>
       ) : ranked.length === 0 ? (
-        <EmptyState source={source} hasQuery={!!query || (source === "all" && category !== "all")} onAdd={() => setMode("write")} />
+        <EmptyState source={source} hasQuery={!!query || (source === "all" && category !== "all")} onAdd={() => setMode("write")} failed={loadFailed} onRetry={() => { setLoaded(false); void refresh(); }} />
       ) : (
         <>
           <div className="browse-list">
@@ -291,15 +314,7 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
                 key={keyOf(fi)}
                 fi={fi}
                 cov={covFor(fi)}
-                onOpen={async () => {
-                  // loadRecipeBody RETURNS the filled row (catalog rows ship
-                  // slim — no ingredients/instructions until opened). Awaiting
-                  // it and then selecting the original `fi` threw the body away,
-                  // so the detail screen rendered empty INGREDIENTS and
-                  // INSTRUCTIONS headings.
-                  const recipe = await loadRecipeBody(fi.recipe);
-                  setSelected({ ...fi, recipe } as FeedRecipe);
-                }}
+                onOpen={() => run(async () => setSelected(await withRecipeBody(fi)))}
               />
             ))}
           </div>
@@ -328,7 +343,7 @@ function matchesQuery(fi: FeedRecipe, q: string): boolean {
   return false;
 }
 
-function EmptyState({ source, hasQuery, onAdd }: { source: RecipeSource; hasQuery: boolean; onAdd: () => void }) {
+function EmptyState({ source, hasQuery, onAdd, failed, onRetry }: { source: RecipeSource; hasQuery: boolean; onAdd: () => void; failed: boolean; onRetry: () => void }) {
   if (hasQuery)
     return (
       <div className="empty-state">
@@ -344,7 +359,14 @@ function EmptyState({ source, hasQuery, onAdd }: { source: RecipeSource; hasQuer
       </div>
     );
   if (source === "mine")
-    return (
+    return failed ? (
+      <div className="empty-state">
+        <Icon name="bowl-food" className="empty-icon" />
+        <div>Couldn&apos;t load your recipes. They&apos;re still saved — this is a
+          connection problem, not a missing library.</div>
+        <button className="btn" onClick={onRetry}>Try again</button>
+      </div>
+    ) : (
       <div className="empty-state">
         <Icon name="bowl-food" className="empty-icon" />
         <div>You haven't saved any recipes yet. Save one from All, or add your own.</div>

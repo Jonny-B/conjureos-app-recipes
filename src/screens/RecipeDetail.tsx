@@ -3,6 +3,8 @@ import type { FeedRecipe, PantryItem, Recipe, SavedRecipe } from "../types";
 import { ingredientsFromPantry } from "../features/pantry";
 import { computeAvailability, computeCoverage } from "../features/scaling";
 import { parseIngredient, formatStrip } from "../features/nutrition";
+import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
+import { safeHref, hrefHost } from "../features/safeUrl";
 import { CHEF_NAME } from "./StudioScreen";
 import { Icon } from "../icons";
 
@@ -63,6 +65,13 @@ export function RecipeDetail({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const recipeRef = useRef<HTMLDivElement | null>(null);
   const recipe: Recipe = feed.recipe;
+  /**
+   * The source link, scheme-checked. `sourceUrl` is scraped third-party data
+   * that was rendered straight into an href — a row carrying `javascript:...`
+   * was a one-tap script execution in the app's own origin. Null when it isn't
+   * an http(s) URL, and the link simply isn't rendered.
+   */
+  const sourceHref = safeHref((recipe as Recipe & { sourceUrl?: string }).sourceUrl);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -163,7 +172,7 @@ export function RecipeDetail({
         >
           <Icon name="heart" />
         </button>
-        {recipe.imageUrl && (
+        {RECIPE_PHOTOS_ENABLED && recipe.imageUrl && (
           <div className="recipe-hero">
             <img src={recipe.imageUrl} alt={recipe.title} loading="lazy" />
           </div>
@@ -257,11 +266,11 @@ export function RecipeDetail({
           <Icon name="bowl-food" /> Cook this
         </button>
 
-        {isCatalog && feed.recipe.sourceUrl && (
+        {isCatalog && sourceHref && (
           <div className="faint" style={{ fontSize: 11, marginTop: 8 }}>
             Source:{" "}
-            <a href={feed.recipe.sourceUrl} target="_blank" rel="noreferrer" className="source-link">
-              AllRecipes
+            <a href={sourceHref} target="_blank" rel="noreferrer noopener" className="source-link">
+              {hrefHost(sourceHref) ?? "AllRecipes"}
             </a>
           </div>
         )}

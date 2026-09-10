@@ -257,6 +257,21 @@ export async function planWeekRemote(args: {
   pinnedId?: string;
   /** Picks to hold onto — the server fills only the remaining slots. */
   pinnedIds?: string[];
+  /**
+   * The caller's OWN recipes, added to the server's pool for this run. The
+   * pool is the public catalog, so without these a saved recipe can never be
+   * picked — or pinned, which is how "plan around this recipe" silently
+   * ignored your own recipes. `tokens` is computed client-side because saved
+   * rows are stored with none. The server hydrates the picks from the DB and
+   * only ever returns rows the caller created, so these are hints, not data.
+   */
+  extraCandidates?: Array<{
+    id: string;
+    title: string;
+    category: string;
+    tags: string[];
+    tokens: string[];
+  }>;
 }): Promise<{ recipes: CatalogRecipe[]; warnings: string[]; shortfall: number }> {
   const r = await invokeRaw<{ recipes?: DbRecipe[]; warnings?: string[]; shortfall?: number }>(
     "planWeek",
@@ -318,6 +333,17 @@ export async function deleteRecipe(id: string): Promise<void> {
 export async function markCooked(id: string): Promise<SavedRecipe> {
   const r = await invoke("markCooked", { id });
   if (!r.recipe) throw new Error("markCooked failed");
+  return toSavedRecipe(r.recipe);
+}
+
+/**
+ * Undo a "made this". `lastMadeAt` is the value the caller held BEFORE the
+ * mark — the server keeps a timestamp, not a history, so it cannot recover the
+ * previous one on its own. Pass null and it clears.
+ */
+export async function unmarkCooked(id: string, lastMadeAt: string | null): Promise<SavedRecipe> {
+  const r = await invoke("unmarkCooked", { id, ...(lastMadeAt ? { lastMadeAt } : {}) });
+  if (!r.recipe) throw new Error("unmarkCooked failed");
   return toSavedRecipe(r.recipe);
 }
 
@@ -590,6 +616,23 @@ export async function joinFamily(inviteCode: string): Promise<AppFamily> {
   return r.family;
 }
 
+/**
+ * Mint a new invite code for a family, invalidating every link shared so far.
+ * Owner-only (the backend re-checks). The only way to retire the six-character
+ * codes issued before the code was widened.
+ */
+export async function rotateInviteCode(familyId: string): Promise<AppFamily> {
+  if (!isBackendAvailable()) {
+    const fam = devProfile.families.find((f) => f.id === familyId);
+    if (!fam) throw new Error("family not found");
+    fam.inviteCode = "DEV" + Math.floor(Math.random() * 900 + 100);
+    return fam;
+  }
+  const r = await invokeRaw<{ family?: AppFamily }>("rotateInviteCode", { familyId });
+  if (!r.family) throw new Error("reset failed");
+  return r.family;
+}
+
 export async function getFamilyInfo(familyId: string): Promise<{ family: AppFamily; members: FamilyMember[] }> {
   if (!isBackendAvailable()) {
     const fam = devProfile.families.find((f) => f.id === familyId)!;
@@ -641,6 +684,13 @@ export async function listPlans(): Promise<PlanRecord[]> {
  * Create or update a plan. `familyId` is sent only when explicitly setting the
  * scope (a new plan, or moving a plan to/from a family) — a routine data update
  * (a check-off toggle) omits it so the backend keeps the plan where it is.
+ *
+ * `expectedUpdatedAt` makes the write a compare-and-swap: the server refuses
+ * (`conflict: true`, plus the row as it now stands) rather than overwriting a
+ * change we hadn't seen. Callers that pass it must be able to re-apply their
+ * change onto the returned row and retry — see features/planSync.ts. Omitting
+ * it keeps the old blind last-write-wins behaviour, which is right for a create
+ * or a deliberate whole-plan write (share / make private).
  */
 export async function savePlanRecord(args: {
   id?: string;
@@ -648,19 +698,24 @@ export async function savePlanRecord(args: {
   title?: string | null;
   /** Present → set/change scope (null = personal). Absent → keep current scope. */
   familyId?: string | null;
-}): Promise<PlanRecord> {
+  /** The `updatedAt` this write is based on. Absent → no concurrency check. */
+  expectedUpdatedAt?: string;
+}): Promise<{ plan: PlanRecord; conflict: boolean }> {
   const setScope = "familyId" in args;
   if (!isBackendAvailable()) {
     if (args.id) {
       const i = devPlans.findIndex((p) => p.id === args.id);
       if (i >= 0) {
+        if (args.expectedUpdatedAt && devPlans[i]!.updatedAt !== args.expectedUpdatedAt) {
+          return { plan: devPlans[i]!, conflict: true };
+        }
         devPlans[i] = { ...devPlans[i]!, data: args.plan, title: args.title ?? devPlans[i]!.title, updatedAt: nowIso(), ...(setScope ? { familyId: args.familyId ?? null } : {}) };
-        return devPlans[i]!;
+        return { plan: devPlans[i]!, conflict: false };
       }
     }
     const rec: PlanRecord = { id: `plan-${devSeq++}`, ownerId: "u-1", familyId: setScope ? args.familyId ?? null : null, title: args.title ?? null, mine: true, data: args.plan, createdAt: nowIso(), updatedAt: nowIso() };
     devPlans.unshift(rec);
-    return rec;
+    return { plan: rec, conflict: false };
   }
   // Send `title` only when the caller supplied one. A check-off toggle passes
   // just the plan, and the server treats an absent title as "leave it alone" —
@@ -669,9 +724,10 @@ export async function savePlanRecord(args: {
   if ("title" in args || !args.id) params.title = args.title ?? null;
   if (args.id) params.id = args.id;
   if (setScope || !args.id) params.familyId = args.familyId ?? null; // always set scope on create
-  const r = await invokeRaw<{ plan?: PlanRecord }>("savePlan", params);
+  if (args.expectedUpdatedAt) params.expectedUpdatedAt = args.expectedUpdatedAt;
+  const r = await invokeRaw<{ plan?: PlanRecord; conflict?: boolean }>("savePlan", params);
   if (!r.plan) throw new Error("save failed");
-  return r.plan;
+  return { plan: r.plan, conflict: !!r.conflict };
 }
 
 export async function deletePlanRecord(id: string): Promise<void> {

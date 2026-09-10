@@ -14,6 +14,7 @@
  * family shopping list re-groups to whoever is viewing it.
  */
 import { vfs } from "../bridge/vfs";
+import { readJsonDoc, type DocLoad } from "./jsonDoc";
 
 /** The app's fixed ingredient categories (mirror of planWeek.ts AISLE_ORDER). */
 export const STORE_CATEGORIES = [
@@ -60,6 +61,8 @@ export interface StoresState {
   defaultId: string;
 }
 
+/** Over this, assume a real layouts file we must not clobber. */
+const MAX_FILE_BYTES = 256 * 1024;
 const STORES_PATH = "/home/Documents/Recipes/stores.json";
 const LAST_STORE_KEY = "recipes.stores.lastStoreId";
 /** Aisle id for items no rule placed — rendered as a trailing "Unsorted" group. */
@@ -89,22 +92,39 @@ export function newStore(name: string): StoreLayout {
   return { ...defaultStore(), id: newId("s"), name: name.trim() || "New store" };
 }
 
+function parseStores(raw: unknown): StoresState | null {
+  const parsed = raw as Partial<StoresState> | null;
+  if (!parsed?.stores?.length) return null;
+  return { stores: parsed.stores, defaultId: parsed.defaultId ?? parsed.stores[0]!.id };
+}
+
+/** A file we couldn't read is NOT a first run — see loadStoresState. */
+const storesDoc = () => ({
+  maxBytes: MAX_FILE_BYTES,
+  empty: (): StoresState => {
+    const d = defaultStore();
+    return { stores: [d], defaultId: d.id };
+  },
+});
+
+/**
+ * Load the user's store layouts, distinguishing a genuine first run from an
+ * unreadable file. This one mattered most of the four: the old version answered
+ * BOTH cases with a synthetic default store, and StoreEditor's debounced commit
+ * then wrote that default straight over the user's real aisle layouts — every
+ * custom aisle order and per-item exception gone, from one bad read.
+ */
+export async function loadStoresState(): Promise<DocLoad<StoresState>> {
+  return readJsonDoc(STORES_PATH, parseStores, storesDoc());
+}
+
+/**
+ * Display-only convenience. Callers that can WRITE the result back must use
+ * loadStoresState and refuse to save when it answers `ok: false`.
+ */
 export async function loadStores(): Promise<StoresState> {
-  try {
-    if (await vfs.exists(STORES_PATH)) {
-      const parsed = JSON.parse(await vfs.read(STORES_PATH)) as Partial<StoresState>;
-      if (parsed?.stores?.length) {
-        return {
-          stores: parsed.stores,
-          defaultId: parsed.defaultId ?? parsed.stores[0]!.id,
-        };
-      }
-    }
-  } catch {
-    /* unreadable / malformed → fall back to a fresh default */
-  }
-  const d = defaultStore();
-  return { stores: [d], defaultId: d.id };
+  const r = await loadStoresState();
+  return r.ok ? r.value : storesDoc().empty();
 }
 
 export async function saveStores(state: StoresState): Promise<void> {
@@ -128,9 +148,32 @@ export function setAiSortEnabled(on: boolean): void {
   }
 }
 
-/** Merge AI-learned placements (canonical → aisleId) into a store, immutably. */
+/**
+ * Cap on remembered AI placements, per store.
+ *
+ * There was no write-side bound at all, and every successfully placed item was
+ * remembered forever. That collided with the 256KB read cap: once stores.json
+ * crossed it, loadStoresState answered `ok:false` permanently, and the only
+ * control that can shrink the file — "Clear N AI-learned" — lives inside the
+ * editor that then refuses to open. An unbounded cache could therefore lock the
+ * user out of the screen that fixes it. ~2,000 entries is far more distinct
+ * grocery items than a household buys and leaves a wide margin under the cap.
+ */
+const MAX_LEARNED = 2000;
+
+/**
+ * Merge AI-learned placements (canonical → aisleId) into a store, immutably.
+ * Oldest entries are dropped first when the cap is hit — insertion order is
+ * preserved by object key order for string keys, and the newest placement is
+ * the one most likely to matter next.
+ */
 export function withLearned(store: StoreLayout, placements: Record<string, string>): StoreLayout {
-  return { ...store, learned: { ...(store.learned ?? {}), ...placements } };
+  const merged = { ...(store.learned ?? {}), ...placements };
+  const keys = Object.keys(merged);
+  if (keys.length <= MAX_LEARNED) return { ...store, learned: merged };
+  const trimmed: Record<string, string> = {};
+  for (const k of keys.slice(keys.length - MAX_LEARNED)) trimmed[k] = merged[k]!;
+  return { ...store, learned: trimmed };
 }
 
 export function readLastStoreId(): string | null {

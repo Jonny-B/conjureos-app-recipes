@@ -4,6 +4,7 @@ import { reviewRecipe } from "../features/customRecipe";
 import { saveRecipe } from "../features/storage";
 import { publishChefRecipe } from "../bridge/recipesApi";
 import { ImagePicker } from "./ImagePicker";
+import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
 import { Icon } from "../icons";
 
 /**
@@ -192,16 +193,20 @@ function EditablePreview({
       </div>
       {recipe.summary && <p className="summary">{recipe.summary}</p>}
 
-      <ImagePicker
-        value={image}
-        onChange={onImageChange}
-        label={chefMode ? "Blog header image" : "Recipe photo"}
-        hint={
-          chefMode
-            ? "Shown big at the top of your post, above the story. Optional."
-            : "A photo of the finished dish. Optional."
-        }
-      />
+      {/* Photos are stored and round-tripped, but not surfaced — the app
+          commits to a typographic treatment. See features/flags.ts. */}
+      {RECIPE_PHOTOS_ENABLED && (
+        <ImagePicker
+          value={image}
+          onChange={onImageChange}
+          label={chefMode ? "Blog header image" : "Recipe photo"}
+          hint={
+            chefMode
+              ? "Shown big at the top of your post, above the story. Optional."
+              : "A photo of the finished dish. Optional."
+          }
+        />
+      )}
 
       <section>
         <h4>Ingredients</h4>

@@ -1478,6 +1478,19 @@ select {
   color: #ffb0c0;
 }
 
+/* A question, not a failure — same shape as .error, warmer, and it wraps so
+   the two buttons drop below the sentence on a phone. */
+.status-banner.warn {
+  background: rgba(255, 190, 92, 0.09);
+  border-color: rgba(255, 190, 92, 0.45);
+  color: #ffd9a0;
+}
+.plan-confirm {
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.plan-confirm > span { flex: 1 1 240px; min-width: 0; }
+
 .spinner {
   width: 16px;
   height: 16px;
@@ -3457,6 +3470,22 @@ select {
   transition: opacity var(--cui-duration) var(--cui-ease);
 }
 .admin-row.busy { opacity: 0.5; pointer-events: none; }
+/* The self-demotion warning sits BELOW the row it belongs to, so the row has
+   to wrap; without the basis it squeezes in beside the dropdown. */
+.admin-row { flex-wrap: wrap; }
+.admin-confirm {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-1);
+}
+.admin-confirm > span { flex: 1 1 220px; min-width: 0; }
 .admin-id { min-width: 0; }
 .admin-name {
   font-weight: 600;
@@ -3553,3 +3582,113 @@ select {
   .browse-item .meta { font-size: 11px; color: #444 !important; }
   @page { margin: 14mm; }
 }
+
+/* ── Resume a cook left running ────────────────────────────────────────
+   Sits directly under the Home greeting, above everything else, because it
+   is time-sensitive in a way nothing else on this screen is — there is food
+   on a hob. Deliberately quieter than .chef-promo (a border, no gradient):
+   it's a way back to something you were already doing, not a pitch. */
+.resume-cook {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 4px 8px 4px 4px;
+  background: var(--bg-1);
+  border: 1px solid var(--accent-warm);
+  border-radius: 18px;
+}
+.resume-cook-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: none;
+  border: 0;
+  border-radius: 14px;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  /* 44px minimum touch target — this gets tapped with wet hands. */
+  min-height: 44px;
+}
+.resume-cook-main:hover { background: var(--bg-2); }
+.resume-cook-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  font-size: 13px;
+}
+.resume-cook-text > strong { font-size: 12px; letter-spacing: 0.02em; text-transform: uppercase; opacity: 0.75; }
+.resume-cook-title {
+  font-weight: 600;
+  font-size: 15px;
+  /* One line — a long title must not push the summary out of view. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The chevron points the way in, so flip the shared "down" caret. */
+.resume-cook-go { margin-left: auto; flex: none; transform: rotate(-90deg); opacity: 0.6; }
+.resume-cook .icon-btn { align-self: center; flex: none; }
+
+/* ── Accessibility: keyboard, focus, and real touch targets ────────────
+   The recipe rows, plan rows and both cook checklists used to be <div>s and
+   <li>s with an onClick. That is unreachable by keyboard, takes no focus
+   ring, and announces as plain text — and RecipeRow is EVERY recipe row in
+   the app, so the whole feed was affected. They are <button>s now, which
+   means they arrive carrying the browser's button styling; these rules put
+   the original look back. */
+button.browse-item,
+button.check-row,
+button.step-row {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  -webkit-appearance: none;
+  appearance: none;
+}
+/* Buttons don't inherit the flex layout the old <li> got from its own rule,
+   and Safari refuses `display: flex` on some button variants without this. */
+button.check-row,
+button.step-row { display: flex; }
+
+/* One visible focus ring for everything now that everything is focusable.
+   `:focus-visible` rather than `:focus` so a mouse click doesn't leave a ring
+   behind — the keyboard user gets it, the pointer user doesn't. */
+:where(button, a, [role="button"], [role="checkbox"], input, select, textarea):focus-visible {
+  outline: 2px solid var(--cui-accent, #7c6af7);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+/* 44px hit areas without a 44px box.
+   The kitchen controls — Ask the chef, Adjust servings, the servings stepper,
+   the overflow menu, the favourite heart — are all .icon-btn at 36px, and
+   they are exactly the controls most likely to be tapped with wet or greasy
+   hands. Growing the visual button would reflow several dense headers, so the
+   TARGET grows instead: a transparent, centred 44px pseudo-element. Nothing
+   moves, and the thing you're aiming at is the size it should have been. */
+.icon-btn { position: relative; }
+.icon-btn::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+  /* Purely a hit area — never paints, never affects layout. */
+  background: none;
+}
+/* A pointer-coarse-only guard is deliberately NOT used: a 44px target is no
+   worse with a mouse, and the media query would leave desktop-with-touch
+   hybrids on the small one. */
+
+/* The paste counter under the free-form recipe box. Quiet until it matters. */
+.create-count { font-size: 11px; margin-top: 6px; text-align: right; }
+.create-count.at-cap { color: var(--tangerine); font-weight: 600; text-align: left; }

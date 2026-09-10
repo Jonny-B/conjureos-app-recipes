@@ -5,6 +5,7 @@ import {
   joinFamily,
   leaveFamily as leaveFamilyApi,
   renameFamily,
+  rotateInviteCode,
   type AppFamily,
   type AppProfile,
   type FamilyMember,
@@ -96,15 +97,46 @@ function FamilyCard({
     setRename(family.name);
   }, [family.name]);
 
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const resetLink = async () => {
+    setResetting(true);
+    setResetError(null);
+    try {
+      await rotateInviteCode(family.id);
+      await onChanged();
+    } catch {
+      setResetError("Couldn't reset the link — try again.");
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const [nameError, setNameError] = useState<string | null>(null);
   const saveName = async () => {
     const next = rename.trim();
     if (!next || next === family.name) return;
     setSavingName(true);
+    setNameError(null);
+    // The rename and the refetch are caught SEPARATELY. One try around both
+    // meant a rename that succeeded but whose refetch threw ran the rollback:
+    // the field snapped back to the old name while the server held the new
+    // one, so the UI showed a name that doesn't exist. And nothing was ever
+    // told to the user either way — the only action on this screen with no
+    // error surface at all.
     try {
       await renameFamily(family.id, next);
+    } catch (e) {
+      setRename(family.name);
+      setNameError(e instanceof Error ? e.message : "Couldn't rename this family.");
+      setSavingName(false);
+      return;
+    }
+    try {
       await onChanged();
     } catch {
-      setRename(family.name);
+      // The rename landed; only our view of it is stale.
+      setNameError("Renamed, but the list didn't refresh — reopen this screen to see it.");
     } finally {
       setSavingName(false);
     }
@@ -168,6 +200,7 @@ function FamilyCard({
                   <Icon name="pen" /> {savingName ? "Saving…" : "Rename"}
                 </button>
               </div>
+              {nameError && <div className="fam-error">{nameError}</div>}
             </>
           )}
           <div className="ing-group-label">Invite link</div>
@@ -180,6 +213,21 @@ function FamilyCard({
               <Icon name={copied ? "check" : "copy"} /> {copied ? "Copied" : "Copy link"}
             </button>
           </div>
+          {isOwner && (
+            <div style={{ marginTop: 6 }}>
+              <button
+                className="link-btn"
+                type="button"
+                disabled={resetting}
+                onClick={resetLink}
+              >
+                {resetting ? "Resetting…" : "Reset link"}
+              </button>
+              <span className="muted" style={{ fontSize: 12, marginLeft: 8 }}>
+                {resetError ?? "Stops the old link working. Anyone already in stays in."}
+              </span>
+            </div>
+          )}
 
           <div className="ing-group-label" style={{ marginTop: 10 }}>Members</div>
           {membersError ? (
