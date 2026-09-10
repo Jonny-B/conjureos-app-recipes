@@ -234,13 +234,29 @@ const CONTAINER_NOUNS =
   "cans?|jars?|packages?|pkgs?|bags?|boxes|box|containers?|bottles?|tubs?|packets?|envelopes?|cartons?";
 
 function normalizeSizedContainer(text: string): string {
-  const m = text.match(
-    new RegExp(
-      "^(\\d+(?:\\.\\d+)?)?\\s*\\(\\s*(\\d+(?:\\.\\d+)?)\\s*([a-z.]+)\\s*\\)\\s*(?:" +
-        CONTAINER_NOUNS +
-        ")?\\s*(.+)$",
-    ),
-  );
+  // TWO orderings, because two corpora write this differently and both are in
+  // the catalog now:
+  //   AllRecipes: "1 (14.5 ounce) can diced tomatoes"  -> size THEN container
+  //   USDA:       "1 can (10.75 ounces) cream of chicken soup" -> container THEN size
+  // Only the first was handled, so every USDA canned good tokenized as
+  // "can (10.75 ounces) cream of chicken soup" and matched nothing in a
+  // pantry holding "cream of chicken soup". This corpus is full of canned
+  // goods, so that is most of it.
+  const m =
+    text.match(
+      new RegExp(
+        "^(\\d+(?:\\.\\d+)?)?\\s*\\(\\s*(\\d+(?:\\.\\d+)?)\\s*([a-z.]+)\\s*\\)\\s*(?:" +
+          CONTAINER_NOUNS +
+          ")?\\s*(.+)$",
+      ),
+    ) ??
+    text.match(
+      new RegExp(
+        "^(\\d+(?:\\.\\d+)?)?\\s*(?:" +
+          CONTAINER_NOUNS +
+          ")\\s*\\(\\s*(\\d+(?:\\.\\d+)?)\\s*([a-z.]+)\\s*\\)\\s*(.+)$",
+      ),
+    );
   if (!m) return text;
   const count = m[1] ? Number(m[1]) : 1;
   const amount = Number(m[2]);
