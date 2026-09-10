@@ -17,6 +17,11 @@ import { RecipeDetail } from "./RecipeDetail";
 import { CHEF_NAME } from "./StudioScreen";
 import { fetchChefLatest } from "../bridge/recipesApi";
 import { Icon, type IconName } from "../icons";
+import {
+  clearCookSession,
+  loadCookSession,
+  type CookSession,
+} from "../features/cookSession";
 import { ErrorBanner, useActionError } from "../components/ErrorBanner";
 
 type NavTab = "cook" | "recipes" | "plan";
@@ -43,6 +48,19 @@ interface Scored {
   reason: string;
 }
 
+/** "3 of 7 steps · serves 4" — enough to recognise what you're going back to. */
+function resumeSummary(s: CookSession): string {
+  const total = s.recipe.instructions.length;
+  const bits: string[] = [];
+  if (total > 0) bits.push(`${s.steps.length} of ${total} steps`);
+  else if (s.ingredients.length > 0) bits.push(`${s.ingredients.length} gathered`);
+  if (s.factor !== 1) {
+    const base = s.recipe.servings > 0 ? s.recipe.servings : 1;
+    bits.push(`serves ${Math.max(1, Math.round(base * s.factor))}`);
+  }
+  return bits.join(" · ");
+}
+
 function keyOf(fi: FeedRecipe): string {
   return fi.kind === "catalog" ? `c:${fi.id}` : `s:${fi.recipe.path}`;
 }
@@ -54,6 +72,16 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
   const [shuffle, setShuffle] = useState(0);
   const [selected, setSelected] = useState<FeedRecipe | null>(null);
   const [chefPick, setChefPick] = useState<CatalogRecipe | null>(null);
+  /**
+   * A cook left running, if there is one.
+   *
+   * There is no Cook tab in the bottom bar (the two entry points live on Home
+   * and the guided cook is reached by tapping a recipe), so without this card
+   * a persisted session would have nowhere to be resumed FROM — the state
+   * would survive and still be unreachable. Read on mount and whenever Home
+   * comes back into view, which is exactly when a cook has just been left.
+   */
+  const [resumable, setResumable] = useState<CookSession | null>(null);
 
   const refresh = useCallback(async () => {
     const [s, f] = await Promise.all([listSavedRecipes(), loadFavorites()]);
@@ -63,6 +91,7 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
   }, []);
   useEffect(() => {
     refresh();
+    setResumable(loadCookSession());
   }, [refresh]);
   // Chef Payson's newest promoted recipe (best-effort; absent if none/offline).
   useEffect(() => {
@@ -189,6 +218,39 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
         <h2>{greeting()}</h2>
         <div className="muted">{tagline(favoriteItems.length, readyToCook, hasPantry)}</div>
       </div>
+
+      {resumable && (
+        <div className="resume-cook">
+          <button
+            className="resume-cook-main"
+            onClick={() =>
+              onCook(
+                resumable.recipe,
+                saved.find((r) => r.path === resumable.savedPath) ?? null,
+              )
+            }
+          >
+            <Icon name="utensils" />
+            <span className="resume-cook-text">
+              <strong>Still cooking</strong>
+              <span className="resume-cook-title">{resumable.recipe.title}</span>
+              <span className="muted">{resumeSummary(resumable)}</span>
+            </span>
+            <Icon name="chevron-down" className="resume-cook-go" />
+          </button>
+          <button
+            className="icon-btn"
+            aria-label="Forget this cook"
+            title="Forget this cook"
+            onClick={() => {
+              clearCookSession(resumable.key);
+              setResumable(null);
+            }}
+          >
+            <Icon name="xmark" />
+          </button>
+        </div>
+      )}
 
       {hero && (
         <HeroPick

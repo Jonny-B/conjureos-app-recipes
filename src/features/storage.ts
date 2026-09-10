@@ -94,6 +94,14 @@ export async function markMade(recipe: SavedRecipe): Promise<SavedRecipe> {
   return api.markCooked(recipeIdFromPath(recipe.path));
 }
 
+/**
+ * Undo the last `markMade` on a recipe. Takes the row as it was BEFORE the
+ * mark, so its `lastMadeAt` can be restored rather than guessed.
+ */
+export async function unmarkMade(before: SavedRecipe): Promise<SavedRecipe> {
+  return api.unmarkCooked(recipeIdFromPath(before.path), before.lastMadeAt ?? null);
+}
+
 export async function deleteRecipe(recipe: SavedRecipe): Promise<void> {
   await api.deleteRecipe(recipeIdFromPath(recipe.path));
 }

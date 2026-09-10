@@ -14,7 +14,7 @@ import { vfs } from "./bridge/vfs";
 import { joinFamily } from "./bridge/recipesApi";
 import { ensureCatalogLoaded } from "./features/catalog";
 import { loadPantry, ingredientsFromPantry } from "./features/pantry";
-import { markMade, saveRecipe } from "./features/storage";
+import { markMade, unmarkMade, saveRecipe } from "./features/storage";
 import { useWhoami } from "./hooks/useWhoami";
 import { useRole } from "./hooks/useRole";
 import { Icon } from "./icons";
@@ -214,11 +214,24 @@ export function App() {
             </div>
             {cookTarget && (
               <GuidedCook
+                // `key` remounts the cook when the recipe changes, so its
+                // lazy state initializers re-read the stored session instead
+                // of carrying the previous recipe's ticks into this one.
+                key={cookTarget.saved?.path ?? cookTarget.recipe.title}
                 recipe={cookTarget.recipe}
                 pantry={pantry}
                 saved={!!cookTarget.saved}
+                savedPath={cookTarget.saved?.path ?? null}
                 onBack={endCook}
                 onMade={() => (cookTarget.saved ? markMade(cookTarget.saved).then(() => {}) : Promise.resolve())}
+                // `cookTarget.saved` is the row as it was BEFORE the mark (we
+                // never refresh it here), so its lastMadeAt is exactly the
+                // value the undo needs to restore.
+                onUnmade={
+                  cookTarget.saved
+                    ? () => unmarkMade(cookTarget.saved!).then(() => {})
+                    : undefined
+                }
                 onSave={(r) => saveRecipe(r).then(() => {})}
               />
             )}

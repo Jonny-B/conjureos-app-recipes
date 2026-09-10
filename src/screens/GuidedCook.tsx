@@ -1,21 +1,37 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PantryItem, Recipe } from "../types";
 import { ingredientsFromPantry } from "../features/pantry";
 import { computeAvailability, computeCoverage, scaleRecipe } from "../features/scaling";
 import { parseIngredient } from "../features/nutrition";
 import { Icon } from "../icons";
 import { ChefChat } from "./ChefChat";
+import {
+  clearCookSession,
+  cookKeyFor,
+  hasProgress,
+  loadCookSession,
+  saveCookSession,
+} from "../features/cookSession";
 
 interface Props {
   recipe: Recipe;
   pantry: PantryItem[] | null;
   /** True when this recipe is already in the user's library (offer "mark as made"). */
   saved?: boolean;
+  /** The library row's path, when there is one. Identifies the cook session. */
+  savedPath?: string | null;
   onBack: () => void;
   /** Saved recipes: increment made-count. Rejects if persistence fails. */
   onMade?: () => Promise<void>;
   /** Unsaved (AI-described / catalog) recipes: save the (scaled) recipe. Rejects on failure. */
   onSave?: (recipe: Recipe) => Promise<void>;
+  /**
+   * Undo the made-count bump. Offered only on the saved path, and only right
+   * after the tap: "Mark as made" appears the instant the last step is ticked,
+   * which is exactly where a stray tap lands, and it used to be permanent —
+   * there was no endpoint anywhere that could decrement the count.
+   */
+  onUnmade?: () => Promise<void>;
 }
 
 /**
@@ -24,14 +40,28 @@ interface Props {
  * popover (never a visible row). An unobtrusive "Ask the chef" button floats in
  * the corner. Resting chrome = back + Adjust; everything else is the checklist.
  */
-export function GuidedCook({ recipe, pantry, saved, onBack, onMade, onSave }: Props) {
-  const [checkedIng, setCheckedIng] = useState<Set<number>>(new Set());
-  const [checkedStep, setCheckedStep] = useState<Set<number>>(new Set());
-  const [factor, setFactor] = useState(1);
+export function GuidedCook({ recipe, pantry, saved, savedPath = null, onBack, onMade, onSave, onUnmade }: Props) {
+  /**
+   * Identity of this cook, and whatever was left of it last time.
+   *
+   * Read ONCE, in a lazy initializer, so it can't fight the user: re-reading
+   * on a later render would clobber a tick with the version on disk.
+   */
+  const cookKey = cookKeyFor(recipe, savedPath);
+  const [restored] = useState(() => {
+    const s = loadCookSession();
+    return s && s.key === cookKey ? s : null;
+  });
+
+  const [checkedIng, setCheckedIng] = useState<Set<number>>(() => new Set(restored?.ingredients ?? []));
+  const [checkedStep, setCheckedStep] = useState<Set<number>>(() => new Set(restored?.steps ?? []));
+  const [factor, setFactor] = useState(restored?.factor ?? 1);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [chefOpen, setChefOpen] = useState(false);
   const [ingredientsCollapsed, setIngredientsCollapsed] = useState(false);
   const [madeDone, setMadeDone] = useState(false);
+  const [undoing, setUndoing] = useState(false);
+  const [undone, setUndone] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -72,6 +102,10 @@ export function GuidedCook({ recipe, pantry, saved, onBack, onMade, onSave }: Pr
     setSaving(true);
     try {
       await fn();
+      // The cook is over: nothing left to resume, and leaving the snapshot
+      // would offer a finished meal back on Home.
+      clearCookSession(cookKey);
+      hasWritten.current = false;
       setMadeDone(true);
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : String(e));
@@ -79,6 +113,25 @@ export function GuidedCook({ recipe, pantry, saved, onBack, onMade, onSave }: Pr
       setSaving(false);
     }
   };
+  /**
+   * Mirror progress to localStorage on every change.
+   *
+   * Only once there IS progress: opening a recipe and backing straight out
+   * must not overwrite the cook you left running on another recipe, and must
+   * not manufacture a "Still cooking" card out of nothing. Once a session has
+   * been written, later changes keep writing even back down to nothing, so
+   * un-ticking your last step doesn't strand a stale snapshot on disk.
+   */
+  const hasWritten = useRef(!!restored);
+  useEffect(() => {
+    if (madeDone) return; // the finish path owns clearing; don't rewrite behind it
+    const steps = [...checkedStep];
+    const ingredients = [...checkedIng];
+    if (!hasWritten.current && !hasProgress({ steps, ingredients, factor })) return;
+    hasWritten.current = true;
+    saveCookSession({ key: cookKey, recipe, savedPath, steps, ingredients, factor });
+  }, [checkedStep, checkedIng, factor, madeDone, cookKey, recipe, savedPath]);
+
   const scaleToPantry = () => {
     const a = computeAvailability(recipe, pantryIng);
     if (a.factor > 0) setFactor(a.factor);
@@ -211,6 +264,28 @@ export function GuidedCook({ recipe, pantry, saved, onBack, onMade, onSave }: Pr
       {madeDone && (
         <div className="guided-done">
           <Icon name="check" /> {saved ? "Marked as made." : "Saved to your recipes."}
+          {saved && onUnmade && !undone && (
+            <button
+              className="link-btn"
+              type="button"
+              disabled={undoing}
+              onClick={async () => {
+                setUndoing(true);
+                setSaveError(null);
+                try {
+                  await onUnmade();
+                  setUndone(true);
+                } catch (e) {
+                  setSaveError(e instanceof Error ? e.message : String(e));
+                } finally {
+                  setUndoing(false);
+                }
+              }}
+            >
+              {undoing ? "Undoing…" : "Undo"}
+            </button>
+          )}
+          {undone && <span className="muted">Undone.</span>}
         </div>
       )}
 

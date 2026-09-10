@@ -336,6 +336,17 @@ export async function markCooked(id: string): Promise<SavedRecipe> {
   return toSavedRecipe(r.recipe);
 }
 
+/**
+ * Undo a "made this". `lastMadeAt` is the value the caller held BEFORE the
+ * mark — the server keeps a timestamp, not a history, so it cannot recover the
+ * previous one on its own. Pass null and it clears.
+ */
+export async function unmarkCooked(id: string, lastMadeAt: string | null): Promise<SavedRecipe> {
+  const r = await invoke("unmarkCooked", { id, ...(lastMadeAt ? { lastMadeAt } : {}) });
+  if (!r.recipe) throw new Error("unmarkCooked failed");
+  return toSavedRecipe(r.recipe);
+}
+
 export async function setFavorite(id: string, favorite: boolean): Promise<SavedRecipe> {
   const r = await invoke("setFavorite", { id, favorite });
   if (!r.recipe) throw new Error("setFavorite failed");

@@ -3582,3 +3582,55 @@ select {
   .browse-item .meta { font-size: 11px; color: #444 !important; }
   @page { margin: 14mm; }
 }
+
+/* ── Resume a cook left running ────────────────────────────────────────
+   Sits directly under the Home greeting, above everything else, because it
+   is time-sensitive in a way nothing else on this screen is — there is food
+   on a hob. Deliberately quieter than .chef-promo (a border, no gradient):
+   it's a way back to something you were already doing, not a pitch. */
+.resume-cook {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 4px 8px 4px 4px;
+  background: var(--bg-1);
+  border: 1px solid var(--accent-warm);
+  border-radius: 18px;
+}
+.resume-cook-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: none;
+  border: 0;
+  border-radius: 14px;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  /* 44px minimum touch target — this gets tapped with wet hands. */
+  min-height: 44px;
+}
+.resume-cook-main:hover { background: var(--bg-2); }
+.resume-cook-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  font-size: 13px;
+}
+.resume-cook-text > strong { font-size: 12px; letter-spacing: 0.02em; text-transform: uppercase; opacity: 0.75; }
+.resume-cook-title {
+  font-weight: 600;
+  font-size: 15px;
+  /* One line — a long title must not push the summary out of view. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The chevron points the way in, so flip the shared "down" caret. */
+.resume-cook-go { margin-left: auto; flex: none; transform: rotate(-90deg); opacity: 0.6; }
+.resume-cook .icon-btn { align-self: center; flex: none; }
