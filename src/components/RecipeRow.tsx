@@ -21,7 +21,10 @@ export function RecipeRow({
   const r = fi.recipe;
   const category = fi.kind === "catalog" ? fi.recipe.category : null;
   return (
-    <div className="browse-item" onClick={onOpen}>
+    // A button, not a div-with-onClick: every recipe row in the app is this
+    // component, so the whole feed was keyboard-unreachable. `type="button"`
+    // matters because these do appear inside forms.
+    <button type="button" className="browse-item" onClick={onOpen}>
       {RECIPE_PHOTOS_ENABLED && r.imageUrl && (
         <div className="browse-thumb">
           <img src={r.imageUrl} alt="" loading="lazy" />
@@ -46,7 +49,7 @@ export function RecipeRow({
         </div>
         {cov && <CoverageChips cov={cov} />}
       </div>
-    </div>
+    </button>
   );
 }
 

@@ -19,6 +19,8 @@ Output ONLY a JSON object mapping each item's EXACT given name to an aisle id,
 e.g. {"all-purpose flour":"a1b2c3"}. Use only ids that appear in the layout.
 Omit an item entirely if you genuinely cannot tell. No prose, no code fences.`;
 
+/** How many chunk calls may be in flight at once. Mirrors nutrition.ts. */
+const SORT_CONCURRENCY = 3;
 /** Items per model call — see the chunking note in inferAislePlacements. */
 const CHUNK = 25;
 
@@ -50,7 +52,21 @@ export async function inferAislePlacements(
   if (items.length > CHUNK) {
     const chunks: (typeof items)[] = [];
     for (let i = 0; i < items.length; i += CHUNK) chunks.push(items.slice(i, i + CHUNK));
-    const results = await Promise.all(chunks.map((c) => inferAislePlacements(c, store)));
+    // Bounded concurrency, not a bare Promise.all over every chunk. A long
+    // shopping list fanned out unlimited simultaneous model calls; the
+    // nutrition path one directory over already caps at 3 for exactly this
+    // reason (a tight upstream rate limit), and this one didn't.
+    const results: Record<string, string>[] = [];
+    let cursor = 0;
+    const worker = async (): Promise<void> => {
+      while (cursor < chunks.length) {
+        const c = chunks[cursor++]!;
+        results.push(await inferAislePlacements(c, store));
+      }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(SORT_CONCURRENCY, chunks.length) }, () => worker()),
+    );
     return Object.assign({}, ...results) as Record<string, string>;
   }
 

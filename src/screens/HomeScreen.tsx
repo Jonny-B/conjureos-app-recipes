@@ -107,9 +107,23 @@ export function HomeScreen({ pantry, onNavigate, onViewFavorites, onOpenKitchen,
   // Daily seed: reshuffles equal-scored ties once a day so "Tonight's pick"
   // (and the idea lists) feel fresh day-to-day instead of frozen.
   const seed = daySeed();
+  /**
+   * Coverage is computed once per recipe and kept separate from scoring.
+   *
+   * It used to live inside `buildScored`, whose deps included `favs` — so
+   * tapping one heart re-ran computeCoverage across the entire ~1,200-recipe
+   * catalog. Favouriting changes a 0.4 term in the score; it cannot change how
+   * much of a recipe your pantry covers, and the two have no business sharing
+   * a memo. (The other half of that cost was re-normalizing the same pantry
+   * per call — see `normalizedPantry` in scaling.ts.)
+   */
+  const covByKey = useMemo(
+    () => buildCoverage(catalog, saved, pantryIng, hasPantry),
+    [catalog, saved, pantryIng, hasPantry],
+  );
   const scored = useMemo(
-    () => buildScored(catalog, saved, favs, pantryIng, hasPantry, seed),
-    [catalog, saved, favs, pantryIng, hasPantry, seed],
+    () => buildScored(catalog, saved, favs, covByKey, seed),
+    [catalog, saved, favs, covByKey, seed],
   );
 
   const favoriteItems = useMemo(() => scored.filter((s) => s.fi.favorite), [scored]);
@@ -478,21 +492,42 @@ function QuickAction({
 
 // ── recommendation engine ─────────────────────────────────────────────
 
+/** Every feed row, in one place, so coverage and scoring iterate the same set. */
+function feedItems(catalog: CatalogRecipe[], saved: SavedRecipe[], favs: Set<string>): FeedRecipe[] {
+  const items: FeedRecipe[] = [];
+  for (const r of saved) if (r.favorite) items.push({ kind: "saved", recipe: r, favorite: true });
+  for (const c of catalog) items.push({ kind: "catalog", id: c.id, recipe: c, favorite: favs.has(c.id) });
+  return items;
+}
+
+/** Coverage per row key. Depends on the catalog and the pantry — never on favourites. */
+function buildCoverage(
+  catalog: CatalogRecipe[],
+  saved: SavedRecipe[],
+  pantryIng: ReturnType<typeof ingredientsFromPantry>,
+  hasPantry: boolean,
+): Map<string, CoverageResult | null> {
+  const out = new Map<string, CoverageResult | null>();
+  if (!hasPantry) return out;
+  // `favs` is irrelevant to coverage, so an empty set is fine for keying here.
+  for (const fi of feedItems(catalog, saved, new Set())) {
+    out.set(keyOf(fi), computeCoverage(fi.recipe, pantryIng));
+  }
+  return out;
+}
+
 function buildScored(
   catalog: CatalogRecipe[],
   saved: SavedRecipe[],
   favs: Set<string>,
-  pantryIng: ReturnType<typeof ingredientsFromPantry>,
-  hasPantry: boolean,
+  covByKey: Map<string, CoverageResult | null>,
   seed: number,
 ): Scored[] {
-  const items: FeedRecipe[] = [];
-  for (const r of saved) if (r.favorite) items.push({ kind: "saved", recipe: r, favorite: true });
-  for (const c of catalog) items.push({ kind: "catalog", id: c.id, recipe: c, favorite: favs.has(c.id) });
+  const items = feedItems(catalog, saved, favs);
 
   const scored = items.map<Scored>((fi) => {
     const recipe = fi.recipe;
-    const cov = hasPantry ? computeCoverage(recipe, pantryIng) : null;
+    const cov = covByKey.get(keyOf(fi)) ?? null;
     let score = 0;
     if (cov) score += cov.score; // -1..1, dominant signal when a pantry exists
     if (fi.favorite) score += 0.4;

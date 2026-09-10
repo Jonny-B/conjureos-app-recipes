@@ -969,7 +969,7 @@ function PlanView({
 function PlanRow({ rec, familyName, onOpen }: { rec: PlanRecord; familyName: string | null; onOpen: () => void }) {
   const titles = (rec.data.picks ?? []).map((p) => p.title).join(", ");
   return (
-    <div className="browse-item" onClick={onOpen}>
+    <button type="button" className="browse-item" onClick={onOpen}>
       <div className="browse-thumb plan-row-icon">
         <Icon name="calendar-days" />
       </div>
@@ -983,7 +983,7 @@ function PlanRow({ rec, familyName, onOpen }: { rec: PlanRecord; familyName: str
           {titles ? ` · ${titles}` : ""}
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 

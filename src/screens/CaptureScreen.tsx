@@ -60,8 +60,24 @@ export function CaptureScreen({ onIdentify, initialPhotos, title, emptyHint, mor
 
   const addFiles = async (files: FileList | File[]) => {
     setErr(null);
-    const incoming = Array.from(files);
-    if (incoming.length === 0) return;
+    const all = Array.from(files);
+    if (all.length === 0) return;
+    // `accept="image/*"` filters the PICKER and nothing else — a drag-and-drop
+    // hands us whatever was dragged. A dropped PDF got as far as the image
+    // decoder and surfaced a raw engine error, which reads like the app broke
+    // rather than like the file was wrong.
+    const incoming = all.filter((f) => f.type.startsWith("image/"));
+    if (incoming.length === 0) {
+      setErr(
+        all.length === 1
+          ? "That's not an image — drop a photo (JPG, PNG, HEIC or WebP)."
+          : "None of those are images — drop photos (JPG, PNG, HEIC or WebP).",
+      );
+      return;
+    }
+    if (incoming.length < all.length) {
+      setErr(`Skipped ${all.length - incoming.length} file(s) that aren't images.`);
+    }
     const room = MAX_PHOTOS - photos.length;
     if (room <= 0) {
       setErr(`Up to ${MAX_PHOTOS} photos per session — remove one to add another.`);

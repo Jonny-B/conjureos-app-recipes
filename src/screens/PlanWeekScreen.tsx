@@ -631,13 +631,18 @@ function MoodStep(p: MoodProps) {
               </div>
               <div className="browse-list">
                 {p.seedResults.map((c) => (
-                  <div key={c.id} className="browse-item" onClick={() => p.setSeed(c)}>
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="browse-item"
+                    onClick={() => p.setSeed(c)}
+                  >
                     <div className="title-block">
                       <div className="title">{c.title}</div>
                       {/* Saved recipes carry no category — see savedCandidates. */}
                       <div className="meta">{c.category || "your recipe"}</div>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </>

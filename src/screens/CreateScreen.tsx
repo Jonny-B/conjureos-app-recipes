@@ -10,6 +10,12 @@ import { Icon } from "../icons";
  * RecipeEditor takes over: every line is editable by hand, an optional AI
  * "verify & tidy" pass runs over manual edits, and Save writes it to the DB.
  */
+/**
+ * Paste cap. Shared with the textarea's `maxLength` and shown as a counter —
+ * see the note by the counter for why a silent cap was the bug.
+ */
+const MAX_CHARS = 6000;
+
 export function CreateScreen({
   chefMode = false,
   onPublished,
@@ -69,9 +75,22 @@ export function CreateScreen({
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={7}
-        maxLength={6000}
+        maxLength={MAX_CHARS}
         disabled={busy}
+        aria-describedby="create-count"
       />
+      {/* A counter, because `maxLength` truncates a paste SILENTLY: paste a
+          10,000-character recipe and the browser keeps 6,000 with no sign
+          anything was dropped — the last third of the method simply isn't
+          there, and the AI structures what's left as though it were whole. */}
+      <div
+        id="create-count"
+        className={`faint create-count${text.length >= MAX_CHARS ? " at-cap" : ""}`}
+      >
+        {text.length >= MAX_CHARS
+          ? `At the ${MAX_CHARS.toLocaleString()}-character limit — anything past this was not pasted. Split a long recipe in two.`
+          : `${text.length.toLocaleString()} / ${MAX_CHARS.toLocaleString()}`}
+      </div>
 
       <div className="capture-buttons" style={{ justifyContent: "flex-start" }}>
         <button className="btn" onClick={generate} disabled={busy || !text.trim()}>

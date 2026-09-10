@@ -205,15 +205,24 @@ export function GuidedCook({ recipe, pantry, saved, savedPath = null, onBack, on
               const short = hasPantry && !!name && shortSet.has(name);
               const checked = checkedIng.has(i);
               return (
-                <li
-                  key={i}
-                  className={`check-row${checked ? " checked" : ""}`}
-                  onClick={() => toggle(checkedIng, i, setCheckedIng)}
-                >
-                  <Icon name={checked ? "check" : "circle"} className="check-mark" />
-                  <span className="check-text">{ing}</span>
-                  {missing && <span className="ing-tag miss"><Icon name="basket-shopping" /> need</span>}
-                  {short && !missing && <span className="ing-tag low">low</span>}
+                <li key={i}>
+                  {/* A real button with role="checkbox": these were bare <li>
+                      elements with an onClick, so they could not be reached by
+                      keyboard at all, took no focus ring, and announced as
+                      plain text. Everything a checkbox needs comes free from
+                      the element rather than being re-implemented per row. */}
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={checked}
+                    className={`check-row${checked ? " checked" : ""}`}
+                    onClick={() => toggle(checkedIng, i, setCheckedIng)}
+                  >
+                    <Icon name={checked ? "check" : "circle"} className="check-mark" />
+                    <span className="check-text">{ing}</span>
+                    {missing && <span className="ing-tag miss"><Icon name="basket-shopping" /> need</span>}
+                    {short && !missing && <span className="ing-tag low">low</span>}
+                  </button>
                 </li>
               );
             })}
@@ -228,13 +237,17 @@ export function GuidedCook({ recipe, pantry, saved, savedPath = null, onBack, on
             const checked = checkedStep.has(i);
             const isCurrent = !checked && i === currentStep;
             return (
-              <li
-                key={i}
-                className={`step-row${checked ? " checked" : ""}${isCurrent ? " current" : ""}`}
-                onClick={() => toggle(checkedStep, i, setCheckedStep)}
-              >
-                <span className="step-num"><Icon name={checked ? "check" : "circle"} /></span>
-                <span className="step-text">{step}</span>
+              <li key={i}>
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={checked}
+                  className={`step-row${checked ? " checked" : ""}${isCurrent ? " current" : ""}`}
+                  onClick={() => toggle(checkedStep, i, setCheckedStep)}
+                >
+                  <span className="step-num"><Icon name={checked ? "check" : "circle"} /></span>
+                  <span className="step-text">{step}</span>
+                </button>
               </li>
             );
           })}

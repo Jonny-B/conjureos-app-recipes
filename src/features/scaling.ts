@@ -616,13 +616,38 @@ export interface CoverageResult {
  * Here we layer a name-only presence path on top: quantified-both -> ratio
  * decides have/short; matched-by-name-only -> have; no match -> missing.
  */
+/**
+ * Normalized pantry names, cached against the array they came from.
+ *
+ * `computeCoverage` is called once per recipe, and Home calls it across the
+ * WHOLE catalog — ~1,200 times with the identical pantry array. The pantry
+ * array is a stable `useMemo` result at every caller, so a WeakMap on its
+ * identity turns 1,200 normalizations into one, with no signature change and
+ * no way for a stale entry to outlive the array being rebuilt.
+ *
+ * Measured, rather than assumed: on a 1,200-recipe pass with full ingredient
+ * lines this is worth ~10% (63ms vs 70ms), not the ~45% the audit estimated —
+ * the ingredient-side matching dominates. Kept because it is free and correct,
+ * but the real fix for the favourite-toggle stutter was hoisting coverage out
+ * of the memo that `favs` invalidates (see HomeScreen's `covByKey`).
+ */
+const userNormCache = new WeakMap<object, string[]>();
+
+function normalizedPantry(userIngredients: Ingredient[]): string[] {
+  const hit = userNormCache.get(userIngredients);
+  if (hit) return hit;
+  const norms = userIngredients
+    .map((i) => normalizeIngredientName(parseIngredient(i.name)?.name ?? i.name))
+    .filter((n) => n.length > 0);
+  userNormCache.set(userIngredients, norms);
+  return norms;
+}
+
 export function computeCoverage(
   recipe: Recipe,
   userIngredients: Ingredient[],
 ): CoverageResult {
-  const userNorms = userIngredients
-    .map((i) => normalizeIngredientName(parseIngredient(i.name)?.name ?? i.name))
-    .filter((n) => n.length > 0);
+  const userNorms = normalizedPantry(userIngredients);
 
   // Catalog rows arrive SLIM: `ingredients` is empty until the recipe is
   // opened, and the body fetch is deliberate (it's ~66% of the payload). This
