@@ -187,7 +187,7 @@ export function GuidedCook({ recipe, pantry, saved, savedPath = null, onBack, on
       <h2 className="guided-title">{recipe.title}</h2>
       <div className="guided-meta">
         <span className={`pill ${recipe.difficulty}`}>{recipe.difficulty}</span>
-        <span className="pill">{recipe.cookTime} min</span>
+        {recipe.cookTime > 0 && <span className="pill">{recipe.cookTime} min</span>}
         <span className="pill">{servings} serving{servings === 1 ? "" : "s"}</span>
         {doneSteps > 0 && <span className="pill">{doneSteps}/{totalSteps} steps</span>}
       </div>

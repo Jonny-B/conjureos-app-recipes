@@ -181,7 +181,7 @@ export function RecipeDetail({
         <div>
           {isCatalog && <span className="pill">{feed.recipe.category}</span>}
           <span className={`pill ${recipe.difficulty}`}>{recipe.difficulty}</span>
-          <span className="pill">{recipe.cookTime} min</span>
+          {recipe.cookTime > 0 && <span className="pill">{recipe.cookTime} min</span>}
           <span className="pill">{recipe.servings} serving{recipe.servings === 1 ? "" : "s"}</span>
           {feed.kind === "saved" && feed.recipe.madeCount > 0 && (
             <span className="pill">made {feed.recipe.madeCount}×</span>

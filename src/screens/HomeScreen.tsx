@@ -401,7 +401,7 @@ function HeroPick({
       <div className="hero-meta">
         {scored.fi.kind === "catalog" && <span className="pill cat">{scored.fi.recipe.category}</span>}
         <span className={`pill ${r.difficulty}`}>{r.difficulty}</span>
-        <span className="pill">{r.cookTime} min</span>
+        {r.cookTime > 0 && <span className="pill">{r.cookTime} min</span>}
         {r.nutrition && <span className="pill">~{r.nutrition.calories} cal</span>}
       </div>
       <div className={`hero-why${cov && cov.missing === 0 ? " have" : ""}`}>

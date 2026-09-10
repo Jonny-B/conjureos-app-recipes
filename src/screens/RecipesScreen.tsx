@@ -316,7 +316,7 @@ function RecipeCard({
       </div>
       <div>
         <span className={`pill ${original.difficulty}`}>{original.difficulty}</span>
-        <span className="pill">{original.cookTime} min</span>
+        {original.cookTime > 0 && <span className="pill">{original.cookTime} min</span>}
       </div>
       {original.summary && <p className="summary">{original.summary}</p>}
 
