@@ -39,7 +39,7 @@
 
   /* Vivid purple→blue for filled buttons + active pills (the signature
      gradient applied as an opaque fill, not the soft hero wash). */
-  --grad-primary: linear-gradient(135deg, var(--cui-accent), #4a9eff);
+  --grad-primary: linear-gradient(135deg, var(--cui-accent), var(--cui-accent-hover));
   --grad-warm: linear-gradient(135deg, var(--cui-accent-soft), var(--cui-accent));
   --shadow-glow: var(--cui-shadow-accent);
   --shadow-soft: var(--cui-shadow);
@@ -145,7 +145,7 @@ select {
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  color: #fff;
+  color: var(--cui-on-accent);
   background: var(--grad-primary);
   box-shadow: var(--cui-shadow-accent);
 }
@@ -232,8 +232,96 @@ select {
 }
 .sheet-item:hover { background: var(--bg-3); }
 .sheet-item svg { width: 16px; height: 16px; color: var(--accent-soft); flex: 0 0 auto; }
-.sheet-item.danger { color: #ff6b6b; }
-.sheet-item.danger svg { color: #ff6b6b; }
+.sheet-item.danger { color: var(--cui-error); }
+.sheet-item.danger svg { color: var(--cui-error); }
+
+/* ---- Appearance sheet -------------------------------------------------
+   Every colour here resolves from a --cui-* token, because this is the one
+   panel guaranteed to be looked at in all eighteen theme/flavour
+   combinations: it is where they are chosen. */
+.appearance-title {
+  margin: 2px 12px 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--cui-fg);
+}
+.appearance-follow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--cui-bg-2);
+  border: 1px solid var(--cui-border);
+  cursor: pointer;
+}
+.appearance-follow-text { display: flex; flex-direction: column; gap: 3px; flex: 1 1 auto; }
+.appearance-follow-label { font-size: 14px; font-weight: 600; color: var(--cui-fg); }
+.appearance-follow-hint { font-size: 12px; color: var(--cui-fg-mute); }
+.appearance-switch {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--cui-accent);
+  cursor: pointer;
+}
+.appearance-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 12px 4px;
+  /* Dimmed rather than hidden while ConjureOS is being followed: the controls
+     still SHOW what is applied, which is the answer to "what am I on?" — and
+     a panel whose contents vanish reads as a bug rather than a mode. */
+  transition: opacity 0.15s ease;
+}
+.appearance-controls[aria-hidden="true"] { opacity: 0.45; }
+.appearance-field { display: flex; flex-direction: column; gap: 6px; }
+.appearance-field-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--cui-fg-mute);
+}
+.appearance-select {
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  color: var(--cui-fg);
+  background: var(--cui-bg-1);
+  border: 1px solid var(--cui-border);
+}
+.appearance-select:disabled { cursor: not-allowed; }
+.appearance-flavors { display: flex; gap: 8px; }
+.appearance-flavor {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--cui-fg);
+  background: var(--cui-bg-1);
+  border: 1px solid var(--cui-border);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.appearance-flavor svg { width: 14px; height: 14px; }
+.appearance-flavor:hover:not(:disabled) { border-color: var(--cui-border-strong); }
+.appearance-flavor.on {
+  background: var(--cui-accent);
+  border-color: var(--cui-accent);
+  color: var(--cui-on-accent);
+}
+.appearance-flavor.on svg { color: var(--cui-on-accent); }
+.appearance-flavor:disabled { cursor: not-allowed; }
+.appearance-done { justify-content: center; font-weight: 600; margin-top: 6px; }
 .sheet-sep { height: 1px; background: var(--cui-border); margin: 6px 12px; }
 .sheet-cancel {
   justify-content: center;
@@ -342,12 +430,12 @@ select {
 /* Pill-shaped active state: accent-gradient backing + accent-tint ring +
    soft accent glow (the canonical Modern Whimsy selected-affordance). */
 .nav-btn.active {
-  color: #fff;
+  color: var(--cui-on-accent);
   background: linear-gradient(135deg,
-    rgba(124, 106, 247, 0.6),
-    rgba(74, 158, 255, 0.45));
+    color-mix(in srgb, var(--cui-accent) 60%, transparent),
+    color-mix(in srgb, var(--cui-accent-hover) 45%, transparent));
   box-shadow: 0 0 0 1px var(--cui-accent-tint),
-              0 4px 12px rgba(124, 106, 247, 0.25);
+              0 4px 12px color-mix(in srgb, var(--cui-accent) 25%, transparent);
 }
 
 /* ── Info popover (version + USDA quota) ──────────────────────────────
@@ -477,7 +565,7 @@ select {
   gap: 8px;
   background: var(--grad-primary);
   border: none;
-  color: #fff;
+  color: var(--cui-on-accent);
   padding: 11px 18px;
   /* Rounded-rect, not a full pill — the pill shape was the main "toy" tell.
      Matches the Conjure Health button radius. */
@@ -529,8 +617,11 @@ select {
 }
 
 .btn.danger {
-  background: linear-gradient(135deg, #ff6b8b, #e23d6a);
-  color: #fff;
+  background: linear-gradient(135deg, var(--cui-error), color-mix(in srgb, var(--cui-error) 70%, #000));
+  /* --cui-onstatus, not --cui-on-accent: this fill is the error colour, and
+     the two labels differ (on-accent is dark in six palettes, onstatus tracks
+     the status hues instead). */
+  color: var(--cui-onstatus);
 }
 
 .btn.ghost {
@@ -709,7 +800,7 @@ select {
 .capture-area .icon {
   font-size: 40px;
   margin-bottom: 8px;
-  filter: drop-shadow(0 6px 14px rgba(124, 106, 247, 0.4));
+  filter: drop-shadow(0 6px 14px color-mix(in srgb, var(--cui-accent) 40%, transparent));
   line-height: 0;
 }
 
@@ -1085,8 +1176,8 @@ select {
 
 .recipe-card .pill.easy,
 .browse-item .pill.easy {
-  background: rgba(94, 234, 212, 0.18);
-  color: #8af0dd;
+  background: color-mix(in srgb, var(--cui-success) 18%, transparent);
+  color: var(--cui-success);
 }
 
 .recipe-card .pill.medium,
@@ -1097,8 +1188,8 @@ select {
 
 .recipe-card .pill.hard,
 .browse-item .pill.hard {
-  background: rgba(255, 107, 139, 0.18);
-  color: #ffb0c0;
+  background: color-mix(in srgb, var(--cui-error) 18%, transparent);
+  color: var(--cui-error);
 }
 
 .recipe-card .summary {
@@ -1194,7 +1285,7 @@ select {
 
 .serving-stepper button:hover:not(:disabled) {
   background: var(--grad-primary);
-  color: #2a1840;
+  color: var(--cui-on-accent);
   transform: scale(1.12);
 }
 
@@ -1436,7 +1527,7 @@ select {
 .browse-item .made-pill {
   font-size: 12px;
   font-weight: 700;
-  color: #2a1840;
+  color: var(--cui-on-accent);
   background: var(--grad-warm);
   padding: 4px 11px;
   border-radius: 999px;
@@ -1473,17 +1564,17 @@ select {
 }
 
 .status-banner.error {
-  background: rgba(255, 107, 139, 0.09);
+  background: color-mix(in srgb, var(--cui-error) 12%, transparent);
   border-color: rgba(255, 107, 139, 0.45);
-  color: #ffb0c0;
+  color: var(--cui-error);
 }
 
 /* A question, not a failure — same shape as .error, warmer, and it wraps so
    the two buttons drop below the sentence on a phone. */
 .status-banner.warn {
-  background: rgba(255, 190, 92, 0.09);
+  background: color-mix(in srgb, var(--cui-warning) 12%, transparent);
   border-color: rgba(255, 190, 92, 0.45);
-  color: #ffd9a0;
+  color: var(--cui-warning);
 }
 .plan-confirm {
   flex-wrap: wrap;
@@ -1772,8 +1863,8 @@ select {
 }
 
 .miss-chip {
-  background: rgba(248, 113, 113, 0.14);
-  color: #fca5a5;
+  background: color-mix(in srgb, var(--cui-error) 14%, transparent);
+  color: var(--cui-error);
   font-weight: 600;
 }
 
@@ -1790,7 +1881,7 @@ select {
 }
 
 .pill.cat {
-  background: rgba(124, 106, 247, 0.16);
+  background: color-mix(in srgb, var(--cui-accent) 16%, transparent);
   color: var(--accent-soft);
 }
 
@@ -1834,7 +1925,7 @@ select {
 
 .ing-missing {
   font-size: 11px;
-  color: #fca5a5;
+  color: var(--cui-error);
   margin-top: 2px;
   padding-left: 10px;
   display: inline-flex;
@@ -1936,7 +2027,7 @@ select {
 
 .plan-step.active .plan-step-dot {
   background: var(--grad-primary);
-  color: #fff;
+  color: var(--cui-on-accent);
   border-color: transparent;
 }
 
@@ -2182,7 +2273,7 @@ select {
   gap: 12px;
   padding: 24px;
   border-radius: 22px;
-  background: linear-gradient(135deg, rgba(124, 106, 247, 0.2), rgba(74, 158, 255, 0.05) 70%),
+  background: linear-gradient(135deg, color-mix(in srgb, var(--cui-accent) 20%, transparent), color-mix(in srgb, var(--cui-accent-hover) 5%, transparent) 70%),
     var(--bg-1);
   border: 1px solid var(--cui-accent-tint);
   box-shadow: var(--cui-shadow-accent);
@@ -2280,7 +2371,7 @@ select {
 }
 
 .stat-tile.accent {
-  background: linear-gradient(135deg, rgba(124, 106, 247, 0.14), transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--cui-accent) 14%, transparent), transparent);
   border-color: var(--cui-accent-tint);
 }
 
@@ -2464,7 +2555,7 @@ select {
   height: 46px;
   border-radius: 14px;
   background: var(--grad-primary);
-  color: #fff;
+  color: var(--cui-on-accent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2522,9 +2613,9 @@ select {
   color: var(--cui-fg);
 }
 .seg-btn.active {
-  color: #fff;
-  background: linear-gradient(135deg, rgba(124, 106, 247, 0.6), rgba(74, 158, 255, 0.45));
-  box-shadow: 0 0 0 1px var(--cui-accent-tint), 0 4px 12px rgba(124, 106, 247, 0.25);
+  color: var(--cui-on-accent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--cui-accent) 60%, transparent), color-mix(in srgb, var(--cui-accent-hover) 45%, transparent));
+  box-shadow: 0 0 0 1px var(--cui-accent-tint), 0 4px 12px color-mix(in srgb, var(--cui-accent) 25%, transparent);
 }
 
 .lib-header { display: flex; align-items: center; gap: 8px; }
@@ -2546,7 +2637,7 @@ select {
   padding: 0 4px;
   border-radius: 999px;
   background: var(--grad-primary);
-  color: #fff;
+  color: var(--cui-on-accent);
   font-size: 10px;
   font-weight: 700;
   display: inline-flex;
@@ -2609,9 +2700,9 @@ select {
 .step-num { flex: 0 0 auto; width: 20px; height: 20px; color: var(--fg-faint); margin-top: 1px; }
 .step-num .fa-icon { width: 18px; height: 18px; }
 .step-row.checked .step-num { color: var(--mint); }
-.step-row.current { border-color: var(--cui-accent-tint); box-shadow: 0 0 0 1px var(--cui-accent-tint), 0 4px 14px rgba(124, 106, 247, 0.18); }
+.step-row.current { border-color: var(--cui-accent-tint); box-shadow: 0 0 0 1px var(--cui-accent-tint), 0 4px 14px color-mix(in srgb, var(--cui-accent) 18%, transparent); }
 .ing-tag { flex: 0 0 auto; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; display: inline-flex; align-items: center; gap: 4px; }
-.ing-tag.miss { background: rgba(255, 122, 122, 0.16); color: #ff9b9b; }
+.ing-tag.miss { background: color-mix(in srgb, var(--cui-error) 16%, transparent); color: var(--cui-error); }
 .ing-tag.miss .fa-icon { width: 10px; height: 10px; }
 .ing-tag.low { background: rgba(255, 184, 108, 0.16); color: var(--tangerine); }
 
@@ -2657,7 +2748,7 @@ select {
 .chef-thread { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .chef-hint { margin: 0; font-size: 13px; color: var(--fg-dim); line-height: 1.5; }
 .chef-msg { max-width: 85%; padding: 9px 12px; border-radius: 14px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
-.chef-msg.user { align-self: flex-end; background: var(--grad-primary); color: #fff; border-bottom-right-radius: 4px; }
+.chef-msg.user { align-self: flex-end; background: var(--grad-primary); color: var(--cui-on-accent); border-bottom-right-radius: 4px; }
 .chef-msg.assistant { align-self: flex-start; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
 .chef-typing { opacity: 0.7; font-style: italic; }
 .chef-input { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--border); }
@@ -2891,7 +2982,7 @@ select {
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #2a1840;
+  color: var(--cui-on-accent);
   background: var(--grad-warm);
   padding: 2px 9px;
   border-radius: 999px;
@@ -2916,7 +3007,7 @@ select {
   gap: 6px;
 }
 .shopping-progress .all-done {
-  color: #8af0dd;
+  color: var(--cui-success);
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -2948,7 +3039,7 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #2a1840;
+  color: var(--cui-on-accent);
   flex: 0 0 auto;
   transition: background 0.15s, border-color 0.15s;
 }
@@ -3089,7 +3180,7 @@ select {
   padding: 6px 12px;
   cursor: pointer;
 }
-.chip-tab.active { color: #fff; background: var(--grad-primary); border-color: transparent; }
+.chip-tab.active { color: var(--cui-on-accent); background: var(--grad-primary); border-color: transparent; }
 .chip-default {
   font-size: 10px;
   font-weight: 700;
@@ -3148,7 +3239,7 @@ select {
   cursor: pointer;
   transition: all 0.12s;
 }
-.cat-chip.on { color: #fff; background: var(--grad-primary); border-color: transparent; }
+.cat-chip.on { color: var(--cui-on-accent); background: var(--grad-primary); border-color: transparent; }
 
 .exception-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .exception-kw {
@@ -3276,8 +3367,8 @@ select {
   padding: 10px 14px;
   margin-bottom: 8px;
 }
-.username-claimed svg { width: 14px; height: 14px; color: #8af0dd; }
-.fam-error { color: #ffb0c0; font-size: 13px; margin-top: 6px; }
+.username-claimed svg { width: 14px; height: 14px; color: var(--cui-success); }
+.fam-error { color: var(--cui-error); font-size: 13px; margin-top: 6px; }
 .fam-note { color: var(--fg-dim); font-size: 13px; margin-top: 4px; }
 
 .fam-pending-tag {
@@ -3332,7 +3423,7 @@ select {
   height: 48px;
   border-radius: 14px;
   background: var(--grad-warm);
-  color: #2a1840;
+  color: var(--cui-on-accent);
 }
 .join-badge svg { width: 22px; height: 22px; }
 .join-actions { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
@@ -3366,7 +3457,7 @@ select {
   justify-content: center;
   border-radius: 10px;
   background: var(--grad-warm);
-  color: #2a1840;
+  color: var(--cui-on-accent);
 }
 .invite-banner-icon svg { width: 16px; height: 16px; }
 .invite-banner-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }

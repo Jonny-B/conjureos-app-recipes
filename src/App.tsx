@@ -19,6 +19,7 @@ import { useWhoami } from "./hooks/useWhoami";
 import { useRole } from "./hooks/useRole";
 import { Icon } from "./icons";
 import type { IconName } from "./icons";
+import { AppearanceSheet } from "./components/AppearanceSheet";
 import { APP_VERSION } from "./version";
 
 type Tab = "home" | "recipes" | "cook" | "plan" | "studio" | "admin";
@@ -92,6 +93,9 @@ export function App() {
   const [cogOpen, setCogOpen] = useState(false);
   const [plansIntent, setPlansIntent] = useState<PlansIntent | null>(null);
   const [cogExtras, setCogExtras] = useState<CogItem[]>([]);
+  // Appearance lives behind the cog rather than on a tab: it is set once and
+  // then almost never, so it should not cost a slot in a three-tab bar.
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
   const goPlans = (intent: PlansIntent) => {
     setCookTarget(null);
     setTab("plan");
@@ -290,6 +294,15 @@ export function App() {
             <button className="sheet-item" onClick={() => goPlans("stores")}>
               <Icon name="store" /> Grocery stores
             </button>
+            <button
+              className="sheet-item"
+              onClick={() => {
+                setCogOpen(false);
+                setAppearanceOpen(true);
+              }}
+            >
+              <Icon name="palette" /> Appearance
+            </button>
             {cogExtras.length > 0 && <div className="sheet-sep" />}
             {cogExtras.map((it) => (
               <button
@@ -309,6 +322,7 @@ export function App() {
           </div>
         </div>
       )}
+      {appearanceOpen && <AppearanceSheet onClose={() => setAppearanceOpen(false)} />}
       {pendingJoin && (
         <FamilyJoinPrompt
           code={pendingJoin}

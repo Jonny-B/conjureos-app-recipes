@@ -2,67 +2,1217 @@
    @conjureos/ui is a CSS-only package; ConjureOS @bundle externalizes bare
    imports to the jspm ESM CDN, which cannot serve it. So we vendor it here and
    import it by relative path (see src/main.tsx). Re-sync from the devDependency
-   when the design tokens change. */
+   when the design tokens change:
+     cp node_modules/@conjureos/ui/dist/ui.css src/conjureos-ui.css
+   src/theme.test.ts asserts this file still carries all nine palettes, so a
+   re-sync that lands an older build fails the suite instead of silently
+   flattening every theme back to one. */
 /*!
- * @conjureos/ui v0.1.2
- * Built 2026-06-04T04:38:34.268Z
- * MIT License — https://github.com/Jonny-B/conjureos-ui
+ * @conjureos/ui v1.0.3
+ * MIT License, https://github.com/Jonny-B/conjureos-ui
  */
 
 /*
- * @conjureos/ui — tokens.css
+ * @conjureos/ui - tokens.css
  *
  * Semantic design tokens for ConjureOS apps. Wrap content in
  * `.cui-tokens` (or `.cui-ui` which extends it) to pick up the
  * palette without committing to the primitive component classes.
  *
- * Tokens are organized into four buckets so apps reaching for one
- * thing don't have to read past 80 lines to find it:
+ * TWO INDEPENDENT AXES
  *
- *   1. Color (accent + neutral surfaces, dark theme as canonical)
- *   2. Typography (font stacks, sizes, weights, leading)
- *   3. Space + radius + border (the layout primitives)
- *   4. Motion (durations + easings — kept tiny, opt-in)
+ *   theme   which palette, as `data-theme`. Nine of them. Omit it and the
+ *           subtree inherits; say "system" and it returns to Conjure, the
+ *           ConjureOS default.
+ *   flavor  light or dark, as `data-flavor`. Omit it and the browser
+ *           decides.
  *
- * Dark is the canonical theme; light-theme work lives in v2.
+ * The browser is consulted for exactly one thing: light or dark. It is
+ * never asked which palette to use.
+ *
+ *   <html>                                       Conjure, browser flavor
+ *   <html data-theme="fal">                      Fall, browser flavor
+ *   <html data-theme="fal" data-flavor="light">  Fall, forced light
+ *   <div data-flavor="light">                    light, ancestor's palette
+ *   <div data-theme="system">                    back to Conjure
+ *
+ * HOW A TOKEN RESOLVES, AND WHY IT IS TWO STEPS
+ *
+ * A custom property containing var() is substituted on the element that
+ * DECLARES it, and descendants inherit the finished value. So a token
+ * written once as `var(--cui-d, dark) var(--cui-l, light)` inside a theme
+ * block can never react to a flavor set further down the tree: by the time
+ * that element exists, the value is already resolved and inherited.
+ *
+ * Tokens are therefore stored and resolved separately:
+ *
+ *   1. Each theme block declares INERT pairs, --cui-bg-d and --cui-bg-l.
+ *      Nothing reads the flavor here, so these inherit intact.
+ *   2. One resolution block, matching every element that carries a theme
+ *      or a flavor, collapses each pair to the half this flavor wants.
+ *
+ * Because step 2 re-runs wherever either attribute appears, changing just
+ * the flavor on a nested element re-resolves all 35 tokens against the
+ * palette it inherited. The deprecated aliases live in that block for the
+ * same reason.
+ *
+ * Buckets, in order:
+ *
+ *   0. Flavor switch     the inherited pair
+ *   1a. Palettes         9 themes as inert pairs
+ *   1b. Resolution       pairs collapsed, plus deprecated aliases
+ *   1c. Single-element   .cui-t-* helpers
+ *   2. Typography        font stacks, sizes, weights, leading
+ *   3. Space + radius    the layout primitives
+ *   4. Motion            durations + easings
  */
+
+/* ---- 0. Flavor switch ------------------------------------------------
+   Declared on :root, not on .cui-ui, so a nested .cui-ui inherits rather
+   than resetting. Exactly one of the pair is set; `initial` makes var()
+   fall through to its fallback, an empty value makes it collapse. */
+
+:root {
+  --cui-d: initial;
+  --cui-l: ;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --cui-d: ;
+    --cui-l: initial;
+  }
+}
+
+/* An explicit choice beats the browser, anywhere in the tree. */
+[data-flavor="dark"]  { --cui-d: initial; --cui-l: ; }
+[data-flavor="light"] { --cui-d: ;        --cui-l: initial; }
+
+/* ---- 1a. Palettes ----------------------------------------------------
+   Inert dark/light pairs. Conjure sits on :root so an app declaring no
+   theme inherits it, and on [data-theme="system"] so that value returns a
+   subtree to the ConjureOS default rather than being a silent no-op. */
+
+:root,
+[data-theme="cnj"],
+[data-theme="system"] {   /* Conjure */
+  --cui-bg-d: #0b0e14; --cui-bg-l: #f1f3f5;
+  --cui-bg-1-d: #11151d; --cui-bg-1-l: #ffffff;
+  --cui-bg-2-d: #1a1f2b; --cui-bg-2-l: #e6eaee;
+  --cui-bg-3-d: #232938; --cui-bg-3-l: #e2e6ea;
+  --cui-fg-d: #e5e9f0; --cui-fg-l: #16191f;
+  --cui-fg-mute-d: #9ca3af; --cui-fg-mute-l: #5b6472;
+  --cui-fg-dim-d: #6b7280; --cui-fg-dim-l: #8a93a3;
+  --cui-border-d: rgba(229,233,240,0.10); --cui-border-l: rgba(22,25,31,0.14);
+  --cui-border-strong-d: rgba(229,233,240,0.20); --cui-border-strong-l: rgba(22,25,31,0.26);
+  --cui-accent-d: #0f766e; --cui-accent-l: #0f766e;
+  --cui-accent-hover-d: #0c5f58; --cui-accent-hover-l: #0c5f58;
+  --cui-on-accent-d: #fff; --cui-on-accent-l: #fff;
+  --cui-link-d: #38bdf8; --cui-link-l: #0c6660;
+  --cui-link-hover-d: #38bdf8; --cui-link-hover-l: #0c6660;
+  --cui-support-d: #60a5fa; --cui-support-l: #075985;
+  --cui-support-text-d: #93c5fd; --cui-support-text-l: #075985;
+  --cui-support-tint-d: rgba(96,165,250,0.22); --cui-support-tint-l: rgba(7,89,133,0.12);
+  --cui-support-line-d: rgba(147,197,253,0.32); --cui-support-line-l: rgba(7,89,133,0.28);
+  --cui-third-d: #34d399; --cui-third-l: #036348;
+  --cui-third-text-d: #6ee7b7; --cui-third-text-l: #036348;
+  --cui-third-tint-d: rgba(52,211,153,0.20); --cui-third-tint-l: rgba(3,99,72,0.12);
+  --cui-third-line-d: rgba(110,231,183,0.30); --cui-third-line-l: rgba(3,99,72,0.28);
+  --cui-secondary-d: #3b4252; --cui-secondary-l: #e2e6ea;
+  --cui-hero-bg-d: #243b59; --cui-hero-bg-l: #dae4ea;
+  --cui-hero-fg-d: #e5e9f0; --cui-hero-fg-l: #16191f;
+  --cui-hero-mute-d: #b8c4d4; --cui-hero-mute-l: #5b6472;
+  --cui-hero-line-d: rgba(147,197,253,0.32); --cui-hero-line-l: rgba(7,89,133,0.28);
+  --cui-tile-d: rgba(15,118,110,0.62); --cui-tile-l: rgba(15,118,110,0.50);
+  --cui-tile-line-d: rgba(15,118,110,0.80); --cui-tile-line-l: rgba(15,118,110,0.68);
+  --cui-glyph-d: #7dd3fc; --cui-glyph-l: #0a4f4a;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+
+[data-theme="hal"] {   /* Halloween */
+  --cui-bg-d: #0c0b09; --cui-bg-l: #d9d1bd;
+  --cui-bg-1-d: #15140f; --cui-bg-1-l: #e7e0cf;
+  --cui-bg-2-d: #1f1d16; --cui-bg-2-l: #cdc3aa;
+  --cui-bg-3-d: #2a2820; --cui-bg-3-l: #bcb094;
+  --cui-fg-d: #f0ece2; --cui-fg-l: #1a1813;
+  --cui-fg-mute-d: #a8a294; --cui-fg-mute-l: #46412f;
+  --cui-fg-dim-d: #71695c; --cui-fg-dim-l: #857f6b;
+  --cui-border-d: rgba(240,236,226,0.10); --cui-border-l: rgba(26,24,19,0.14);
+  --cui-border-strong-d: rgba(240,236,226,0.20); --cui-border-strong-l: rgba(26,24,19,0.26);
+  --cui-accent-d: #c2410c; --cui-accent-l: #a8380a;
+  --cui-accent-hover-d: #9a3208; --cui-accent-hover-l: #8a2d08;
+  --cui-on-accent-d: #fff; --cui-on-accent-l: #fff;
+  --cui-link-d: #e8934f; --cui-link-l: #8f3208;
+  --cui-link-hover-d: #e8934f; --cui-link-hover-l: #8f3208;
+  --cui-support-d: #6d4482; --cui-support-l: #573268;
+  --cui-support-text-d: #b195c9; --cui-support-text-l: #573268;
+  --cui-support-tint-d: rgba(109,68,130,0.24); --cui-support-tint-l: rgba(87,50,104,0.12);
+  --cui-support-line-d: rgba(177,149,201,0.32); --cui-support-line-l: rgba(87,50,104,0.28);
+  --cui-third-d: #5f7a3a; --cui-third-l: #445f29;
+  --cui-third-text-d: #a3bd78; --cui-third-text-l: #3a5222;
+  --cui-third-tint-d: rgba(95,122,58,0.22); --cui-third-tint-l: rgba(68,95,41,0.12);
+  --cui-third-line-d: rgba(163,189,120,0.30); --cui-third-line-l: rgba(68,95,41,0.28);
+  --cui-secondary-d: #2a2820; --cui-secondary-l: #bcb094;
+  --cui-hero-bg-d: #4a2f56; --cui-hero-bg-l: #c7b4a8;
+  --cui-hero-fg-d: #f0ece2; --cui-hero-fg-l: #1a1813;
+  --cui-hero-mute-d: #aaa497; --cui-hero-mute-l: #4c4838;
+  --cui-hero-line-d: rgba(177,149,201,0.32); --cui-hero-line-l: rgba(115,47,74,0.30);
+  --cui-tile-d: rgba(194,65,12,0.62); --cui-tile-l: rgba(168,56,10,0.50);
+  --cui-tile-line-d: rgba(194,65,12,0.80); --cui-tile-line-l: rgba(168,56,10,0.68);
+  --cui-glyph-d: #e8934f; --cui-glyph-l: #6f2306;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+
+[data-theme="fal"] {   /* Fall */
+  --cui-bg-d: #19140f; --cui-bg-l: #f0dab0;
+  --cui-bg-1-d: #231d17; --cui-bg-1-l: #faeeda;
+  --cui-bg-2-d: #2d2621; --cui-bg-2-l: #e2c99a;
+  --cui-bg-3-d: #3d3630; --cui-bg-3-l: #d1b684;
+  --cui-fg-d: #f5efe3; --cui-fg-l: #211a11;
+  --cui-fg-mute-d: #bbae98; --cui-fg-mute-l: #585038;
+  --cui-fg-dim-d: #867a63; --cui-fg-dim-l: #918569;
+  --cui-border-d: rgba(245,239,227,0.10); --cui-border-l: rgba(33,26,17,0.14);
+  --cui-border-strong-d: rgba(245,239,227,0.20); --cui-border-strong-l: rgba(33,26,17,0.26);
+  --cui-accent-d: #c2820a; --cui-accent-l: #a35207;
+  --cui-accent-hover-d: #ad7409; --cui-accent-hover-l: #864306;
+  --cui-on-accent-d: #14100c; --cui-on-accent-l: #fff;
+  --cui-link-d: #e8b53f; --cui-link-l: #7f3e04;
+  --cui-link-hover-d: #e8b53f; --cui-link-hover-l: #7f3e04;
+  --cui-support-d: #b04728; --cui-support-l: #8a3418;
+  --cui-support-text-d: #eb9a78; --cui-support-text-l: #8a3418;
+  --cui-support-tint-d: rgba(176,71,40,0.26); --cui-support-tint-l: rgba(138,52,24,0.12);
+  --cui-support-line-d: rgba(235,154,120,0.32); --cui-support-line-l: rgba(138,52,24,0.28);
+  --cui-third-d: #2f5d3f; --cui-third-l: #245036;
+  --cui-third-text-d: #84c398; --cui-third-text-l: #245036;
+  --cui-third-tint-d: rgba(47,93,63,0.24); --cui-third-tint-l: rgba(36,80,54,0.12);
+  --cui-third-line-d: rgba(132,195,152,0.30); --cui-third-line-l: rgba(36,80,54,0.28);
+  --cui-secondary-d: #2d2621; --cui-secondary-l: #e2c99a;
+  --cui-hero-bg-d: #5b2a1a; --cui-hero-bg-l: #e0bf98;
+  --cui-hero-fg-d: #f5efe3; --cui-hero-fg-l: #211a11;
+  --cui-hero-mute-d: #bbae98; --cui-hero-mute-l: #585038;
+  --cui-hero-line-d: rgba(235,154,120,0.32); --cui-hero-line-l: rgba(138,52,24,0.28);
+  --cui-tile-d: rgba(194,130,10,0.52); --cui-tile-l: rgba(163,82,7,0.62);
+  --cui-tile-line-d: rgba(194,130,10,0.70); --cui-tile-line-l: rgba(163,82,7,0.80);
+  --cui-glyph-d: #e8b53f; --cui-glyph-l: #672f04;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+
+[data-theme="win"] {   /* Winter */
+  --cui-bg-d: #0a1d26; --cui-bg-l: #e6ecf4;
+  --cui-bg-1-d: #12262f; --cui-bg-1-l: #f8fafd;
+  --cui-bg-2-d: #1b323d; --cui-bg-2-l: #d3dce8;
+  --cui-bg-3-d: #27414e; --cui-bg-3-l: #bec9d8;
+  --cui-fg-d: #eef2f7; --cui-fg-l: #111820;
+  --cui-fg-mute-d: #9fabb9; --cui-fg-mute-l: #4f5b68;
+  --cui-fg-dim-d: #6d7886; --cui-fg-dim-l: #7d8894;
+  --cui-border-d: rgba(238,242,247,0.10); --cui-border-l: rgba(17,24,32,0.14);
+  --cui-border-strong-d: rgba(238,242,247,0.20); --cui-border-strong-l: rgba(17,24,32,0.26);
+  --cui-accent-d: #4a90b8; --cui-accent-l: #2b6d92;
+  --cui-accent-hover-d: #5a9fc6; --cui-accent-hover-l: #225874;
+  --cui-on-accent-d: #0a0f14; --cui-on-accent-l: #fff;
+  --cui-link-d: #7cc0e0; --cui-link-l: #245f80;
+  --cui-link-hover-d: #7cc0e0; --cui-link-hover-l: #245f80;
+  --cui-support-d: #3f4894; --cui-support-l: #3a3f80;
+  --cui-support-text-d: #9fa3e8; --cui-support-text-l: #3a3f80;
+  --cui-support-tint-d: rgba(63,72,148,0.28); --cui-support-tint-l: rgba(58,63,128,0.13);
+  --cui-support-line-d: rgba(159,163,232,0.32); --cui-support-line-l: rgba(58,63,128,0.28);
+  --cui-third-d: #a34a5e; --cui-third-l: #8e3a4e;
+  --cui-third-text-d: #eb96a8; --cui-third-text-l: #8e3a4e;
+  --cui-third-tint-d: rgba(163,74,94,0.24); --cui-third-tint-l: rgba(142,58,78,0.12);
+  --cui-third-line-d: rgba(235,150,168,0.30); --cui-third-line-l: rgba(142,58,78,0.28);
+  --cui-secondary-d: #34515f; --cui-secondary-l: #d3dce8;
+  --cui-hero-bg-d: #2b386a; --cui-hero-bg-l: #ccd2e3;
+  --cui-hero-fg-d: #eef2f7; --cui-hero-fg-l: #111820;
+  --cui-hero-mute-d: #9fabb9; --cui-hero-mute-l: #4f5b67;
+  --cui-hero-line-d: rgba(159,163,232,0.32); --cui-hero-line-l: rgba(58,63,128,0.28);
+  --cui-tile-d: rgba(74,144,184,0.58); --cui-tile-l: rgba(43,109,146,0.56);
+  --cui-tile-line-d: rgba(74,144,184,0.76); --cui-tile-line-l: rgba(43,109,146,0.74);
+  --cui-glyph-d: #9ad2ec; --cui-glyph-l: #173e54;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+
+[data-theme="spr"] {   /* Spring */
+  --cui-bg-d: #131a17; --cui-bg-l: #ebf1e6;
+  --cui-bg-1-d: #1c2620; --cui-bg-1-l: #f9fbf7;
+  --cui-bg-2-d: #27342c; --cui-bg-2-l: #dae4d3;
+  --cui-bg-3-d: #35453a; --cui-bg-3-l: #c7d4bd;
+  --cui-fg-d: #f0f4ea; --cui-fg-l: #131810;
+  --cui-fg-mute-d: #a8b39c; --cui-fg-mute-l: #4f5a46;
+  --cui-fg-dim-d: #74806a; --cui-fg-dim-l: #7d8874;
+  --cui-border-d: rgba(240,244,234,0.10); --cui-border-l: rgba(19,24,16,0.14);
+  --cui-border-strong-d: rgba(240,244,234,0.20); --cui-border-strong-l: rgba(19,24,16,0.26);
+  --cui-accent-d: #6aa32e; --cui-accent-l: #47801a;
+  --cui-accent-hover-d: #5f9427; --cui-accent-hover-l: #3a690f;
+  --cui-on-accent-d: #0d1108; --cui-on-accent-l: #fff;
+  --cui-link-d: #a8d95f; --cui-link-l: #3d6d16;
+  --cui-link-hover-d: #a8d95f; --cui-link-hover-l: #3d6d16;
+  --cui-support-d: #c4629b; --cui-support-l: #a53d7a;
+  --cui-support-text-d: #f0a8cc; --cui-support-text-l: #a53d7a;
+  --cui-support-tint-d: rgba(196,98,155,0.26); --cui-support-tint-l: rgba(165,61,122,0.12);
+  --cui-support-line-d: rgba(240,168,204,0.32); --cui-support-line-l: rgba(165,61,122,0.28);
+  --cui-third-d: #e0c33f; --cui-third-l: #705708;
+  --cui-third-text-d: #f2d878; --cui-third-text-l: #705708;
+  --cui-third-tint-d: rgba(224,195,63,0.22); --cui-third-tint-l: rgba(112,87,8,0.12);
+  --cui-third-line-d: rgba(242,216,120,0.30); --cui-third-line-l: rgba(112,87,8,0.28);
+  --cui-secondary-d: #445748; --cui-secondary-l: #dae4d3;
+  --cui-hero-bg-d: #613a51; --cui-hero-bg-l: #e0d6d6;
+  --cui-hero-fg-d: #f0f4ea; --cui-hero-fg-l: #131810;
+  --cui-hero-mute-d: #afb9a3; --cui-hero-mute-l: #4f5a46;
+  --cui-hero-line-d: rgba(240,168,204,0.32); --cui-hero-line-l: rgba(165,61,122,0.28);
+  --cui-tile-d: rgba(106,163,46,0.62); --cui-tile-l: rgba(71,128,26,0.60);
+  --cui-tile-line-d: rgba(106,163,46,0.80); --cui-tile-line-l: rgba(71,128,26,0.78);
+  --cui-glyph-d: #c0e884; --cui-glyph-l: #28480e;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+
+[data-theme="sum"] {   /* Summer */
+  --cui-bg-d: #123434; --cui-bg-l: #dff3ef;
+  --cui-bg-1-d: #1a4242; --cui-bg-1-l: #f0faf7;
+  --cui-bg-2-d: #245252; --cui-bg-2-l: #d4ebe6;
+  --cui-bg-3-d: #2b5b5d; --cui-bg-3-l: #c0ded6;
+  --cui-fg-d: #eaf7f6; --cui-fg-l: #1a1610;
+  --cui-fg-mute-d: #b3cdcc; --cui-fg-mute-l: #5a5346;
+  --cui-fg-dim-d: #86a3a1; --cui-fg-dim-l: #8a8375;
+  --cui-border-d: rgba(234,247,246,0.10); --cui-border-l: rgba(26,22,16,0.14);
+  --cui-border-strong-d: rgba(234,247,246,0.20); --cui-border-strong-l: rgba(26,22,16,0.26);
+  --cui-accent-d: #43b5b2; --cui-accent-l: #1d6764;
+  --cui-accent-hover-d: #35938f; --cui-accent-hover-l: #175553;
+  --cui-on-accent-d: #04161a; --cui-on-accent-l: #fff;
+  --cui-link-d: #7cd6d3; --cui-link-l: #175553;
+  --cui-link-hover-d: #7cd6d3; --cui-link-hover-l: #175553;
+  --cui-support-d: #e88b6f; --cui-support-l: #a4482c;
+  --cui-support-text-d: #ffc6b0; --cui-support-text-l: #8f3d24;
+  --cui-support-tint-d: #4a352c; --cui-support-tint-l: rgba(164,72,44,0.12);
+  --cui-support-line-d: rgba(255,198,176,0.32); --cui-support-line-l: rgba(164,72,44,0.28);
+  --cui-third-d: #0f7ec1; --cui-third-l: #035996;
+  --cui-third-text-d: #7cc4ee; --cui-third-text-l: #035996;
+  --cui-third-tint-d: rgba(15,126,193,0.26); --cui-third-tint-l: rgba(3,89,150,0.12);
+  --cui-third-line-d: rgba(124,196,238,0.30); --cui-third-line-l: rgba(3,89,150,0.28);
+  --cui-secondary-d: #245252; --cui-secondary-l: #d4ebe6;
+  --cui-hero-bg-d: #c67d66; --cui-hero-bg-l: #e8cfbe;
+  --cui-hero-fg-d: #1a0e08; --cui-hero-fg-l: #1a1610;
+  --cui-hero-mute-d: #37231c; --cui-hero-mute-l: #5a5346;
+  --cui-hero-line-d: rgba(255,198,176,0.40); --cui-hero-line-l: rgba(164,72,44,0.28);
+  --cui-tile-d: #1d6764; --cui-tile-l: rgba(29,103,100,0.50);
+  --cui-tile-line-d: #175553; --cui-tile-line-l: rgba(29,103,100,0.68);
+  --cui-glyph-d: #d6f4f2; --cui-glyph-l: #124240;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #fca5a5; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+
+[data-theme="xms"] {   /* Christmas */
+  --cui-bg-d: #0e1f14; --cui-bg-l: #d6e5cf;
+  --cui-bg-1-d: #16291c; --cui-bg-1-l: #eaf2e5;
+  --cui-bg-2-d: #1f3726; --cui-bg-2-l: #c2d6b8;
+  --cui-bg-3-d: #2b4832; --cui-bg-3-l: #adc7a1;
+  --cui-fg-d: #f2f5ef; --cui-fg-l: #131a10;
+  --cui-fg-mute-d: #a8bcac; --cui-fg-mute-l: #44503f;
+  --cui-fg-dim-d: #7a8d7e; --cui-fg-dim-l: #7e8879;
+  --cui-border-d: rgba(242,245,239,0.10); --cui-border-l: rgba(19,26,16,0.14);
+  --cui-border-strong-d: rgba(242,245,239,0.20); --cui-border-strong-l: rgba(19,26,16,0.26);
+  --cui-accent-d: #ce2229; --cui-accent-l: #ce2229;
+  --cui-accent-hover-d: #a81a20; --cui-accent-hover-l: #a81a20;
+  --cui-on-accent-d: #fff; --cui-on-accent-l: #fff;
+  --cui-link-d: #f89a86; --cui-link-l: #9e2318;
+  --cui-link-hover-d: #f89a86; --cui-link-hover-l: #9e2318;
+  --cui-support-d: #ce2229; --cui-support-l: #ce2229;
+  --cui-support-text-d: #f89a86; --cui-support-text-l: #9e2318;
+  --cui-support-tint-d: rgba(206,34,41,0.26); --cui-support-tint-l: rgba(206,34,41,0.14);
+  --cui-support-line-d: rgba(248,154,134,0.32); --cui-support-line-l: rgba(206,34,41,0.28);
+  --cui-third-d: #a0c356; --cui-third-l: #a0c356;
+  --cui-third-text-d: #bcd97e; --cui-third-text-l: #3d5c14;
+  --cui-third-tint-d: rgba(160,195,86,0.28); --cui-third-tint-l: rgba(160,195,86,0.45);
+  --cui-third-line-d: rgba(188,217,126,0.30); --cui-third-line-l: rgba(125,164,58,0.40);
+  --cui-secondary-d: #1f3726; --cui-secondary-l: #c2d6b8;
+  --cui-hero-bg-d: #7d1a18; --cui-hero-bg-l: #f0bcb2;
+  --cui-hero-fg-d: #f2f5ef; --cui-hero-fg-l: #131a10;
+  --cui-hero-mute-d: #e8b9ae; --cui-hero-mute-l: #6e4a42;
+  --cui-hero-line-d: rgba(248,154,134,0.34); --cui-hero-line-l: rgba(206,34,41,0.30);
+  --cui-tile-d: #8f7219; --cui-tile-l: #b08c1f;
+  --cui-tile-line-d: #a8871f; --cui-tile-line-l: #c9a227;
+  --cui-glyph-d: #2b1a05; --cui-glyph-l: #3d2f07;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+
+[data-theme="est"] {   /* Easter */
+  --cui-bg-d: #1c1524; --cui-bg-l: #d9eeed;
+  --cui-bg-1-d: #271e31; --cui-bg-1-l: #eef8f7;
+  --cui-bg-2-d: #352a41; --cui-bg-2-l: #c3e2e0;
+  --cui-bg-3-d: #453855; --cui-bg-3-l: #a9d3d1;
+  --cui-fg-d: #f4eff7; --cui-fg-l: #12191a;
+  --cui-fg-mute-d: #b6acbe; --cui-fg-mute-l: #4b5757;
+  --cui-fg-dim-d: #8f8697; --cui-fg-dim-l: #7b8686;
+  --cui-border-d: rgba(244,239,247,0.10); --cui-border-l: rgba(18,25,26,0.14);
+  --cui-border-strong-d: rgba(244,239,247,0.20); --cui-border-strong-l: rgba(18,25,26,0.26);
+  --cui-accent-d: #ae71d4; --cui-accent-l: #9e4aa6;
+  --cui-accent-hover-d: #bd86dd; --cui-accent-hover-l: #843d8b;
+  --cui-on-accent-d: #170f1c; --cui-on-accent-l: #fff;
+  --cui-link-d: #d4aeee; --cui-link-l: #8a3d92;
+  --cui-link-hover-d: #d4aeee; --cui-link-hover-l: #8a3d92;
+  --cui-support-d: #febfd0; --cui-support-l: #febfd0;
+  --cui-support-text-d: #f7c7d6; --cui-support-text-l: #9c3357;
+  --cui-support-tint-d: rgba(254,191,208,0.30); --cui-support-tint-l: rgba(254,191,208,0.34);
+  --cui-support-line-d: rgba(247,199,214,0.32); --cui-support-line-l: rgba(156,51,87,0.30);
+  --cui-third-d: #fbf49a; --cui-third-l: #fbf49a;
+  --cui-third-text-d: #f7ef9a; --cui-third-text-l: #6b5d07;
+  --cui-third-tint-d: rgba(251,244,154,0.26); --cui-third-tint-l: rgba(251,244,154,0.34);
+  --cui-third-line-d: rgba(247,239,154,0.30); --cui-third-line-l: rgba(107,93,7,0.30);
+  --cui-secondary-d: #352a41; --cui-secondary-l: #c3e2e0;
+  --cui-hero-bg-d: #644b5b; --cui-hero-bg-l: #efd2dc;
+  --cui-hero-fg-d: #f4eff7; --cui-hero-fg-l: #12191a;
+  --cui-hero-mute-d: #ccc5d2; --cui-hero-mute-l: #4b5757;
+  --cui-hero-line-d: rgba(247,199,214,0.32); --cui-hero-line-l: rgba(156,51,87,0.28);
+  --cui-tile-d: #9564ab; --cui-tile-l: #c286be;
+  --cui-tile-line-d: #a878bd; --cui-tile-line-l: #cf9bcb;
+  --cui-glyph-d: #e4cbf5; --cui-glyph-l: #742f7b;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+
+[data-theme="cnd"] {   /* Candyland */
+  --cui-bg-d: #2d0a1e; --cui-bg-l: #ffd6e6;
+  --cui-bg-1-d: #3a1128; --cui-bg-1-l: #fff0f6;
+  --cui-bg-2-d: #4a1a35; --cui-bg-2-l: #fbbcd6;
+  --cui-bg-3-d: #5d2444; --cui-bg-3-l: #f5a2c4;
+  --cui-fg-d: #f8eef4; --cui-fg-l: #1a1016;
+  --cui-fg-mute-d: #c0a8b6; --cui-fg-mute-l: #5f4b55;
+  --cui-fg-dim-d: #8f7a86; --cui-fg-dim-l: #8d7883;
+  --cui-border-d: rgba(248,238,244,0.10); --cui-border-l: rgba(26,16,22,0.14);
+  --cui-border-strong-d: rgba(248,238,244,0.20); --cui-border-strong-l: rgba(26,16,22,0.26);
+  --cui-accent-d: #ff70a6; --cui-accent-l: #d1207a;
+  --cui-accent-hover-d: #e04a86; --cui-accent-hover-l: #b31a68;
+  --cui-on-accent-d: #2a0715; --cui-on-accent-l: #fff;
+  --cui-link-d: #ffa3c6; --cui-link-l: #a0175c;
+  --cui-link-hover-d: #ffa3c6; --cui-link-hover-l: #a0175c;
+  --cui-support-d: #4ee9e9; --cui-support-l: #4ee9e9;
+  --cui-support-text-d: #8ff2f2; --cui-support-text-l: #096e6e;
+  --cui-support-tint-d: #14454d; --cui-support-tint-l: #b5eef1;
+  --cui-support-line-d: #1d6b76; --cui-support-line-l: #7fd8dc;
+  --cui-third-d: #e9ff70; --cui-third-l: #e9ff70;
+  --cui-third-text-d: #e9ff70; --cui-third-text-l: #4f5804;
+  --cui-third-tint-d: #354715; --cui-third-tint-l: #e2f2a0;
+  --cui-third-line-d: #4a6420; --cui-third-line-l: #c8dc78;
+  --cui-secondary-d: #4a1a35; --cui-secondary-l: #fbbcd6;
+  --cui-hero-bg-d: #0f5560; --cui-hero-bg-l: #93e2e7;
+  --cui-hero-fg-d: #f8eef4; --cui-hero-fg-l: #1a1016;
+  --cui-hero-mute-d: #a8d4da; --cui-hero-mute-l: #3f5457;
+  --cui-hero-line-d: #2a939b; --cui-hero-line-l: #4bb8bf;
+  --cui-tile-d: #d6538c; --cui-tile-l: #e0448a;
+  --cui-tile-line-d: #e26196; --cui-tile-line-l: #ee6ba1;
+  --cui-glyph-d: #2a0817; --cui-glyph-l: #ffe0ee;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+
+/* ---- 1b. Resolution --------------------------------------------------
+   Runs on the root and on every element carrying either attribute, so a
+   change to either one re-resolves the whole set against whatever palette
+   that element inherited. */
+
+:root,
+[data-theme],
+[data-flavor],
+.cui-t-cnj-d,
+.cui-t-cnj-l,
+.cui-t-hal-d,
+.cui-t-hal-l,
+.cui-t-fal-d,
+.cui-t-fal-l,
+.cui-t-win-d,
+.cui-t-win-l,
+.cui-t-spr-d,
+.cui-t-spr-l,
+.cui-t-sum-d,
+.cui-t-sum-l,
+.cui-t-xms-d,
+.cui-t-xms-l,
+.cui-t-est-d,
+.cui-t-est-l,
+.cui-t-cnd-d,
+.cui-t-cnd-l {
+  color-scheme: var(--cui-d, dark) var(--cui-l, light);
+  --cui-bg: var(--cui-d, var(--cui-bg-d)) var(--cui-l, var(--cui-bg-l));
+  --cui-bg-1: var(--cui-d, var(--cui-bg-1-d)) var(--cui-l, var(--cui-bg-1-l));
+  --cui-bg-2: var(--cui-d, var(--cui-bg-2-d)) var(--cui-l, var(--cui-bg-2-l));
+  --cui-bg-3: var(--cui-d, var(--cui-bg-3-d)) var(--cui-l, var(--cui-bg-3-l));
+  --cui-fg: var(--cui-d, var(--cui-fg-d)) var(--cui-l, var(--cui-fg-l));
+  --cui-fg-mute: var(--cui-d, var(--cui-fg-mute-d)) var(--cui-l, var(--cui-fg-mute-l));
+  --cui-fg-dim: var(--cui-d, var(--cui-fg-dim-d)) var(--cui-l, var(--cui-fg-dim-l));
+  --cui-border: var(--cui-d, var(--cui-border-d)) var(--cui-l, var(--cui-border-l));
+  --cui-border-strong: var(--cui-d, var(--cui-border-strong-d)) var(--cui-l, var(--cui-border-strong-l));
+  --cui-accent: var(--cui-d, var(--cui-accent-d)) var(--cui-l, var(--cui-accent-l));
+  --cui-accent-hover: var(--cui-d, var(--cui-accent-hover-d)) var(--cui-l, var(--cui-accent-hover-l));
+  --cui-on-accent: var(--cui-d, var(--cui-on-accent-d)) var(--cui-l, var(--cui-on-accent-l));
+  --cui-link: var(--cui-d, var(--cui-link-d)) var(--cui-l, var(--cui-link-l));
+  --cui-link-hover: var(--cui-d, var(--cui-link-hover-d)) var(--cui-l, var(--cui-link-hover-l));
+  --cui-support: var(--cui-d, var(--cui-support-d)) var(--cui-l, var(--cui-support-l));
+  --cui-support-text: var(--cui-d, var(--cui-support-text-d)) var(--cui-l, var(--cui-support-text-l));
+  --cui-support-tint: var(--cui-d, var(--cui-support-tint-d)) var(--cui-l, var(--cui-support-tint-l));
+  --cui-support-line: var(--cui-d, var(--cui-support-line-d)) var(--cui-l, var(--cui-support-line-l));
+  --cui-third: var(--cui-d, var(--cui-third-d)) var(--cui-l, var(--cui-third-l));
+  --cui-third-text: var(--cui-d, var(--cui-third-text-d)) var(--cui-l, var(--cui-third-text-l));
+  --cui-third-tint: var(--cui-d, var(--cui-third-tint-d)) var(--cui-l, var(--cui-third-tint-l));
+  --cui-third-line: var(--cui-d, var(--cui-third-line-d)) var(--cui-l, var(--cui-third-line-l));
+  --cui-secondary: var(--cui-d, var(--cui-secondary-d)) var(--cui-l, var(--cui-secondary-l));
+  --cui-hero-bg: var(--cui-d, var(--cui-hero-bg-d)) var(--cui-l, var(--cui-hero-bg-l));
+  --cui-hero-fg: var(--cui-d, var(--cui-hero-fg-d)) var(--cui-l, var(--cui-hero-fg-l));
+  --cui-hero-mute: var(--cui-d, var(--cui-hero-mute-d)) var(--cui-l, var(--cui-hero-mute-l));
+  --cui-hero-line: var(--cui-d, var(--cui-hero-line-d)) var(--cui-l, var(--cui-hero-line-l));
+  --cui-tile: var(--cui-d, var(--cui-tile-d)) var(--cui-l, var(--cui-tile-l));
+  --cui-tile-line: var(--cui-d, var(--cui-tile-line-d)) var(--cui-l, var(--cui-tile-line-l));
+  --cui-glyph: var(--cui-d, var(--cui-glyph-d)) var(--cui-l, var(--cui-glyph-l));
+  --cui-success: var(--cui-d, var(--cui-success-d)) var(--cui-l, var(--cui-success-l));
+  --cui-warning: var(--cui-d, var(--cui-warning-d)) var(--cui-l, var(--cui-warning-l));
+  --cui-error: var(--cui-d, var(--cui-error-d)) var(--cui-l, var(--cui-error-l));
+  --cui-info: var(--cui-d, var(--cui-info-d)) var(--cui-l, var(--cui-info-l));
+  --cui-onstatus: var(--cui-d, var(--cui-onstatus-d)) var(--cui-l, var(--cui-onstatus-l));
+
+  /* Deprecated, removed in 2.0. They live in this block rather than a bare
+     :root so they re-resolve per theme; declared once at the root they would
+     substitute against Conjure and inherit that frozen value everywhere. */
+  --cui-accent-soft:       var(--cui-link);
+  --cui-accent-mute:       var(--cui-support-tint);
+  --cui-accent-tint:       var(--cui-support-line);
+  --cui-accent-pink:       var(--cui-third);
+  --cui-warn:              var(--cui-warning);
+  --cui-danger:            var(--cui-error);
+  --cui-danger-hover:      var(--cui-error);
+  --cui-warning-hover:     var(--cui-warning);
+  --cui-info-strong:       var(--cui-info);
+  --cui-info-strong-hover: var(--cui-info);
+  --cui-secondary-hover:   var(--cui-bg-3);
+  --cui-surface:           var(--cui-bg-1);
+  --cui-surface-2:         var(--cui-bg-2);
+  --cui-surface-hover:     var(--cui-d, rgba(255,255,255,0.06)) var(--cui-l, rgba(0,0,0,0.05));
+  --cui-accent-gradient:   var(--cui-accent);
+  --cui-brand-gradient:    var(--cui-accent);
+}
+
+/* ---- 1c. Single-element theming ---------------------------------------
+   Theme one button, one card or one route without adopting a theme for the
+   whole app. They pin the flavor deliberately, which is right for a
+   decorative one-off and wrong for an app. Resolution is handled by the
+   block above, which lists these selectors. */
+.cui-t-cnj-d {
+  --cui-d: initial; --cui-l: ;
+  --cui-bg-d: #0b0e14; --cui-bg-l: #f1f3f5;
+  --cui-bg-1-d: #11151d; --cui-bg-1-l: #ffffff;
+  --cui-bg-2-d: #1a1f2b; --cui-bg-2-l: #e6eaee;
+  --cui-bg-3-d: #232938; --cui-bg-3-l: #e2e6ea;
+  --cui-fg-d: #e5e9f0; --cui-fg-l: #16191f;
+  --cui-fg-mute-d: #9ca3af; --cui-fg-mute-l: #5b6472;
+  --cui-fg-dim-d: #6b7280; --cui-fg-dim-l: #8a93a3;
+  --cui-border-d: rgba(229,233,240,0.10); --cui-border-l: rgba(22,25,31,0.14);
+  --cui-border-strong-d: rgba(229,233,240,0.20); --cui-border-strong-l: rgba(22,25,31,0.26);
+  --cui-accent-d: #0f766e; --cui-accent-l: #0f766e;
+  --cui-accent-hover-d: #0c5f58; --cui-accent-hover-l: #0c5f58;
+  --cui-on-accent-d: #fff; --cui-on-accent-l: #fff;
+  --cui-link-d: #38bdf8; --cui-link-l: #0c6660;
+  --cui-link-hover-d: #38bdf8; --cui-link-hover-l: #0c6660;
+  --cui-support-d: #60a5fa; --cui-support-l: #075985;
+  --cui-support-text-d: #93c5fd; --cui-support-text-l: #075985;
+  --cui-support-tint-d: rgba(96,165,250,0.22); --cui-support-tint-l: rgba(7,89,133,0.12);
+  --cui-support-line-d: rgba(147,197,253,0.32); --cui-support-line-l: rgba(7,89,133,0.28);
+  --cui-third-d: #34d399; --cui-third-l: #036348;
+  --cui-third-text-d: #6ee7b7; --cui-third-text-l: #036348;
+  --cui-third-tint-d: rgba(52,211,153,0.20); --cui-third-tint-l: rgba(3,99,72,0.12);
+  --cui-third-line-d: rgba(110,231,183,0.30); --cui-third-line-l: rgba(3,99,72,0.28);
+  --cui-secondary-d: #3b4252; --cui-secondary-l: #e2e6ea;
+  --cui-hero-bg-d: #243b59; --cui-hero-bg-l: #dae4ea;
+  --cui-hero-fg-d: #e5e9f0; --cui-hero-fg-l: #16191f;
+  --cui-hero-mute-d: #b8c4d4; --cui-hero-mute-l: #5b6472;
+  --cui-hero-line-d: rgba(147,197,253,0.32); --cui-hero-line-l: rgba(7,89,133,0.28);
+  --cui-tile-d: rgba(15,118,110,0.62); --cui-tile-l: rgba(15,118,110,0.50);
+  --cui-tile-line-d: rgba(15,118,110,0.80); --cui-tile-line-l: rgba(15,118,110,0.68);
+  --cui-glyph-d: #7dd3fc; --cui-glyph-l: #0a4f4a;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+.cui-t-cnj-l {
+  --cui-d: ; --cui-l: initial;
+  --cui-bg-d: #0b0e14; --cui-bg-l: #f1f3f5;
+  --cui-bg-1-d: #11151d; --cui-bg-1-l: #ffffff;
+  --cui-bg-2-d: #1a1f2b; --cui-bg-2-l: #e6eaee;
+  --cui-bg-3-d: #232938; --cui-bg-3-l: #e2e6ea;
+  --cui-fg-d: #e5e9f0; --cui-fg-l: #16191f;
+  --cui-fg-mute-d: #9ca3af; --cui-fg-mute-l: #5b6472;
+  --cui-fg-dim-d: #6b7280; --cui-fg-dim-l: #8a93a3;
+  --cui-border-d: rgba(229,233,240,0.10); --cui-border-l: rgba(22,25,31,0.14);
+  --cui-border-strong-d: rgba(229,233,240,0.20); --cui-border-strong-l: rgba(22,25,31,0.26);
+  --cui-accent-d: #0f766e; --cui-accent-l: #0f766e;
+  --cui-accent-hover-d: #0c5f58; --cui-accent-hover-l: #0c5f58;
+  --cui-on-accent-d: #fff; --cui-on-accent-l: #fff;
+  --cui-link-d: #38bdf8; --cui-link-l: #0c6660;
+  --cui-link-hover-d: #38bdf8; --cui-link-hover-l: #0c6660;
+  --cui-support-d: #60a5fa; --cui-support-l: #075985;
+  --cui-support-text-d: #93c5fd; --cui-support-text-l: #075985;
+  --cui-support-tint-d: rgba(96,165,250,0.22); --cui-support-tint-l: rgba(7,89,133,0.12);
+  --cui-support-line-d: rgba(147,197,253,0.32); --cui-support-line-l: rgba(7,89,133,0.28);
+  --cui-third-d: #34d399; --cui-third-l: #036348;
+  --cui-third-text-d: #6ee7b7; --cui-third-text-l: #036348;
+  --cui-third-tint-d: rgba(52,211,153,0.20); --cui-third-tint-l: rgba(3,99,72,0.12);
+  --cui-third-line-d: rgba(110,231,183,0.30); --cui-third-line-l: rgba(3,99,72,0.28);
+  --cui-secondary-d: #3b4252; --cui-secondary-l: #e2e6ea;
+  --cui-hero-bg-d: #243b59; --cui-hero-bg-l: #dae4ea;
+  --cui-hero-fg-d: #e5e9f0; --cui-hero-fg-l: #16191f;
+  --cui-hero-mute-d: #b8c4d4; --cui-hero-mute-l: #5b6472;
+  --cui-hero-line-d: rgba(147,197,253,0.32); --cui-hero-line-l: rgba(7,89,133,0.28);
+  --cui-tile-d: rgba(15,118,110,0.62); --cui-tile-l: rgba(15,118,110,0.50);
+  --cui-tile-line-d: rgba(15,118,110,0.80); --cui-tile-line-l: rgba(15,118,110,0.68);
+  --cui-glyph-d: #7dd3fc; --cui-glyph-l: #0a4f4a;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+.cui-t-hal-d {
+  --cui-d: initial; --cui-l: ;
+  --cui-bg-d: #0c0b09; --cui-bg-l: #d9d1bd;
+  --cui-bg-1-d: #15140f; --cui-bg-1-l: #e7e0cf;
+  --cui-bg-2-d: #1f1d16; --cui-bg-2-l: #cdc3aa;
+  --cui-bg-3-d: #2a2820; --cui-bg-3-l: #bcb094;
+  --cui-fg-d: #f0ece2; --cui-fg-l: #1a1813;
+  --cui-fg-mute-d: #a8a294; --cui-fg-mute-l: #46412f;
+  --cui-fg-dim-d: #71695c; --cui-fg-dim-l: #857f6b;
+  --cui-border-d: rgba(240,236,226,0.10); --cui-border-l: rgba(26,24,19,0.14);
+  --cui-border-strong-d: rgba(240,236,226,0.20); --cui-border-strong-l: rgba(26,24,19,0.26);
+  --cui-accent-d: #c2410c; --cui-accent-l: #a8380a;
+  --cui-accent-hover-d: #9a3208; --cui-accent-hover-l: #8a2d08;
+  --cui-on-accent-d: #fff; --cui-on-accent-l: #fff;
+  --cui-link-d: #e8934f; --cui-link-l: #8f3208;
+  --cui-link-hover-d: #e8934f; --cui-link-hover-l: #8f3208;
+  --cui-support-d: #6d4482; --cui-support-l: #573268;
+  --cui-support-text-d: #b195c9; --cui-support-text-l: #573268;
+  --cui-support-tint-d: rgba(109,68,130,0.24); --cui-support-tint-l: rgba(87,50,104,0.12);
+  --cui-support-line-d: rgba(177,149,201,0.32); --cui-support-line-l: rgba(87,50,104,0.28);
+  --cui-third-d: #5f7a3a; --cui-third-l: #445f29;
+  --cui-third-text-d: #a3bd78; --cui-third-text-l: #3a5222;
+  --cui-third-tint-d: rgba(95,122,58,0.22); --cui-third-tint-l: rgba(68,95,41,0.12);
+  --cui-third-line-d: rgba(163,189,120,0.30); --cui-third-line-l: rgba(68,95,41,0.28);
+  --cui-secondary-d: #2a2820; --cui-secondary-l: #bcb094;
+  --cui-hero-bg-d: #4a2f56; --cui-hero-bg-l: #c7b4a8;
+  --cui-hero-fg-d: #f0ece2; --cui-hero-fg-l: #1a1813;
+  --cui-hero-mute-d: #aaa497; --cui-hero-mute-l: #4c4838;
+  --cui-hero-line-d: rgba(177,149,201,0.32); --cui-hero-line-l: rgba(115,47,74,0.30);
+  --cui-tile-d: rgba(194,65,12,0.62); --cui-tile-l: rgba(168,56,10,0.50);
+  --cui-tile-line-d: rgba(194,65,12,0.80); --cui-tile-line-l: rgba(168,56,10,0.68);
+  --cui-glyph-d: #e8934f; --cui-glyph-l: #6f2306;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+.cui-t-hal-l {
+  --cui-d: ; --cui-l: initial;
+  --cui-bg-d: #0c0b09; --cui-bg-l: #d9d1bd;
+  --cui-bg-1-d: #15140f; --cui-bg-1-l: #e7e0cf;
+  --cui-bg-2-d: #1f1d16; --cui-bg-2-l: #cdc3aa;
+  --cui-bg-3-d: #2a2820; --cui-bg-3-l: #bcb094;
+  --cui-fg-d: #f0ece2; --cui-fg-l: #1a1813;
+  --cui-fg-mute-d: #a8a294; --cui-fg-mute-l: #46412f;
+  --cui-fg-dim-d: #71695c; --cui-fg-dim-l: #857f6b;
+  --cui-border-d: rgba(240,236,226,0.10); --cui-border-l: rgba(26,24,19,0.14);
+  --cui-border-strong-d: rgba(240,236,226,0.20); --cui-border-strong-l: rgba(26,24,19,0.26);
+  --cui-accent-d: #c2410c; --cui-accent-l: #a8380a;
+  --cui-accent-hover-d: #9a3208; --cui-accent-hover-l: #8a2d08;
+  --cui-on-accent-d: #fff; --cui-on-accent-l: #fff;
+  --cui-link-d: #e8934f; --cui-link-l: #8f3208;
+  --cui-link-hover-d: #e8934f; --cui-link-hover-l: #8f3208;
+  --cui-support-d: #6d4482; --cui-support-l: #573268;
+  --cui-support-text-d: #b195c9; --cui-support-text-l: #573268;
+  --cui-support-tint-d: rgba(109,68,130,0.24); --cui-support-tint-l: rgba(87,50,104,0.12);
+  --cui-support-line-d: rgba(177,149,201,0.32); --cui-support-line-l: rgba(87,50,104,0.28);
+  --cui-third-d: #5f7a3a; --cui-third-l: #445f29;
+  --cui-third-text-d: #a3bd78; --cui-third-text-l: #3a5222;
+  --cui-third-tint-d: rgba(95,122,58,0.22); --cui-third-tint-l: rgba(68,95,41,0.12);
+  --cui-third-line-d: rgba(163,189,120,0.30); --cui-third-line-l: rgba(68,95,41,0.28);
+  --cui-secondary-d: #2a2820; --cui-secondary-l: #bcb094;
+  --cui-hero-bg-d: #4a2f56; --cui-hero-bg-l: #c7b4a8;
+  --cui-hero-fg-d: #f0ece2; --cui-hero-fg-l: #1a1813;
+  --cui-hero-mute-d: #aaa497; --cui-hero-mute-l: #4c4838;
+  --cui-hero-line-d: rgba(177,149,201,0.32); --cui-hero-line-l: rgba(115,47,74,0.30);
+  --cui-tile-d: rgba(194,65,12,0.62); --cui-tile-l: rgba(168,56,10,0.50);
+  --cui-tile-line-d: rgba(194,65,12,0.80); --cui-tile-line-l: rgba(168,56,10,0.68);
+  --cui-glyph-d: #e8934f; --cui-glyph-l: #6f2306;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+.cui-t-fal-d {
+  --cui-d: initial; --cui-l: ;
+  --cui-bg-d: #19140f; --cui-bg-l: #f0dab0;
+  --cui-bg-1-d: #231d17; --cui-bg-1-l: #faeeda;
+  --cui-bg-2-d: #2d2621; --cui-bg-2-l: #e2c99a;
+  --cui-bg-3-d: #3d3630; --cui-bg-3-l: #d1b684;
+  --cui-fg-d: #f5efe3; --cui-fg-l: #211a11;
+  --cui-fg-mute-d: #bbae98; --cui-fg-mute-l: #585038;
+  --cui-fg-dim-d: #867a63; --cui-fg-dim-l: #918569;
+  --cui-border-d: rgba(245,239,227,0.10); --cui-border-l: rgba(33,26,17,0.14);
+  --cui-border-strong-d: rgba(245,239,227,0.20); --cui-border-strong-l: rgba(33,26,17,0.26);
+  --cui-accent-d: #c2820a; --cui-accent-l: #a35207;
+  --cui-accent-hover-d: #ad7409; --cui-accent-hover-l: #864306;
+  --cui-on-accent-d: #14100c; --cui-on-accent-l: #fff;
+  --cui-link-d: #e8b53f; --cui-link-l: #7f3e04;
+  --cui-link-hover-d: #e8b53f; --cui-link-hover-l: #7f3e04;
+  --cui-support-d: #b04728; --cui-support-l: #8a3418;
+  --cui-support-text-d: #eb9a78; --cui-support-text-l: #8a3418;
+  --cui-support-tint-d: rgba(176,71,40,0.26); --cui-support-tint-l: rgba(138,52,24,0.12);
+  --cui-support-line-d: rgba(235,154,120,0.32); --cui-support-line-l: rgba(138,52,24,0.28);
+  --cui-third-d: #2f5d3f; --cui-third-l: #245036;
+  --cui-third-text-d: #84c398; --cui-third-text-l: #245036;
+  --cui-third-tint-d: rgba(47,93,63,0.24); --cui-third-tint-l: rgba(36,80,54,0.12);
+  --cui-third-line-d: rgba(132,195,152,0.30); --cui-third-line-l: rgba(36,80,54,0.28);
+  --cui-secondary-d: #2d2621; --cui-secondary-l: #e2c99a;
+  --cui-hero-bg-d: #5b2a1a; --cui-hero-bg-l: #e0bf98;
+  --cui-hero-fg-d: #f5efe3; --cui-hero-fg-l: #211a11;
+  --cui-hero-mute-d: #bbae98; --cui-hero-mute-l: #585038;
+  --cui-hero-line-d: rgba(235,154,120,0.32); --cui-hero-line-l: rgba(138,52,24,0.28);
+  --cui-tile-d: rgba(194,130,10,0.52); --cui-tile-l: rgba(163,82,7,0.62);
+  --cui-tile-line-d: rgba(194,130,10,0.70); --cui-tile-line-l: rgba(163,82,7,0.80);
+  --cui-glyph-d: #e8b53f; --cui-glyph-l: #672f04;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+.cui-t-fal-l {
+  --cui-d: ; --cui-l: initial;
+  --cui-bg-d: #19140f; --cui-bg-l: #f0dab0;
+  --cui-bg-1-d: #231d17; --cui-bg-1-l: #faeeda;
+  --cui-bg-2-d: #2d2621; --cui-bg-2-l: #e2c99a;
+  --cui-bg-3-d: #3d3630; --cui-bg-3-l: #d1b684;
+  --cui-fg-d: #f5efe3; --cui-fg-l: #211a11;
+  --cui-fg-mute-d: #bbae98; --cui-fg-mute-l: #585038;
+  --cui-fg-dim-d: #867a63; --cui-fg-dim-l: #918569;
+  --cui-border-d: rgba(245,239,227,0.10); --cui-border-l: rgba(33,26,17,0.14);
+  --cui-border-strong-d: rgba(245,239,227,0.20); --cui-border-strong-l: rgba(33,26,17,0.26);
+  --cui-accent-d: #c2820a; --cui-accent-l: #a35207;
+  --cui-accent-hover-d: #ad7409; --cui-accent-hover-l: #864306;
+  --cui-on-accent-d: #14100c; --cui-on-accent-l: #fff;
+  --cui-link-d: #e8b53f; --cui-link-l: #7f3e04;
+  --cui-link-hover-d: #e8b53f; --cui-link-hover-l: #7f3e04;
+  --cui-support-d: #b04728; --cui-support-l: #8a3418;
+  --cui-support-text-d: #eb9a78; --cui-support-text-l: #8a3418;
+  --cui-support-tint-d: rgba(176,71,40,0.26); --cui-support-tint-l: rgba(138,52,24,0.12);
+  --cui-support-line-d: rgba(235,154,120,0.32); --cui-support-line-l: rgba(138,52,24,0.28);
+  --cui-third-d: #2f5d3f; --cui-third-l: #245036;
+  --cui-third-text-d: #84c398; --cui-third-text-l: #245036;
+  --cui-third-tint-d: rgba(47,93,63,0.24); --cui-third-tint-l: rgba(36,80,54,0.12);
+  --cui-third-line-d: rgba(132,195,152,0.30); --cui-third-line-l: rgba(36,80,54,0.28);
+  --cui-secondary-d: #2d2621; --cui-secondary-l: #e2c99a;
+  --cui-hero-bg-d: #5b2a1a; --cui-hero-bg-l: #e0bf98;
+  --cui-hero-fg-d: #f5efe3; --cui-hero-fg-l: #211a11;
+  --cui-hero-mute-d: #bbae98; --cui-hero-mute-l: #585038;
+  --cui-hero-line-d: rgba(235,154,120,0.32); --cui-hero-line-l: rgba(138,52,24,0.28);
+  --cui-tile-d: rgba(194,130,10,0.52); --cui-tile-l: rgba(163,82,7,0.62);
+  --cui-tile-line-d: rgba(194,130,10,0.70); --cui-tile-line-l: rgba(163,82,7,0.80);
+  --cui-glyph-d: #e8b53f; --cui-glyph-l: #672f04;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+.cui-t-win-d {
+  --cui-d: initial; --cui-l: ;
+  --cui-bg-d: #0a1d26; --cui-bg-l: #e6ecf4;
+  --cui-bg-1-d: #12262f; --cui-bg-1-l: #f8fafd;
+  --cui-bg-2-d: #1b323d; --cui-bg-2-l: #d3dce8;
+  --cui-bg-3-d: #27414e; --cui-bg-3-l: #bec9d8;
+  --cui-fg-d: #eef2f7; --cui-fg-l: #111820;
+  --cui-fg-mute-d: #9fabb9; --cui-fg-mute-l: #4f5b68;
+  --cui-fg-dim-d: #6d7886; --cui-fg-dim-l: #7d8894;
+  --cui-border-d: rgba(238,242,247,0.10); --cui-border-l: rgba(17,24,32,0.14);
+  --cui-border-strong-d: rgba(238,242,247,0.20); --cui-border-strong-l: rgba(17,24,32,0.26);
+  --cui-accent-d: #4a90b8; --cui-accent-l: #2b6d92;
+  --cui-accent-hover-d: #5a9fc6; --cui-accent-hover-l: #225874;
+  --cui-on-accent-d: #0a0f14; --cui-on-accent-l: #fff;
+  --cui-link-d: #7cc0e0; --cui-link-l: #245f80;
+  --cui-link-hover-d: #7cc0e0; --cui-link-hover-l: #245f80;
+  --cui-support-d: #3f4894; --cui-support-l: #3a3f80;
+  --cui-support-text-d: #9fa3e8; --cui-support-text-l: #3a3f80;
+  --cui-support-tint-d: rgba(63,72,148,0.28); --cui-support-tint-l: rgba(58,63,128,0.13);
+  --cui-support-line-d: rgba(159,163,232,0.32); --cui-support-line-l: rgba(58,63,128,0.28);
+  --cui-third-d: #a34a5e; --cui-third-l: #8e3a4e;
+  --cui-third-text-d: #eb96a8; --cui-third-text-l: #8e3a4e;
+  --cui-third-tint-d: rgba(163,74,94,0.24); --cui-third-tint-l: rgba(142,58,78,0.12);
+  --cui-third-line-d: rgba(235,150,168,0.30); --cui-third-line-l: rgba(142,58,78,0.28);
+  --cui-secondary-d: #34515f; --cui-secondary-l: #d3dce8;
+  --cui-hero-bg-d: #2b386a; --cui-hero-bg-l: #ccd2e3;
+  --cui-hero-fg-d: #eef2f7; --cui-hero-fg-l: #111820;
+  --cui-hero-mute-d: #9fabb9; --cui-hero-mute-l: #4f5b67;
+  --cui-hero-line-d: rgba(159,163,232,0.32); --cui-hero-line-l: rgba(58,63,128,0.28);
+  --cui-tile-d: rgba(74,144,184,0.58); --cui-tile-l: rgba(43,109,146,0.56);
+  --cui-tile-line-d: rgba(74,144,184,0.76); --cui-tile-line-l: rgba(43,109,146,0.74);
+  --cui-glyph-d: #9ad2ec; --cui-glyph-l: #173e54;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+.cui-t-win-l {
+  --cui-d: ; --cui-l: initial;
+  --cui-bg-d: #0a1d26; --cui-bg-l: #e6ecf4;
+  --cui-bg-1-d: #12262f; --cui-bg-1-l: #f8fafd;
+  --cui-bg-2-d: #1b323d; --cui-bg-2-l: #d3dce8;
+  --cui-bg-3-d: #27414e; --cui-bg-3-l: #bec9d8;
+  --cui-fg-d: #eef2f7; --cui-fg-l: #111820;
+  --cui-fg-mute-d: #9fabb9; --cui-fg-mute-l: #4f5b68;
+  --cui-fg-dim-d: #6d7886; --cui-fg-dim-l: #7d8894;
+  --cui-border-d: rgba(238,242,247,0.10); --cui-border-l: rgba(17,24,32,0.14);
+  --cui-border-strong-d: rgba(238,242,247,0.20); --cui-border-strong-l: rgba(17,24,32,0.26);
+  --cui-accent-d: #4a90b8; --cui-accent-l: #2b6d92;
+  --cui-accent-hover-d: #5a9fc6; --cui-accent-hover-l: #225874;
+  --cui-on-accent-d: #0a0f14; --cui-on-accent-l: #fff;
+  --cui-link-d: #7cc0e0; --cui-link-l: #245f80;
+  --cui-link-hover-d: #7cc0e0; --cui-link-hover-l: #245f80;
+  --cui-support-d: #3f4894; --cui-support-l: #3a3f80;
+  --cui-support-text-d: #9fa3e8; --cui-support-text-l: #3a3f80;
+  --cui-support-tint-d: rgba(63,72,148,0.28); --cui-support-tint-l: rgba(58,63,128,0.13);
+  --cui-support-line-d: rgba(159,163,232,0.32); --cui-support-line-l: rgba(58,63,128,0.28);
+  --cui-third-d: #a34a5e; --cui-third-l: #8e3a4e;
+  --cui-third-text-d: #eb96a8; --cui-third-text-l: #8e3a4e;
+  --cui-third-tint-d: rgba(163,74,94,0.24); --cui-third-tint-l: rgba(142,58,78,0.12);
+  --cui-third-line-d: rgba(235,150,168,0.30); --cui-third-line-l: rgba(142,58,78,0.28);
+  --cui-secondary-d: #34515f; --cui-secondary-l: #d3dce8;
+  --cui-hero-bg-d: #2b386a; --cui-hero-bg-l: #ccd2e3;
+  --cui-hero-fg-d: #eef2f7; --cui-hero-fg-l: #111820;
+  --cui-hero-mute-d: #9fabb9; --cui-hero-mute-l: #4f5b67;
+  --cui-hero-line-d: rgba(159,163,232,0.32); --cui-hero-line-l: rgba(58,63,128,0.28);
+  --cui-tile-d: rgba(74,144,184,0.58); --cui-tile-l: rgba(43,109,146,0.56);
+  --cui-tile-line-d: rgba(74,144,184,0.76); --cui-tile-line-l: rgba(43,109,146,0.74);
+  --cui-glyph-d: #9ad2ec; --cui-glyph-l: #173e54;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+.cui-t-spr-d {
+  --cui-d: initial; --cui-l: ;
+  --cui-bg-d: #131a17; --cui-bg-l: #ebf1e6;
+  --cui-bg-1-d: #1c2620; --cui-bg-1-l: #f9fbf7;
+  --cui-bg-2-d: #27342c; --cui-bg-2-l: #dae4d3;
+  --cui-bg-3-d: #35453a; --cui-bg-3-l: #c7d4bd;
+  --cui-fg-d: #f0f4ea; --cui-fg-l: #131810;
+  --cui-fg-mute-d: #a8b39c; --cui-fg-mute-l: #4f5a46;
+  --cui-fg-dim-d: #74806a; --cui-fg-dim-l: #7d8874;
+  --cui-border-d: rgba(240,244,234,0.10); --cui-border-l: rgba(19,24,16,0.14);
+  --cui-border-strong-d: rgba(240,244,234,0.20); --cui-border-strong-l: rgba(19,24,16,0.26);
+  --cui-accent-d: #6aa32e; --cui-accent-l: #47801a;
+  --cui-accent-hover-d: #5f9427; --cui-accent-hover-l: #3a690f;
+  --cui-on-accent-d: #0d1108; --cui-on-accent-l: #fff;
+  --cui-link-d: #a8d95f; --cui-link-l: #3d6d16;
+  --cui-link-hover-d: #a8d95f; --cui-link-hover-l: #3d6d16;
+  --cui-support-d: #c4629b; --cui-support-l: #a53d7a;
+  --cui-support-text-d: #f0a8cc; --cui-support-text-l: #a53d7a;
+  --cui-support-tint-d: rgba(196,98,155,0.26); --cui-support-tint-l: rgba(165,61,122,0.12);
+  --cui-support-line-d: rgba(240,168,204,0.32); --cui-support-line-l: rgba(165,61,122,0.28);
+  --cui-third-d: #e0c33f; --cui-third-l: #705708;
+  --cui-third-text-d: #f2d878; --cui-third-text-l: #705708;
+  --cui-third-tint-d: rgba(224,195,63,0.22); --cui-third-tint-l: rgba(112,87,8,0.12);
+  --cui-third-line-d: rgba(242,216,120,0.30); --cui-third-line-l: rgba(112,87,8,0.28);
+  --cui-secondary-d: #445748; --cui-secondary-l: #dae4d3;
+  --cui-hero-bg-d: #613a51; --cui-hero-bg-l: #e0d6d6;
+  --cui-hero-fg-d: #f0f4ea; --cui-hero-fg-l: #131810;
+  --cui-hero-mute-d: #afb9a3; --cui-hero-mute-l: #4f5a46;
+  --cui-hero-line-d: rgba(240,168,204,0.32); --cui-hero-line-l: rgba(165,61,122,0.28);
+  --cui-tile-d: rgba(106,163,46,0.62); --cui-tile-l: rgba(71,128,26,0.60);
+  --cui-tile-line-d: rgba(106,163,46,0.80); --cui-tile-line-l: rgba(71,128,26,0.78);
+  --cui-glyph-d: #c0e884; --cui-glyph-l: #28480e;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+.cui-t-spr-l {
+  --cui-d: ; --cui-l: initial;
+  --cui-bg-d: #131a17; --cui-bg-l: #ebf1e6;
+  --cui-bg-1-d: #1c2620; --cui-bg-1-l: #f9fbf7;
+  --cui-bg-2-d: #27342c; --cui-bg-2-l: #dae4d3;
+  --cui-bg-3-d: #35453a; --cui-bg-3-l: #c7d4bd;
+  --cui-fg-d: #f0f4ea; --cui-fg-l: #131810;
+  --cui-fg-mute-d: #a8b39c; --cui-fg-mute-l: #4f5a46;
+  --cui-fg-dim-d: #74806a; --cui-fg-dim-l: #7d8874;
+  --cui-border-d: rgba(240,244,234,0.10); --cui-border-l: rgba(19,24,16,0.14);
+  --cui-border-strong-d: rgba(240,244,234,0.20); --cui-border-strong-l: rgba(19,24,16,0.26);
+  --cui-accent-d: #6aa32e; --cui-accent-l: #47801a;
+  --cui-accent-hover-d: #5f9427; --cui-accent-hover-l: #3a690f;
+  --cui-on-accent-d: #0d1108; --cui-on-accent-l: #fff;
+  --cui-link-d: #a8d95f; --cui-link-l: #3d6d16;
+  --cui-link-hover-d: #a8d95f; --cui-link-hover-l: #3d6d16;
+  --cui-support-d: #c4629b; --cui-support-l: #a53d7a;
+  --cui-support-text-d: #f0a8cc; --cui-support-text-l: #a53d7a;
+  --cui-support-tint-d: rgba(196,98,155,0.26); --cui-support-tint-l: rgba(165,61,122,0.12);
+  --cui-support-line-d: rgba(240,168,204,0.32); --cui-support-line-l: rgba(165,61,122,0.28);
+  --cui-third-d: #e0c33f; --cui-third-l: #705708;
+  --cui-third-text-d: #f2d878; --cui-third-text-l: #705708;
+  --cui-third-tint-d: rgba(224,195,63,0.22); --cui-third-tint-l: rgba(112,87,8,0.12);
+  --cui-third-line-d: rgba(242,216,120,0.30); --cui-third-line-l: rgba(112,87,8,0.28);
+  --cui-secondary-d: #445748; --cui-secondary-l: #dae4d3;
+  --cui-hero-bg-d: #613a51; --cui-hero-bg-l: #e0d6d6;
+  --cui-hero-fg-d: #f0f4ea; --cui-hero-fg-l: #131810;
+  --cui-hero-mute-d: #afb9a3; --cui-hero-mute-l: #4f5a46;
+  --cui-hero-line-d: rgba(240,168,204,0.32); --cui-hero-line-l: rgba(165,61,122,0.28);
+  --cui-tile-d: rgba(106,163,46,0.62); --cui-tile-l: rgba(71,128,26,0.60);
+  --cui-tile-line-d: rgba(106,163,46,0.80); --cui-tile-line-l: rgba(71,128,26,0.78);
+  --cui-glyph-d: #c0e884; --cui-glyph-l: #28480e;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+.cui-t-sum-d {
+  --cui-d: initial; --cui-l: ;
+  --cui-bg-d: #123434; --cui-bg-l: #dff3ef;
+  --cui-bg-1-d: #1a4242; --cui-bg-1-l: #f0faf7;
+  --cui-bg-2-d: #245252; --cui-bg-2-l: #d4ebe6;
+  --cui-bg-3-d: #2b5b5d; --cui-bg-3-l: #c0ded6;
+  --cui-fg-d: #eaf7f6; --cui-fg-l: #1a1610;
+  --cui-fg-mute-d: #b3cdcc; --cui-fg-mute-l: #5a5346;
+  --cui-fg-dim-d: #86a3a1; --cui-fg-dim-l: #8a8375;
+  --cui-border-d: rgba(234,247,246,0.10); --cui-border-l: rgba(26,22,16,0.14);
+  --cui-border-strong-d: rgba(234,247,246,0.20); --cui-border-strong-l: rgba(26,22,16,0.26);
+  --cui-accent-d: #43b5b2; --cui-accent-l: #1d6764;
+  --cui-accent-hover-d: #35938f; --cui-accent-hover-l: #175553;
+  --cui-on-accent-d: #04161a; --cui-on-accent-l: #fff;
+  --cui-link-d: #7cd6d3; --cui-link-l: #175553;
+  --cui-link-hover-d: #7cd6d3; --cui-link-hover-l: #175553;
+  --cui-support-d: #e88b6f; --cui-support-l: #a4482c;
+  --cui-support-text-d: #ffc6b0; --cui-support-text-l: #8f3d24;
+  --cui-support-tint-d: #4a352c; --cui-support-tint-l: rgba(164,72,44,0.12);
+  --cui-support-line-d: rgba(255,198,176,0.32); --cui-support-line-l: rgba(164,72,44,0.28);
+  --cui-third-d: #0f7ec1; --cui-third-l: #035996;
+  --cui-third-text-d: #7cc4ee; --cui-third-text-l: #035996;
+  --cui-third-tint-d: rgba(15,126,193,0.26); --cui-third-tint-l: rgba(3,89,150,0.12);
+  --cui-third-line-d: rgba(124,196,238,0.30); --cui-third-line-l: rgba(3,89,150,0.28);
+  --cui-secondary-d: #245252; --cui-secondary-l: #d4ebe6;
+  --cui-hero-bg-d: #c67d66; --cui-hero-bg-l: #e8cfbe;
+  --cui-hero-fg-d: #1a0e08; --cui-hero-fg-l: #1a1610;
+  --cui-hero-mute-d: #37231c; --cui-hero-mute-l: #5a5346;
+  --cui-hero-line-d: rgba(255,198,176,0.40); --cui-hero-line-l: rgba(164,72,44,0.28);
+  --cui-tile-d: #1d6764; --cui-tile-l: rgba(29,103,100,0.50);
+  --cui-tile-line-d: #175553; --cui-tile-line-l: rgba(29,103,100,0.68);
+  --cui-glyph-d: #d6f4f2; --cui-glyph-l: #124240;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #fca5a5; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+.cui-t-sum-l {
+  --cui-d: ; --cui-l: initial;
+  --cui-bg-d: #123434; --cui-bg-l: #dff3ef;
+  --cui-bg-1-d: #1a4242; --cui-bg-1-l: #f0faf7;
+  --cui-bg-2-d: #245252; --cui-bg-2-l: #d4ebe6;
+  --cui-bg-3-d: #2b5b5d; --cui-bg-3-l: #c0ded6;
+  --cui-fg-d: #eaf7f6; --cui-fg-l: #1a1610;
+  --cui-fg-mute-d: #b3cdcc; --cui-fg-mute-l: #5a5346;
+  --cui-fg-dim-d: #86a3a1; --cui-fg-dim-l: #8a8375;
+  --cui-border-d: rgba(234,247,246,0.10); --cui-border-l: rgba(26,22,16,0.14);
+  --cui-border-strong-d: rgba(234,247,246,0.20); --cui-border-strong-l: rgba(26,22,16,0.26);
+  --cui-accent-d: #43b5b2; --cui-accent-l: #1d6764;
+  --cui-accent-hover-d: #35938f; --cui-accent-hover-l: #175553;
+  --cui-on-accent-d: #04161a; --cui-on-accent-l: #fff;
+  --cui-link-d: #7cd6d3; --cui-link-l: #175553;
+  --cui-link-hover-d: #7cd6d3; --cui-link-hover-l: #175553;
+  --cui-support-d: #e88b6f; --cui-support-l: #a4482c;
+  --cui-support-text-d: #ffc6b0; --cui-support-text-l: #8f3d24;
+  --cui-support-tint-d: #4a352c; --cui-support-tint-l: rgba(164,72,44,0.12);
+  --cui-support-line-d: rgba(255,198,176,0.32); --cui-support-line-l: rgba(164,72,44,0.28);
+  --cui-third-d: #0f7ec1; --cui-third-l: #035996;
+  --cui-third-text-d: #7cc4ee; --cui-third-text-l: #035996;
+  --cui-third-tint-d: rgba(15,126,193,0.26); --cui-third-tint-l: rgba(3,89,150,0.12);
+  --cui-third-line-d: rgba(124,196,238,0.30); --cui-third-line-l: rgba(3,89,150,0.28);
+  --cui-secondary-d: #245252; --cui-secondary-l: #d4ebe6;
+  --cui-hero-bg-d: #c67d66; --cui-hero-bg-l: #e8cfbe;
+  --cui-hero-fg-d: #1a0e08; --cui-hero-fg-l: #1a1610;
+  --cui-hero-mute-d: #37231c; --cui-hero-mute-l: #5a5346;
+  --cui-hero-line-d: rgba(255,198,176,0.40); --cui-hero-line-l: rgba(164,72,44,0.28);
+  --cui-tile-d: #1d6764; --cui-tile-l: rgba(29,103,100,0.50);
+  --cui-tile-line-d: #175553; --cui-tile-line-l: rgba(29,103,100,0.68);
+  --cui-glyph-d: #d6f4f2; --cui-glyph-l: #124240;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #fca5a5; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+.cui-t-xms-d {
+  --cui-d: initial; --cui-l: ;
+  --cui-bg-d: #0e1f14; --cui-bg-l: #d6e5cf;
+  --cui-bg-1-d: #16291c; --cui-bg-1-l: #eaf2e5;
+  --cui-bg-2-d: #1f3726; --cui-bg-2-l: #c2d6b8;
+  --cui-bg-3-d: #2b4832; --cui-bg-3-l: #adc7a1;
+  --cui-fg-d: #f2f5ef; --cui-fg-l: #131a10;
+  --cui-fg-mute-d: #a8bcac; --cui-fg-mute-l: #44503f;
+  --cui-fg-dim-d: #7a8d7e; --cui-fg-dim-l: #7e8879;
+  --cui-border-d: rgba(242,245,239,0.10); --cui-border-l: rgba(19,26,16,0.14);
+  --cui-border-strong-d: rgba(242,245,239,0.20); --cui-border-strong-l: rgba(19,26,16,0.26);
+  --cui-accent-d: #ce2229; --cui-accent-l: #ce2229;
+  --cui-accent-hover-d: #a81a20; --cui-accent-hover-l: #a81a20;
+  --cui-on-accent-d: #fff; --cui-on-accent-l: #fff;
+  --cui-link-d: #f89a86; --cui-link-l: #9e2318;
+  --cui-link-hover-d: #f89a86; --cui-link-hover-l: #9e2318;
+  --cui-support-d: #ce2229; --cui-support-l: #ce2229;
+  --cui-support-text-d: #f89a86; --cui-support-text-l: #9e2318;
+  --cui-support-tint-d: rgba(206,34,41,0.26); --cui-support-tint-l: rgba(206,34,41,0.14);
+  --cui-support-line-d: rgba(248,154,134,0.32); --cui-support-line-l: rgba(206,34,41,0.28);
+  --cui-third-d: #a0c356; --cui-third-l: #a0c356;
+  --cui-third-text-d: #bcd97e; --cui-third-text-l: #3d5c14;
+  --cui-third-tint-d: rgba(160,195,86,0.28); --cui-third-tint-l: rgba(160,195,86,0.45);
+  --cui-third-line-d: rgba(188,217,126,0.30); --cui-third-line-l: rgba(125,164,58,0.40);
+  --cui-secondary-d: #1f3726; --cui-secondary-l: #c2d6b8;
+  --cui-hero-bg-d: #7d1a18; --cui-hero-bg-l: #f0bcb2;
+  --cui-hero-fg-d: #f2f5ef; --cui-hero-fg-l: #131a10;
+  --cui-hero-mute-d: #e8b9ae; --cui-hero-mute-l: #6e4a42;
+  --cui-hero-line-d: rgba(248,154,134,0.34); --cui-hero-line-l: rgba(206,34,41,0.30);
+  --cui-tile-d: #8f7219; --cui-tile-l: #b08c1f;
+  --cui-tile-line-d: #a8871f; --cui-tile-line-l: #c9a227;
+  --cui-glyph-d: #2b1a05; --cui-glyph-l: #3d2f07;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+.cui-t-xms-l {
+  --cui-d: ; --cui-l: initial;
+  --cui-bg-d: #0e1f14; --cui-bg-l: #d6e5cf;
+  --cui-bg-1-d: #16291c; --cui-bg-1-l: #eaf2e5;
+  --cui-bg-2-d: #1f3726; --cui-bg-2-l: #c2d6b8;
+  --cui-bg-3-d: #2b4832; --cui-bg-3-l: #adc7a1;
+  --cui-fg-d: #f2f5ef; --cui-fg-l: #131a10;
+  --cui-fg-mute-d: #a8bcac; --cui-fg-mute-l: #44503f;
+  --cui-fg-dim-d: #7a8d7e; --cui-fg-dim-l: #7e8879;
+  --cui-border-d: rgba(242,245,239,0.10); --cui-border-l: rgba(19,26,16,0.14);
+  --cui-border-strong-d: rgba(242,245,239,0.20); --cui-border-strong-l: rgba(19,26,16,0.26);
+  --cui-accent-d: #ce2229; --cui-accent-l: #ce2229;
+  --cui-accent-hover-d: #a81a20; --cui-accent-hover-l: #a81a20;
+  --cui-on-accent-d: #fff; --cui-on-accent-l: #fff;
+  --cui-link-d: #f89a86; --cui-link-l: #9e2318;
+  --cui-link-hover-d: #f89a86; --cui-link-hover-l: #9e2318;
+  --cui-support-d: #ce2229; --cui-support-l: #ce2229;
+  --cui-support-text-d: #f89a86; --cui-support-text-l: #9e2318;
+  --cui-support-tint-d: rgba(206,34,41,0.26); --cui-support-tint-l: rgba(206,34,41,0.14);
+  --cui-support-line-d: rgba(248,154,134,0.32); --cui-support-line-l: rgba(206,34,41,0.28);
+  --cui-third-d: #a0c356; --cui-third-l: #a0c356;
+  --cui-third-text-d: #bcd97e; --cui-third-text-l: #3d5c14;
+  --cui-third-tint-d: rgba(160,195,86,0.28); --cui-third-tint-l: rgba(160,195,86,0.45);
+  --cui-third-line-d: rgba(188,217,126,0.30); --cui-third-line-l: rgba(125,164,58,0.40);
+  --cui-secondary-d: #1f3726; --cui-secondary-l: #c2d6b8;
+  --cui-hero-bg-d: #7d1a18; --cui-hero-bg-l: #f0bcb2;
+  --cui-hero-fg-d: #f2f5ef; --cui-hero-fg-l: #131a10;
+  --cui-hero-mute-d: #e8b9ae; --cui-hero-mute-l: #6e4a42;
+  --cui-hero-line-d: rgba(248,154,134,0.34); --cui-hero-line-l: rgba(206,34,41,0.30);
+  --cui-tile-d: #8f7219; --cui-tile-l: #b08c1f;
+  --cui-tile-line-d: #a8871f; --cui-tile-line-l: #c9a227;
+  --cui-glyph-d: #2b1a05; --cui-glyph-l: #3d2f07;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+.cui-t-est-d {
+  --cui-d: initial; --cui-l: ;
+  --cui-bg-d: #1c1524; --cui-bg-l: #d9eeed;
+  --cui-bg-1-d: #271e31; --cui-bg-1-l: #eef8f7;
+  --cui-bg-2-d: #352a41; --cui-bg-2-l: #c3e2e0;
+  --cui-bg-3-d: #453855; --cui-bg-3-l: #a9d3d1;
+  --cui-fg-d: #f4eff7; --cui-fg-l: #12191a;
+  --cui-fg-mute-d: #b6acbe; --cui-fg-mute-l: #4b5757;
+  --cui-fg-dim-d: #8f8697; --cui-fg-dim-l: #7b8686;
+  --cui-border-d: rgba(244,239,247,0.10); --cui-border-l: rgba(18,25,26,0.14);
+  --cui-border-strong-d: rgba(244,239,247,0.20); --cui-border-strong-l: rgba(18,25,26,0.26);
+  --cui-accent-d: #ae71d4; --cui-accent-l: #9e4aa6;
+  --cui-accent-hover-d: #bd86dd; --cui-accent-hover-l: #843d8b;
+  --cui-on-accent-d: #170f1c; --cui-on-accent-l: #fff;
+  --cui-link-d: #d4aeee; --cui-link-l: #8a3d92;
+  --cui-link-hover-d: #d4aeee; --cui-link-hover-l: #8a3d92;
+  --cui-support-d: #febfd0; --cui-support-l: #febfd0;
+  --cui-support-text-d: #f7c7d6; --cui-support-text-l: #9c3357;
+  --cui-support-tint-d: rgba(254,191,208,0.30); --cui-support-tint-l: rgba(254,191,208,0.34);
+  --cui-support-line-d: rgba(247,199,214,0.32); --cui-support-line-l: rgba(156,51,87,0.30);
+  --cui-third-d: #fbf49a; --cui-third-l: #fbf49a;
+  --cui-third-text-d: #f7ef9a; --cui-third-text-l: #6b5d07;
+  --cui-third-tint-d: rgba(251,244,154,0.26); --cui-third-tint-l: rgba(251,244,154,0.34);
+  --cui-third-line-d: rgba(247,239,154,0.30); --cui-third-line-l: rgba(107,93,7,0.30);
+  --cui-secondary-d: #352a41; --cui-secondary-l: #c3e2e0;
+  --cui-hero-bg-d: #644b5b; --cui-hero-bg-l: #efd2dc;
+  --cui-hero-fg-d: #f4eff7; --cui-hero-fg-l: #12191a;
+  --cui-hero-mute-d: #ccc5d2; --cui-hero-mute-l: #4b5757;
+  --cui-hero-line-d: rgba(247,199,214,0.32); --cui-hero-line-l: rgba(156,51,87,0.28);
+  --cui-tile-d: #9564ab; --cui-tile-l: #c286be;
+  --cui-tile-line-d: #a878bd; --cui-tile-line-l: #cf9bcb;
+  --cui-glyph-d: #e4cbf5; --cui-glyph-l: #742f7b;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+.cui-t-est-l {
+  --cui-d: ; --cui-l: initial;
+  --cui-bg-d: #1c1524; --cui-bg-l: #d9eeed;
+  --cui-bg-1-d: #271e31; --cui-bg-1-l: #eef8f7;
+  --cui-bg-2-d: #352a41; --cui-bg-2-l: #c3e2e0;
+  --cui-bg-3-d: #453855; --cui-bg-3-l: #a9d3d1;
+  --cui-fg-d: #f4eff7; --cui-fg-l: #12191a;
+  --cui-fg-mute-d: #b6acbe; --cui-fg-mute-l: #4b5757;
+  --cui-fg-dim-d: #8f8697; --cui-fg-dim-l: #7b8686;
+  --cui-border-d: rgba(244,239,247,0.10); --cui-border-l: rgba(18,25,26,0.14);
+  --cui-border-strong-d: rgba(244,239,247,0.20); --cui-border-strong-l: rgba(18,25,26,0.26);
+  --cui-accent-d: #ae71d4; --cui-accent-l: #9e4aa6;
+  --cui-accent-hover-d: #bd86dd; --cui-accent-hover-l: #843d8b;
+  --cui-on-accent-d: #170f1c; --cui-on-accent-l: #fff;
+  --cui-link-d: #d4aeee; --cui-link-l: #8a3d92;
+  --cui-link-hover-d: #d4aeee; --cui-link-hover-l: #8a3d92;
+  --cui-support-d: #febfd0; --cui-support-l: #febfd0;
+  --cui-support-text-d: #f7c7d6; --cui-support-text-l: #9c3357;
+  --cui-support-tint-d: rgba(254,191,208,0.30); --cui-support-tint-l: rgba(254,191,208,0.34);
+  --cui-support-line-d: rgba(247,199,214,0.32); --cui-support-line-l: rgba(156,51,87,0.30);
+  --cui-third-d: #fbf49a; --cui-third-l: #fbf49a;
+  --cui-third-text-d: #f7ef9a; --cui-third-text-l: #6b5d07;
+  --cui-third-tint-d: rgba(251,244,154,0.26); --cui-third-tint-l: rgba(251,244,154,0.34);
+  --cui-third-line-d: rgba(247,239,154,0.30); --cui-third-line-l: rgba(107,93,7,0.30);
+  --cui-secondary-d: #352a41; --cui-secondary-l: #c3e2e0;
+  --cui-hero-bg-d: #644b5b; --cui-hero-bg-l: #efd2dc;
+  --cui-hero-fg-d: #f4eff7; --cui-hero-fg-l: #12191a;
+  --cui-hero-mute-d: #ccc5d2; --cui-hero-mute-l: #4b5757;
+  --cui-hero-line-d: rgba(247,199,214,0.32); --cui-hero-line-l: rgba(156,51,87,0.28);
+  --cui-tile-d: #9564ab; --cui-tile-l: #c286be;
+  --cui-tile-line-d: #a878bd; --cui-tile-line-l: #cf9bcb;
+  --cui-glyph-d: #e4cbf5; --cui-glyph-l: #742f7b;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+.cui-t-cnd-d {
+  --cui-d: initial; --cui-l: ;
+  --cui-bg-d: #2d0a1e; --cui-bg-l: #ffd6e6;
+  --cui-bg-1-d: #3a1128; --cui-bg-1-l: #fff0f6;
+  --cui-bg-2-d: #4a1a35; --cui-bg-2-l: #fbbcd6;
+  --cui-bg-3-d: #5d2444; --cui-bg-3-l: #f5a2c4;
+  --cui-fg-d: #f8eef4; --cui-fg-l: #1a1016;
+  --cui-fg-mute-d: #c0a8b6; --cui-fg-mute-l: #5f4b55;
+  --cui-fg-dim-d: #8f7a86; --cui-fg-dim-l: #8d7883;
+  --cui-border-d: rgba(248,238,244,0.10); --cui-border-l: rgba(26,16,22,0.14);
+  --cui-border-strong-d: rgba(248,238,244,0.20); --cui-border-strong-l: rgba(26,16,22,0.26);
+  --cui-accent-d: #ff70a6; --cui-accent-l: #d1207a;
+  --cui-accent-hover-d: #e04a86; --cui-accent-hover-l: #b31a68;
+  --cui-on-accent-d: #2a0715; --cui-on-accent-l: #fff;
+  --cui-link-d: #ffa3c6; --cui-link-l: #a0175c;
+  --cui-link-hover-d: #ffa3c6; --cui-link-hover-l: #a0175c;
+  --cui-support-d: #4ee9e9; --cui-support-l: #4ee9e9;
+  --cui-support-text-d: #8ff2f2; --cui-support-text-l: #096e6e;
+  --cui-support-tint-d: #14454d; --cui-support-tint-l: #b5eef1;
+  --cui-support-line-d: #1d6b76; --cui-support-line-l: #7fd8dc;
+  --cui-third-d: #e9ff70; --cui-third-l: #e9ff70;
+  --cui-third-text-d: #e9ff70; --cui-third-text-l: #4f5804;
+  --cui-third-tint-d: #354715; --cui-third-tint-l: #e2f2a0;
+  --cui-third-line-d: #4a6420; --cui-third-line-l: #c8dc78;
+  --cui-secondary-d: #4a1a35; --cui-secondary-l: #fbbcd6;
+  --cui-hero-bg-d: #0f5560; --cui-hero-bg-l: #93e2e7;
+  --cui-hero-fg-d: #f8eef4; --cui-hero-fg-l: #1a1016;
+  --cui-hero-mute-d: #a8d4da; --cui-hero-mute-l: #3f5457;
+  --cui-hero-line-d: #2a939b; --cui-hero-line-l: #4bb8bf;
+  --cui-tile-d: #d6538c; --cui-tile-l: #e0448a;
+  --cui-tile-line-d: #e26196; --cui-tile-line-l: #ee6ba1;
+  --cui-glyph-d: #2a0817; --cui-glyph-l: #ffe0ee;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
+.cui-t-cnd-l {
+  --cui-d: ; --cui-l: initial;
+  --cui-bg-d: #2d0a1e; --cui-bg-l: #ffd6e6;
+  --cui-bg-1-d: #3a1128; --cui-bg-1-l: #fff0f6;
+  --cui-bg-2-d: #4a1a35; --cui-bg-2-l: #fbbcd6;
+  --cui-bg-3-d: #5d2444; --cui-bg-3-l: #f5a2c4;
+  --cui-fg-d: #f8eef4; --cui-fg-l: #1a1016;
+  --cui-fg-mute-d: #c0a8b6; --cui-fg-mute-l: #5f4b55;
+  --cui-fg-dim-d: #8f7a86; --cui-fg-dim-l: #8d7883;
+  --cui-border-d: rgba(248,238,244,0.10); --cui-border-l: rgba(26,16,22,0.14);
+  --cui-border-strong-d: rgba(248,238,244,0.20); --cui-border-strong-l: rgba(26,16,22,0.26);
+  --cui-accent-d: #ff70a6; --cui-accent-l: #d1207a;
+  --cui-accent-hover-d: #e04a86; --cui-accent-hover-l: #b31a68;
+  --cui-on-accent-d: #2a0715; --cui-on-accent-l: #fff;
+  --cui-link-d: #ffa3c6; --cui-link-l: #a0175c;
+  --cui-link-hover-d: #ffa3c6; --cui-link-hover-l: #a0175c;
+  --cui-support-d: #4ee9e9; --cui-support-l: #4ee9e9;
+  --cui-support-text-d: #8ff2f2; --cui-support-text-l: #096e6e;
+  --cui-support-tint-d: #14454d; --cui-support-tint-l: #b5eef1;
+  --cui-support-line-d: #1d6b76; --cui-support-line-l: #7fd8dc;
+  --cui-third-d: #e9ff70; --cui-third-l: #e9ff70;
+  --cui-third-text-d: #e9ff70; --cui-third-text-l: #4f5804;
+  --cui-third-tint-d: #354715; --cui-third-tint-l: #e2f2a0;
+  --cui-third-line-d: #4a6420; --cui-third-line-l: #c8dc78;
+  --cui-secondary-d: #4a1a35; --cui-secondary-l: #fbbcd6;
+  --cui-hero-bg-d: #0f5560; --cui-hero-bg-l: #93e2e7;
+  --cui-hero-fg-d: #f8eef4; --cui-hero-fg-l: #1a1016;
+  --cui-hero-mute-d: #a8d4da; --cui-hero-mute-l: #3f5457;
+  --cui-hero-line-d: #2a939b; --cui-hero-line-l: #4bb8bf;
+  --cui-tile-d: #d6538c; --cui-tile-l: #e0448a;
+  --cui-tile-line-d: #e26196; --cui-tile-line-l: #ee6ba1;
+  --cui-glyph-d: #2a0817; --cui-glyph-l: #ffe0ee;
+  --cui-success-d: #34d399; --cui-success-l: #036348;
+  --cui-warning-d: #fbbf24; --cui-warning-l: #76460b;
+  --cui-error-d: #f87171; --cui-error-l: #a11818;
+  --cui-info-d: #7dd3fc; --cui-info-l: #075985;
+  --cui-onstatus-d: #0b0e14; --cui-onstatus-l: #ffffff;
+}
 
 .cui-tokens,
 .cui-ui {
-  /* ---- 1. Color ---- */
-
-  /* Accent: the purple/blue gradient that defines Modern Whimsy. */
-  --cui-accent:           #7c6af7;            /* primary accent — buttons, focus rings */
-  --cui-accent-soft:      #a5b4fc;            /* secondary accent — icons, captions */
-  --cui-accent-mute:      rgba(124,106,247,0.18);
-  --cui-accent-tint:      rgba(124,106,247,0.28);
-
-  /* Backgrounds — layered from deepest to highest. */
-  --cui-bg:               #0b0e14;            /* root canvas */
-  --cui-bg-1:             #11151d;            /* primary surface (cards) */
-  --cui-bg-2:             #1a1f2b;            /* raised surface (hover, modal) */
-  --cui-bg-3:             #232938;            /* highest — popovers, selected rows */
-
-  /* Foregrounds. */
-  --cui-fg:               #e5e9f0;            /* primary text */
-  --cui-fg-mute:          #9ca3af;            /* secondary / placeholder */
-  --cui-fg-dim:           #6b7280;            /* tertiary / disabled */
-
-  /* Borders + dividers. */
-  --cui-border:           rgba(255,255,255,0.08);
-  --cui-border-strong:    rgba(255,255,255,0.16);
-
-  /* Status colors. Used by .cui-pill variants + level chips. */
-  --cui-success:          #34d399;
-  --cui-warn:             #fbbf24;
-  --cui-error:            #f87171;
-  --cui-info:             var(--cui-accent-soft);
-
-  /* The signature gradient. Use as background-image on hero
-     surfaces (header tiles, icon badges). */
-  --cui-accent-gradient:  linear-gradient(135deg,
-                            rgba(124,106,247,0.28),
-                            rgba(74,158,255,0.18));
 
   /* ---- 2. Typography ---- */
 
@@ -107,10 +1257,14 @@
 
   --cui-border-width:     1px;
 
-  /* Shadows. Accent-tinted for the Modern Whimsy lift on hover. */
+  /* Shadows. The accent shadow is flavor-aware: an accent-tinted glow
+     reads as a smudge on a light ground, so light gets a neutral drop. */
   --cui-shadow-sm:        0 1px 2px rgba(0,0,0,0.3);
   --cui-shadow:           0 4px 12px rgba(0,0,0,0.4);
-  --cui-shadow-accent:    0 6px 20px rgba(124,106,247,0.25);
+  --cui-shadow-accent:    var(--cui-d, 0 6px 20px rgba(0,0,0,0.45))
+                          var(--cui-l, 0 6px 20px rgba(0,0,0,0.12));
+  --cui-shadow-lg:        var(--cui-d, 0 10px 40px rgba(0,0,0,0.45))
+                          var(--cui-l, 0 10px 40px rgba(0,0,0,0.16));
 
   /* ---- 4. Motion ---- */
 
@@ -120,6 +1274,9 @@
 
   --cui-ease:             cubic-bezier(0.2, 0.7, 0.3, 1);
   --cui-ease-out:         cubic-bezier(0.16, 1, 0.3, 1);
+  /* Reserved for moments that need character: the error card bounce-in,
+     an empty state rising into place. Not a general-purpose easing. */
+  --cui-ease-bounce:      cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* Apply baseline typography + background to wrapped content. */
   font-family: var(--cui-font-sans);
@@ -141,7 +1298,7 @@
 
 
 /*
- * @conjureos/ui — ui.css
+ * @conjureos/ui, ui.css
  *
  * Primitive component classes built on tokens.css. Wrap content in
  * `.cui-ui` to pick up everything; tokens + primitives.
@@ -199,10 +1356,15 @@
 }
 
 .cui-ui .cui-card--hero {
-  background: var(--cui-accent-gradient), var(--cui-bg-1);
-  background-blend-mode: normal;
-  border-color: var(--cui-accent-tint);
+  background: var(--cui-hero-bg);
+  border-color: var(--cui-hero-line);
+  color: var(--cui-hero-fg);
 }
+
+/* The featured card can be LIGHTER than its ground (Summer), so it carries
+   its own foreground pair rather than inheriting the panel's. */
+.cui-ui .cui-card--hero .cui-muted,
+.cui-ui .cui-card--hero .cui-dim { color: var(--cui-hero-mute); }
 
 /* ---- Button ---- */
 
@@ -242,16 +1404,19 @@
   transform: none;
 }
 
+/* The label is a token, not `white`. Six of the nine themes have a lead
+   hue too light to carry white text; Fall's gold takes white at 3.24:1 and
+   a near-black at 5.85:1. --cui-on-accent resolves per theme and flavor. */
 .cui-ui .cui-button--primary {
   background: var(--cui-accent);
   border-color: var(--cui-accent);
-  color: white;
+  color: var(--cui-on-accent);
 }
 
 .cui-ui .cui-button--primary:hover {
-  background: var(--cui-accent-soft);
-  border-color: var(--cui-accent-soft);
-  color: var(--cui-bg);
+  background: var(--cui-accent-hover);
+  border-color: var(--cui-accent-hover);
+  color: var(--cui-on-accent);
 }
 
 .cui-ui .cui-button--ghost {
@@ -260,13 +1425,77 @@
 }
 
 .cui-ui .cui-button--ghost:hover {
-  background: var(--cui-accent-mute);
+  background: var(--cui-support-tint);
   border-color: transparent;
 }
 
 .cui-ui .cui-button--pill {
   border-radius: var(--cui-radius-pill);
   padding: var(--cui-space-2) var(--cui-space-5);
+}
+
+/* Semantic filled variants. Each is a solid fill whose label comes from
+   --cui-onstatus, which is near-black on the dark flavor and white on the
+   light one. They share the base button's shape, padding, and motion. Use
+   them by altitude of intent: secondary for the quiet alternative next to
+   primary, danger for destructive actions, warning for "are you sure,"
+   info for neutral-positive callouts. */
+.cui-ui .cui-button--secondary {
+  background: var(--cui-secondary);
+  /* Was border-color: var(--cui-secondary), a fill-as-border. In most themes
+     --cui-secondary equals --cui-bg-2, and a modal or card is often mounted
+     on bg-2 too, so the button had no visible edge at all wherever it landed
+     on its own fill's twin. A real hairline survives that. */
+  border-color: var(--cui-border-strong);
+  color: var(--cui-fg);
+}
+.cui-ui .cui-button--secondary:hover {
+  background: var(--cui-bg-3);
+  border-color: var(--cui-bg-3);
+}
+
+.cui-ui .cui-button--danger {
+  background: var(--cui-error);
+  border-color: var(--cui-error);
+  color: var(--cui-onstatus);
+}
+.cui-ui .cui-button--danger:hover {
+  filter: brightness(0.92);
+}
+
+.cui-ui .cui-button--warning {
+  background: var(--cui-warning);
+  border-color: var(--cui-warning);
+  color: var(--cui-onstatus);
+}
+.cui-ui .cui-button--warning:hover {
+  filter: brightness(0.92);
+}
+
+.cui-ui .cui-button--info {
+  background: var(--cui-info);
+  border-color: var(--cui-info);
+  color: var(--cui-onstatus);
+}
+.cui-ui .cui-button--info:hover {
+  filter: brightness(0.92);
+}
+
+/* Link-style button: no chrome, reads as inline text but keeps button
+   semantics (focusable, keyboard-activatable). Underline appears on
+   hover so it's distinguishable from a plain label at rest. */
+.cui-ui .cui-button--link {
+  background: transparent;
+  border-color: transparent;
+  color: var(--cui-link);
+  padding-left: var(--cui-space-1);
+  padding-right: var(--cui-space-1);
+}
+.cui-ui .cui-button--link:hover {
+  background: transparent;
+  border-color: transparent;
+  color: var(--cui-link-hover);
+  text-decoration: underline;
 }
 
 /* ---- Pill (status / tag) ---- */
@@ -276,10 +1505,10 @@
   align-items: center;
   gap: var(--cui-space-1);
   padding: 2px var(--cui-space-3);
-  background: var(--cui-accent-mute);
-  border: var(--cui-border-width) solid var(--cui-accent-tint);
+  background: var(--cui-support-tint);
+  border: var(--cui-border-width) solid var(--cui-support-line);
   border-radius: var(--cui-radius-pill);
-  color: var(--cui-accent-soft);
+  color: var(--cui-support-text);
   font-size: var(--cui-text-xs);
   font-weight: var(--cui-weight-medium);
   line-height: 1.4;
@@ -287,9 +1516,28 @@
   letter-spacing: 0.04em;
 }
 
-.cui-ui .cui-pill--success { background: rgba(52,211,153,0.14); border-color: rgba(52,211,153,0.35); color: var(--cui-success); }
-.cui-ui .cui-pill--warn    { background: rgba(251,191,36,0.14); border-color: rgba(251,191,36,0.35); color: var(--cui-warn); }
-.cui-ui .cui-pill--error   { background: rgba(248,113,113,0.14); border-color: rgba(248,113,113,0.35); color: var(--cui-error); }
+/* Derived from the status token rather than a frozen literal. The light
+   flavors carry a deepened status set, so a hardcoded rgba of the dark
+   green left the fill and its own label unrelated, and washed the border
+   out entirely on a warm ground like Halloween's parchment. */
+.cui-ui .cui-pill--success { background: color-mix(in srgb, var(--cui-success) 14%, transparent); border-color: color-mix(in srgb, var(--cui-success) 35%, transparent); color: var(--cui-success); }
+.cui-ui .cui-pill--warn    { background: color-mix(in srgb, var(--cui-warning) 14%, transparent); border-color: color-mix(in srgb, var(--cui-warning) 35%, transparent); color: var(--cui-warning); }
+.cui-ui .cui-pill--error   { background: color-mix(in srgb, var(--cui-error) 14%, transparent);   border-color: color-mix(in srgb, var(--cui-error) 35%, transparent);   color: var(--cui-error); }
+/* `--danger` is an alias of `--error` for naming parity with the button
+   variants; `--info` rounds out the set (uses the soft accent tint). */
+.cui-ui .cui-pill--danger  { background: color-mix(in srgb, var(--cui-error) 14%, transparent);   border-color: color-mix(in srgb, var(--cui-error) 40%, transparent);   color: var(--cui-error); }
+.cui-ui .cui-pill--info    { background: var(--cui-bg-2); border-color: var(--cui-info); color: var(--cui-info); }
+/* The palette's two non-lead hues, as pill families. Support carries the
+   featured card; third is the sparing note. Both are per theme. */
+.cui-ui .cui-pill--support { background: var(--cui-support-tint); border-color: var(--cui-support-line); color: var(--cui-support-text); }
+.cui-ui .cui-pill--third   { background: var(--cui-third-tint);   border-color: var(--cui-third-line);   color: var(--cui-third-text); }
+/* Neutral or quiet variant: a grey label pill with no accent, for calm metadata
+   tags (categories, "Advanced", counts) that shouldn't shout. */
+.cui-ui .cui-pill--neutral { background: var(--cui-bg-2); border-color: var(--cui-border-strong); color: var(--cui-fg-mute); }
+/* Plain variant: drops the uppercase + letter-spacing so mixed-case or numeric
+   content (e.g. "v3 -> v4") reads naturally; tabular figures keep numbers aligned.
+   Composable with --neutral. */
+.cui-ui .cui-pill--plain   { text-transform: none; letter-spacing: normal; font-variant-numeric: tabular-nums; }
 
 /* ---- Chip (interactive tag, e.g. filter selection) ---- */
 
@@ -314,9 +1562,9 @@
 }
 
 .cui-ui .cui-chip--active {
-  background: var(--cui-accent-mute);
-  border-color: var(--cui-accent-tint);
-  color: var(--cui-accent-soft);
+  background: var(--cui-support-tint);
+  border-color: var(--cui-support-line);
+  color: var(--cui-support-text);
 }
 
 /* ---- Input ---- */
@@ -330,7 +1578,7 @@
   border-radius: var(--cui-radius-sm);
   color: var(--cui-fg);
   font-family: inherit;
-  font-size: var(--cui-text-base);  /* 14px — avoids iOS zoom on focus */
+  font-size: var(--cui-text-base);  /* 14px base; bumped to 16px on touch (see the pointer:coarse rule below) so iOS does not zoom on focus */
   line-height: var(--cui-leading-normal);
   outline: none;
   transition: border-color var(--cui-duration) var(--cui-ease);
@@ -351,6 +1599,37 @@
   gap: var(--cui-space-1);
   font-size: var(--cui-text-sm);
   color: var(--cui-fg-mute);
+}
+
+/* ---- Field (labeled control with an optional hint) ---- */
+
+/* cui-label above is label+control only; cui-field adds the muted hint slot that
+   real forms need. Compose:
+     <label class="cui-field">
+       <span class="cui-field__label">Name</span>
+       <span class="cui-field__hint">Shown on the card</span>
+       <input class="cui-input" />
+     </label> */
+.cui-ui .cui-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cui-space-1);
+}
+
+.cui-ui .cui-field__label {
+  font-size: var(--cui-text-sm);
+  font-weight: var(--cui-weight-medium);
+  color: var(--cui-fg);
+}
+
+.cui-ui .cui-field__hint {
+  font-size: var(--cui-text-xs);
+  /* Was --cui-fg-dim, the tertiary/disabled tier, which every theme tunes
+     near 3:1 by design (a nine-theme review measured it 2.2 to 3.4:1 on the
+     raised surfaces this hint actually sits on). A hint is copy someone is
+     meant to read, not disabled text; that is --cui-fg-mute's job. */
+  color: var(--cui-fg-mute);
+  line-height: var(--cui-leading-normal);
 }
 
 /* ---- Heading ---- */
@@ -386,4 +1665,711 @@
 
 .cui-ui .cui-dim {
   color: var(--cui-fg-dim);
+}
+
+/* ---- Select ---- */
+
+.cui-ui .cui-select {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  width: 100%;
+  padding: var(--cui-space-2) calc(var(--cui-space-3) + 18px) var(--cui-space-2) var(--cui-space-3);
+  /* Was --cui-bg, the deepest ground rung. Inputs are documented to sit on
+     --cui-bg-2, the same as .cui-input/.cui-textarea; on a raised card
+     already at bg-2, a select painted at bg reads as a hole cut into it. */
+  background: var(--cui-bg-2);
+  border: var(--cui-border-width) solid var(--cui-border);
+  border-radius: var(--cui-radius-sm);
+  color: var(--cui-fg);
+  font-family: inherit;
+  font-size: var(--cui-text-base);  /* 14px base; bumped to 16px on touch (see the pointer:coarse rule below) so iOS does not zoom on focus */
+  line-height: var(--cui-leading-normal);
+  outline: none;
+  cursor: pointer;
+  /* The chevron's stroke is a literal: a native <select> cannot host a
+     pseudo-element in most browsers, so there is no CSS-variable-aware way
+     to paint this SVG per theme without replacing the control entirely.
+     Known, minor, cosmetic-only limitation; left as-is. */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='none' stroke='%239ca3af' stroke-width='1.5' d='M3 4.5l3 3 3-3'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right var(--cui-space-3) center;
+  transition: border-color var(--cui-duration) var(--cui-ease);
+}
+
+.cui-ui .cui-select:focus {
+  border-color: var(--cui-accent);
+}
+
+.cui-ui .cui-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* iOS Safari zooms the viewport on focus when a form control is under 16px.
+   14px does NOT avoid that (an earlier comment claimed it did). Bump inputs and
+   selects to 16px on touch only, so desktop keeps its denser 14px and pinch-zoom
+   stays available (no user-scalable=no, which would fail WCAG). Placed after both
+   base rules so it wins on source order without !important. */
+@media (pointer: coarse) {
+  .cui-ui .cui-input,
+  .cui-ui .cui-select {
+    font-size: 16px;
+  }
+}
+
+/* ---- Slider ---- */
+
+.cui-ui .cui-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--cui-bg-2);
+  border-radius: var(--cui-radius-pill);
+  outline: none;
+  cursor: pointer;
+}
+
+.cui-ui .cui-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--cui-accent);
+  border: 2px solid var(--cui-fg);
+  border-radius: var(--cui-radius-pill);
+  cursor: pointer;
+  transition: transform var(--cui-duration-fast) var(--cui-ease),
+              box-shadow var(--cui-duration-fast) var(--cui-ease);
+}
+
+.cui-ui .cui-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--cui-accent);
+  border: 2px solid var(--cui-fg);
+  border-radius: var(--cui-radius-pill);
+  cursor: pointer;
+}
+
+.cui-ui .cui-slider:hover::-webkit-slider-thumb { transform: scale(1.1); }
+.cui-ui .cui-slider:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px var(--cui-support-tint); }
+
+/* ---- Toggle ---- */
+
+.cui-ui .cui-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cui-space-2);
+  cursor: pointer;
+  user-select: none;
+  font-size: var(--cui-text-sm);
+  color: var(--cui-fg-mute);
+}
+
+.cui-ui .cui-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+}
+
+.cui-ui .cui-toggle__track {
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+  background: var(--cui-bg-3);
+  border: var(--cui-border-width) solid var(--cui-border);
+  border-radius: var(--cui-radius-pill);
+  position: relative;
+  transition: background var(--cui-duration) var(--cui-ease),
+              border-color var(--cui-duration) var(--cui-ease);
+}
+
+.cui-ui .cui-toggle__track::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 16px;
+  height: 16px;
+  background: var(--cui-fg);
+  border-radius: var(--cui-radius-pill);
+  transition: transform var(--cui-duration) var(--cui-ease),
+              background var(--cui-duration) var(--cui-ease);
+}
+
+.cui-ui .cui-toggle input:checked + .cui-toggle__track {
+  background: var(--cui-accent);
+  border-color: var(--cui-accent);
+}
+
+.cui-ui .cui-toggle input:checked + .cui-toggle__track::after {
+  transform: translateX(16px);
+  /* Sits on the accent fill, so it takes the accent's own label colour.
+     A literal white is 2.47:1 on Summer's track and 2.59:1 on Candyland's,
+     both under the 3:1 that 1.4.11 asks of a control indicator. */
+  background: var(--cui-on-accent);
+}
+
+.cui-ui .cui-toggle input:focus-visible + .cui-toggle__track {
+  box-shadow: 0 0 0 2px var(--cui-support-tint);
+}
+
+/* ---- Tabs ---- */
+
+.cui-ui .cui-tabs {
+  display: inline-flex;
+  gap: var(--cui-space-1);
+  background: var(--cui-bg-2);
+  border: var(--cui-border-width) solid var(--cui-border);
+  border-radius: var(--cui-radius-pill);
+  padding: 3px;
+}
+
+.cui-ui .cui-tab {
+  padding: var(--cui-space-2) var(--cui-space-4);
+  background: transparent;
+  border: 0;
+  border-radius: var(--cui-radius-pill);
+  color: var(--cui-fg-mute);
+  font-family: inherit;
+  font-size: var(--cui-text-sm);
+  font-weight: var(--cui-weight-medium);
+  cursor: pointer;
+  transition: color var(--cui-duration) var(--cui-ease),
+              background var(--cui-duration) var(--cui-ease);
+}
+
+.cui-ui .cui-tab:hover {
+  color: var(--cui-fg);
+}
+
+/* Was two hardcoded purple/blue literals, the retiring brand gradient
+   living inside a component rule. Now a flat accent fill from tokens. */
+.cui-ui .cui-tab--active {
+  background: var(--cui-accent);
+  color: var(--cui-on-accent);
+  box-shadow: var(--cui-shadow-sm);
+}
+
+.cui-ui .cui-tab--active:hover {
+  color: var(--cui-on-accent);
+}
+
+/* ---- Tooltip ---- */
+
+.cui-ui .cui-tooltip {
+  position: relative;
+  display: inline-block;
+}
+
+.cui-ui .cui-tooltip[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  background: var(--cui-bg-3);
+  border: var(--cui-border-width) solid var(--cui-border-strong);
+  border-radius: var(--cui-radius-sm);
+  color: var(--cui-fg);
+  font-size: var(--cui-text-xs);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--cui-duration) var(--cui-ease);
+  z-index: 10;
+}
+
+.cui-ui .cui-tooltip[data-tooltip]:hover::after,
+.cui-ui .cui-tooltip[data-tooltip]:focus-within::after {
+  opacity: 1;
+}
+
+/* ---- Modal ---- */
+
+.cui-ui .cui-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--cui-space-4);
+  z-index: 1000;
+  animation: cui-modal-backdrop-in var(--cui-duration) var(--cui-ease-out) both;
+}
+
+.cui-ui .cui-modal {
+  background: var(--cui-bg-2);
+  border: var(--cui-border-width) solid var(--cui-border);
+  border-radius: var(--cui-radius-lg);
+  padding: var(--cui-space-6);
+  max-width: 480px;
+  width: 100%;
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  box-shadow: var(--cui-shadow);
+  animation: cui-modal-in var(--cui-duration-slow) var(--cui-ease-out) both;
+}
+
+@keyframes cui-modal-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes cui-modal-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+
+/* ======================================================================
+   Added in 0.4.0. Everything below reads tokens only, so each primitive
+   renders in whichever of the nine themes is in scope.
+   ====================================================================== */
+
+/* ---- Button size + icon variants ---- */
+
+.cui-ui .cui-button--sm {
+  padding: var(--cui-space-1) var(--cui-space-3);
+  font-size: var(--cui-text-sm);
+  border-radius: var(--cui-radius-sm);
+}
+
+.cui-ui .cui-button--lg {
+  padding: var(--cui-space-3) var(--cui-space-5);
+  font-size: var(--cui-text-lg);
+  border-radius: var(--cui-radius-lg);
+}
+
+/* Square button for a lone glyph. Pair with an aria-label; an icon with
+   no accessible name is a button nobody using a screen reader can press. */
+.cui-ui .cui-button--icon {
+  padding: var(--cui-space-2);
+  width: 34px;
+  height: 34px;
+}
+
+/* ---- Button group ---- */
+
+/* Segmented run of buttons. Collapses the seam between them so the run
+   reads as one control rather than three that happen to touch. */
+.cui-ui .cui-button-group {
+  display: inline-flex;
+}
+
+.cui-ui .cui-button-group .cui-button {
+  border-radius: 0;
+  margin-left: calc(var(--cui-border-width) * -1);
+}
+
+.cui-ui .cui-button-group .cui-button:first-child {
+  border-radius: var(--cui-radius) 0 0 var(--cui-radius);
+  margin-left: 0;
+}
+
+.cui-ui .cui-button-group .cui-button:last-child {
+  border-radius: 0 var(--cui-radius) var(--cui-radius) 0;
+}
+
+/* ---- Textarea ---- */
+
+.cui-ui .cui-textarea {
+  width: 100%;
+  min-height: 66px;
+  resize: vertical;
+  padding: var(--cui-space-2) var(--cui-space-3);
+  background: var(--cui-bg-1);
+  color: var(--cui-fg);
+  font-family: inherit;
+  font-size: var(--cui-text-base);
+  line-height: var(--cui-leading-normal);
+  border: var(--cui-border-width) solid var(--cui-border-strong);
+  border-radius: var(--cui-radius);
+  transition: border-color var(--cui-duration-fast) var(--cui-ease);
+}
+
+.cui-ui .cui-textarea::placeholder { color: var(--cui-fg-dim); }
+
+.cui-ui .cui-textarea:focus {
+  outline: none;
+  border-color: var(--cui-accent);
+  box-shadow: 0 0 0 3px var(--cui-support-tint);
+}
+
+/* ---- Checkbox + radio ---- */
+
+/* Same idiom as .cui-toggle: a visually hidden real input carries state and
+   focus, an adjacent span carries the paint. Keyboard, screen readers and
+   form submission all work without a line of JavaScript. */
+.cui-ui .cui-choice {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cui-space-2);
+  font-size: var(--cui-text-base);
+  cursor: pointer;
+  user-select: none;
+}
+
+.cui-ui .cui-choice input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+}
+
+.cui-ui .cui-checkbox,
+.cui-ui .cui-radio {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cui-bg-1);
+  border: var(--cui-border-width) solid var(--cui-border-strong);
+  border-radius: var(--cui-radius-sm);
+  transition: background var(--cui-duration-fast) var(--cui-ease),
+              border-color var(--cui-duration-fast) var(--cui-ease);
+}
+
+.cui-ui .cui-radio { border-radius: var(--cui-radius-pill); }
+
+.cui-ui .cui-choice input:checked + .cui-checkbox {
+  background: var(--cui-accent);
+  border-color: var(--cui-accent);
+}
+
+.cui-ui .cui-choice input:checked + .cui-checkbox::after {
+  content: "";
+  width: 8px;
+  height: 4px;
+  border-left: 2px solid var(--cui-on-accent);
+  border-bottom: 2px solid var(--cui-on-accent);
+  transform: rotate(-45deg) translateY(-1px);
+}
+
+.cui-ui .cui-choice input:checked + .cui-radio { border-color: var(--cui-accent); }
+
+.cui-ui .cui-choice input:checked + .cui-radio::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: var(--cui-radius-pill);
+  background: var(--cui-accent);
+}
+
+.cui-ui .cui-choice input:focus-visible + .cui-checkbox,
+.cui-ui .cui-choice input:focus-visible + .cui-radio {
+  box-shadow: 0 0 0 3px var(--cui-support-tint);
+}
+
+.cui-ui .cui-choice input:disabled + .cui-checkbox,
+.cui-ui .cui-choice input:disabled + .cui-radio { opacity: 0.42; }
+
+/* ---- Help text ---- */
+
+.cui-ui .cui-help {
+  font-size: var(--cui-text-xs);
+  color: var(--cui-fg-dim);
+}
+
+/* Error hint under a control. Pair with .cui-input--error on the control
+   itself; colour alone is never the only signal. */
+.cui-ui .cui-help--error { color: var(--cui-error); }
+
+.cui-ui .cui-input--error,
+.cui-ui .cui-textarea--error,
+.cui-ui .cui-select--error { border-color: var(--cui-error); }
+
+/* ---- Alert ---- */
+
+/* Block-level message. The left stripe carries the status colour so the
+   fill stays neutral and the text keeps full contrast on any ground. */
+.cui-ui .cui-alert {
+  display: flex;
+  gap: var(--cui-space-3);
+  padding: var(--cui-space-3);
+  font-size: var(--cui-text-base);
+  background: var(--cui-bg-1);
+  border: var(--cui-border-width) solid var(--cui-border-strong);
+  border-left-width: 3px;
+  border-radius: 0 var(--cui-radius) var(--cui-radius) 0;
+}
+
+.cui-ui .cui-alert b { display: block; margin-bottom: 2px; }
+
+.cui-ui .cui-alert--success { border-left-color: var(--cui-success); }
+.cui-ui .cui-alert--success b { color: var(--cui-success); }
+.cui-ui .cui-alert--warning { border-left-color: var(--cui-warning); }
+.cui-ui .cui-alert--warning b { color: var(--cui-warning); }
+.cui-ui .cui-alert--error   { border-left-color: var(--cui-error); }
+.cui-ui .cui-alert--error b { color: var(--cui-error); }
+.cui-ui .cui-alert--info    { border-left-color: var(--cui-info); }
+.cui-ui .cui-alert--info b  { color: var(--cui-info); }
+
+/* ---- Toast ---- */
+
+.cui-ui .cui-toast {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cui-space-3);
+  padding: var(--cui-space-2) var(--cui-space-3);
+  font-size: var(--cui-text-base);
+  background: var(--cui-bg-3);
+  border: var(--cui-border-width) solid var(--cui-border-strong);
+  border-radius: var(--cui-radius);
+  box-shadow: var(--cui-shadow);
+}
+
+/* ---- Progress ---- */
+
+.cui-ui .cui-progress {
+  height: 7px;
+  overflow: hidden;
+  background: var(--cui-bg-3);
+  border-radius: var(--cui-radius-pill);
+}
+
+.cui-ui .cui-progress__bar {
+  display: block;
+  height: 100%;
+  background: var(--cui-accent);
+  border-radius: var(--cui-radius-pill);
+  transition: width var(--cui-duration) var(--cui-ease);
+}
+
+/* ---- Spinner ---- */
+
+.cui-ui .cui-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--cui-bg-3);
+  border-top-color: var(--cui-accent);
+  border-radius: var(--cui-radius-pill);
+  animation: cui-spin 800ms linear infinite;
+}
+
+@keyframes cui-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .cui-ui .cui-spinner { animation-duration: 2400ms; }
+}
+
+/* ---- Skeleton ---- */
+
+.cui-ui .cui-skeleton {
+  height: 11px;
+  background: var(--cui-bg-2);
+  border-radius: var(--cui-radius-sm);
+}
+
+/* ---- Table ---- */
+
+.cui-ui .cui-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--cui-text-sm);
+}
+
+.cui-ui .cui-table th {
+  padding: var(--cui-space-2) var(--cui-space-3);
+  text-align: left;
+  font-weight: var(--cui-weight-semibold);
+  color: var(--cui-fg-mute);
+  border-bottom: var(--cui-border-width) solid var(--cui-border-strong);
+}
+
+.cui-ui .cui-table td {
+  padding: var(--cui-space-2) var(--cui-space-3);
+  border-bottom: var(--cui-border-width) solid var(--cui-border);
+}
+
+.cui-ui .cui-table tbody tr:last-child td { border-bottom: 0; }
+
+/* ---- Avatar ---- */
+
+.cui-ui .cui-avatar {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--cui-text-sm);
+  font-weight: var(--cui-weight-bold);
+  background: var(--cui-support-tint);
+  border: var(--cui-border-width) solid var(--cui-support-line);
+  border-radius: var(--cui-radius-pill);
+  color: var(--cui-support-text);
+}
+
+/* Overlapping run. The ring is the surface behind it, so a stack reads
+   as separate faces rather than one blob. */
+.cui-ui .cui-avatar-stack { display: flex; }
+
+.cui-ui .cui-avatar-stack .cui-avatar {
+  margin-left: -8px;
+  border: 2px solid var(--cui-bg-1);
+}
+
+.cui-ui .cui-avatar-stack .cui-avatar:first-child { margin-left: 0; }
+
+/* ---- Stat ---- */
+
+.cui-ui .cui-stat {
+  margin: 0;
+  padding: var(--cui-space-3);
+  background: var(--cui-bg-1);
+  border: var(--cui-border-width) solid var(--cui-border);
+  border-radius: var(--cui-radius);
+}
+
+.cui-ui .cui-stat dt {
+  font-size: var(--cui-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cui-fg-dim);
+}
+
+.cui-ui .cui-stat dd {
+  margin: 3px 0 0;
+  font-size: var(--cui-text-2xl);
+  font-weight: var(--cui-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Breadcrumb ---- */
+
+.cui-ui .cui-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--cui-space-2);
+  font-size: var(--cui-text-sm);
+  color: var(--cui-fg-mute);
+}
+
+.cui-ui .cui-breadcrumb b {
+  color: var(--cui-fg);
+  font-weight: var(--cui-weight-semibold);
+}
+
+/* ---- Menu ---- */
+
+.cui-ui .cui-menu {
+  min-width: 190px;
+  padding: var(--cui-space-1);
+  background: var(--cui-bg-1);
+  border: var(--cui-border-width) solid var(--cui-border-strong);
+  border-radius: var(--cui-radius);
+  box-shadow: var(--cui-shadow-lg);
+}
+
+.cui-ui .cui-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--cui-space-2);
+  padding: var(--cui-space-2) var(--cui-space-3);
+  font-size: var(--cui-text-base);
+  border-radius: var(--cui-radius-sm);
+  cursor: pointer;
+}
+
+.cui-ui .cui-menu-item:hover { background: var(--cui-bg-2); }
+.cui-ui .cui-menu-item:focus-visible {
+  outline: none;
+  background: var(--cui-bg-2);
+  box-shadow: inset 0 0 0 2px var(--cui-accent);
+}
+
+.cui-ui .cui-menu-item--active {
+  background: var(--cui-support-tint);
+  color: var(--cui-support-text);
+}
+
+.cui-ui .cui-menu-sep {
+  height: var(--cui-border-width);
+  margin: var(--cui-space-1) 0;
+  background: var(--cui-border);
+}
+
+.cui-ui .cui-menu-key {
+  margin-left: auto;
+  font-family: var(--cui-font-mono);
+  font-size: var(--cui-text-xs);
+  color: var(--cui-fg-dim);
+}
+
+/* ---- Pagination ---- */
+
+.cui-ui .cui-pagination { display: flex; gap: var(--cui-space-1); }
+
+.cui-ui .cui-pagination > * {
+  min-width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--cui-text-sm);
+  color: var(--cui-fg-mute);
+  border: var(--cui-border-width) solid var(--cui-border);
+  border-radius: var(--cui-radius-sm);
+}
+
+.cui-ui .cui-pagination > .cui-is-current {
+  background: var(--cui-accent);
+  border-color: var(--cui-accent);
+  color: var(--cui-on-accent);
+}
+
+.cui-ui .cui-pagination > *:hover { background: var(--cui-bg-2); color: var(--cui-fg); }
+
+.cui-ui .cui-pagination > *:focus-visible {
+  outline: none;
+  border-color: var(--cui-accent);
+  box-shadow: 0 0 0 3px var(--cui-support-tint);
+}
+
+/* ---- Tile ---- */
+
+/* The square that fronts an app or a list row. Inside a hero card it
+   swaps to the featured-card tile tokens, where the accent is carried as
+   a glyph rather than as a fill; a saturated block at this size reads as
+   a badge rather than as a surface. */
+.cui-ui .cui-tile {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cui-third-tint);
+  border: var(--cui-border-width) solid var(--cui-third-line);
+  border-radius: var(--cui-radius);
+}
+
+.cui-ui .cui-card--hero .cui-tile {
+  background: var(--cui-tile);
+  border-color: var(--cui-tile-line);
+}
+
+.cui-ui .cui-tile svg { fill: var(--cui-third-text); }
+.cui-ui .cui-card--hero .cui-tile svg { fill: var(--cui-glyph); }
+
+/* ---- Empty state ---- */
+
+.cui-ui .cui-empty {
+  padding: var(--cui-space-6) var(--cui-space-4);
+  text-align: center;
+  border: var(--cui-border-width) dashed var(--cui-border-strong);
+  border-radius: var(--cui-radius);
 }
