@@ -12,9 +12,16 @@ import { App } from "./App";
 //   cp node_modules/@conjureos/ui/dist/ui.css src/conjureos-ui.css
 import "./conjureos-ui.css";
 import "./styles.css";
+import { initAppearance } from "./theme";
 
 const container = document.getElementById("root");
 if (!container) throw new Error("#root not found");
+
+// Resolve and apply the palette BEFORE React mounts, so <html> already carries
+// data-theme / data-flavor for the first paint. ConjureOS hands us its own
+// appearance through the injected shim, so following the OS costs no round
+// trip and no flash; after this, pushes arrive by postMessage.
+initAppearance();
 
 // Activate the Modern Whimsy tokens. They're scoped to `.cui-ui`, and the whole
 // app's palette resolves through that class being on <body>. Local `conj-pack

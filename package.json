@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.40.0",
+  "version": "0.41.0",
   "description": "Recipes for ConjureOS: browse a catalog, keep a pantry, get suggestions ranked by what you have, and plan a week of meals that shares a shopping list.",
   "type": "module",
   "license": "MIT",
@@ -601,7 +601,7 @@
       },
       "setBlocked": {
         "permission": "actions.write",
-        "description": "Stop (or resume) the week planner suggesting a catalog recipe. Affects RECOMMENDATIONS only — the recipe stays searchable, openable and cookable. Reversible.",
+        "description": "Stop (or resume) the week planner suggesting a catalog recipe. Affects RECOMMENDATIONS only \u2014 the recipe stays searchable, openable and cookable. Reversible.",
         "params": {
           "type": "object",
           "properties": {
@@ -759,7 +759,7 @@
       },
       "planWeek": {
         "permission": "actions.read",
-        "description": "Build a week of meals around the user's pantry and return it as a PROPOSAL. Does not save anything — the user commits a plan in the app. Honours their blocked list automatically.",
+        "description": "Build a week of meals around the user's pantry and return it as a PROPOSAL. Does not save anything \u2014 the user commits a plan in the app. Honours their blocked list automatically.",
         "params": {
           "type": "object",
           "properties": {
@@ -848,7 +848,7 @@
             },
             "saved": {
               "type": "boolean",
-              "description": "Always false — this action never persists."
+              "description": "Always false \u2014 this action never persists."
             }
           }
         }
@@ -893,7 +893,7 @@
             },
             "saved": {
               "type": "boolean",
-              "description": "Always false — this action never persists."
+              "description": "Always false \u2014 this action never persists."
             }
           }
         }
@@ -967,7 +967,7 @@
       },
       "renameFamily": {
         "permission": "actions.write",
-        "description": "Rename a household the user OWNS. Owner-only (the server rejects a non-owner) and reversible. Does not change who is in the family or what they can see — use the app for that.",
+        "description": "Rename a household the user OWNS. Owner-only (the server rejects a non-owner) and reversible. Does not change who is in the family or what they can see \u2014 use the app for that.",
         "params": {
           "type": "object",
           "properties": {
@@ -1015,7 +1015,8 @@
   "scripts": {
     "dev": "conj-pack dev",
     "build": "npx -y tsx scripts/build-bundle.mjs",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "test": "npx -y tsx scripts/theme.test.ts"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -1023,7 +1024,7 @@
   },
   "devDependencies": {
     "@conjureos/pack": "^0.1.1",
-    "@conjureos/ui": "^0.1.2",
+    "@conjureos/ui": "^1.0.3",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "typescript": "^5.6.3"

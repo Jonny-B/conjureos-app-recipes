@@ -38,9 +38,21 @@
   --success: var(--cui-success);
 
   /* Vivid purple→blue for filled buttons + active pills (the signature
-     gradient applied as an opaque fill, not the soft hero wash). */
-  --grad-primary: linear-gradient(135deg, var(--cui-accent), #4a9eff);
-  --grad-warm: linear-gradient(135deg, var(--cui-accent-soft), var(--cui-accent));
+     gradient applied as an opaque fill, not the soft hero wash).
+     Both stops of BOTH gradients below must come from the --cui-accent /
+     --cui-accent-hover pair, because --cui-on-accent (the label every call
+     site pairs these with) is calibrated ONLY against that pair. --grad-warm
+     used to run --cui-accent-soft -> --cui-accent - accent-soft is a
+     deprecated alias for --cui-link, a color chosen for TEXT, not for a
+     fill that carries on-accent - and on-accent-on-link measured as low as
+     2.11:1 (Christmas dark). Reordering the same two accent stops instead
+     of introducing a third color keeps every consumer of --grad-warm inside
+     the one calibrated pair; see DECISIONS.md 2026-09-10. If this ever needs
+     a third stop, it has to be --cui-accent or --cui-accent-hover again, not
+     --cui-link/--cui-accent-soft, --cui-fg, or any other un-calibrated
+     token. */
+  --grad-primary: linear-gradient(135deg, var(--cui-accent), var(--cui-accent-hover));
+  --grad-warm: linear-gradient(135deg, var(--cui-accent-hover), var(--cui-accent));
   --shadow-glow: var(--cui-shadow-accent);
   --shadow-soft: var(--cui-shadow);
 
@@ -145,7 +157,7 @@ select {
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  color: #fff;
+  color: var(--cui-on-accent);
   background: var(--grad-primary);
   box-shadow: var(--cui-shadow-accent);
 }
@@ -232,8 +244,96 @@ select {
 }
 .sheet-item:hover { background: var(--bg-3); }
 .sheet-item svg { width: 16px; height: 16px; color: var(--accent-soft); flex: 0 0 auto; }
-.sheet-item.danger { color: #ff6b6b; }
-.sheet-item.danger svg { color: #ff6b6b; }
+.sheet-item.danger { color: var(--cui-error); }
+.sheet-item.danger svg { color: var(--cui-error); }
+
+/* ---- Appearance sheet -------------------------------------------------
+   Every colour here resolves from a --cui-* token, because this is the one
+   panel guaranteed to be looked at in all eighteen theme/flavour
+   combinations: it is where they are chosen. */
+.appearance-title {
+  margin: 2px 12px 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--cui-fg);
+}
+.appearance-follow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--cui-bg-2);
+  border: 1px solid var(--cui-border);
+  cursor: pointer;
+}
+.appearance-follow-text { display: flex; flex-direction: column; gap: 3px; flex: 1 1 auto; }
+.appearance-follow-label { font-size: 14px; font-weight: 600; color: var(--cui-fg); }
+.appearance-follow-hint { font-size: 12px; color: var(--cui-fg-mute); }
+.appearance-switch {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--cui-accent);
+  cursor: pointer;
+}
+.appearance-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 12px 4px;
+  /* Dimmed rather than hidden while ConjureOS is being followed: the controls
+     still SHOW what is applied, which is the answer to "what am I on?" — and
+     a panel whose contents vanish reads as a bug rather than a mode. */
+  transition: opacity 0.15s ease;
+}
+.appearance-controls[aria-hidden="true"] { opacity: 0.45; }
+.appearance-field { display: flex; flex-direction: column; gap: 6px; }
+.appearance-field-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--cui-fg-mute);
+}
+.appearance-select {
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  color: var(--cui-fg);
+  background: var(--cui-bg-1);
+  border: 1px solid var(--cui-border);
+}
+.appearance-select:disabled { cursor: not-allowed; }
+.appearance-flavors { display: flex; gap: 8px; }
+.appearance-flavor {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--cui-fg);
+  background: var(--cui-bg-1);
+  border: 1px solid var(--cui-border);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.appearance-flavor svg { width: 14px; height: 14px; }
+.appearance-flavor:hover:not(:disabled) { border-color: var(--cui-border-strong); }
+.appearance-flavor.on {
+  background: var(--cui-accent);
+  border-color: var(--cui-accent);
+  color: var(--cui-on-accent);
+}
+.appearance-flavor.on svg { color: var(--cui-on-accent); }
+.appearance-flavor:disabled { cursor: not-allowed; }
+.appearance-done { justify-content: center; font-weight: 600; margin-top: 6px; }
 .sheet-sep { height: 1px; background: var(--cui-border); margin: 6px 12px; }
 .sheet-cancel {
   justify-content: center;
@@ -339,15 +439,20 @@ select {
   background: var(--cui-accent-mute);
 }
 
-/* Pill-shaped active state: accent-gradient backing + accent-tint ring +
-   soft accent glow (the canonical Modern Whimsy selected-affordance). */
+/* Pill-shaped active state: opaque accent-gradient backing + accent-tint ring
+   + soft accent glow (the canonical Modern Whimsy selected-affordance).
+   --cui-on-accent is only calibrated against an OPAQUE --cui-accent fill —
+   the previous version painted this as a color-mix(..., transparent) wash
+   over .nav-btn's own background, which is nowhere near opaque and read as
+   low as 1.88:1 in Fall dark. --grad-primary is accent -> accent-hover with
+   nothing mixed toward transparent, so on-accent stays correct here; don't
+   reintroduce a translucent stop under this label (see DECISIONS.md
+   2026-09-10, and --grad-warm above for the same mistake in a gradient). */
 .nav-btn.active {
-  color: #fff;
-  background: linear-gradient(135deg,
-    rgba(124, 106, 247, 0.6),
-    rgba(74, 158, 255, 0.45));
+  color: var(--cui-on-accent);
+  background: var(--grad-primary);
   box-shadow: 0 0 0 1px var(--cui-accent-tint),
-              0 4px 12px rgba(124, 106, 247, 0.25);
+              0 4px 12px color-mix(in srgb, var(--cui-accent) 25%, transparent);
 }
 
 /* ── Info popover (version + USDA quota) ──────────────────────────────
@@ -477,7 +582,7 @@ select {
   gap: 8px;
   background: var(--grad-primary);
   border: none;
-  color: #fff;
+  color: var(--cui-on-accent);
   padding: 11px 18px;
   /* Rounded-rect, not a full pill — the pill shape was the main "toy" tell.
      Matches the Conjure Health button radius. */
@@ -529,8 +634,18 @@ select {
 }
 
 .btn.danger {
-  background: linear-gradient(135deg, #ff6b8b, #e23d6a);
-  color: #fff;
+  /* The far stop was 70% error / 30% black. --cui-onstatus-d sits right next
+     to black (#0b0e14), so darkening the far end toward #000 in a dark
+     palette pushes it toward the label's own color instead of away from it -
+     8 of 9 dark palettes measured under 4.5:1, worst #0b0e14 on #ae4f4f at
+     3.70:1. 85% keeps a visible near-to-far shade step (14px/600 still needs
+     4.5:1) while the worst case (Conjure dark, #0b0e14 on #d36060) clears it
+     at 5.16:1. */
+  background: linear-gradient(135deg, var(--cui-error), color-mix(in srgb, var(--cui-error) 85%, #000));
+  /* --cui-onstatus, not --cui-on-accent: this fill is the error colour, and
+     the two labels differ (on-accent is dark in six palettes, onstatus tracks
+     the status hues instead). */
+  color: var(--cui-onstatus);
 }
 
 .btn.ghost {
@@ -709,7 +824,7 @@ select {
 .capture-area .icon {
   font-size: 40px;
   margin-bottom: 8px;
-  filter: drop-shadow(0 6px 14px rgba(124, 106, 247, 0.4));
+  filter: drop-shadow(0 6px 14px color-mix(in srgb, var(--cui-accent) 40%, transparent));
   line-height: 0;
 }
 
@@ -892,14 +1007,22 @@ select {
   transform: translateX(3px);
 }
 
+/* Both were hardcoded literals off the retired palette (a fixed teal, a
+   fixed orange), so a scanned ingredient stayed that exact color regardless
+   of theme. Mapped to the closest status role - confirmed reads as a good
+   outcome (--cui-success, matching .token-chip.on-hand/.pill.easy below),
+   unconfirmed as a caution (--cui-warning, matching .token-chip.to-buy).
+   .name keeps the default --fg color in both, so this is a background/border
+   tint under plain ink, not the text-on-its-own-wash shape the chips above
+   are; alphas kept exactly as they were. */
 .ing-row.confirmed {
-  border-color: rgba(94, 234, 212, 0.45);
-  background: rgba(94, 234, 212, 0.06);
+  border-color: color-mix(in srgb, var(--cui-success) 45%, transparent);
+  background: color-mix(in srgb, var(--cui-success) 6%, transparent);
 }
 
 .ing-row.unconfirmed {
-  border-color: rgba(255, 178, 77, 0.45);
-  background: rgba(255, 178, 77, 0.05);
+  border-color: color-mix(in srgb, var(--cui-warning) 45%, transparent);
+  background: color-mix(in srgb, var(--cui-warning) 5%, transparent);
 }
 
 .ing-row .name {
@@ -1083,22 +1206,33 @@ select {
   margin-right: 6px;
 }
 
+/* Difficulty pills: text is the status color itself, on a wash of that same
+   color, over --bg-1 (the recipe-card/browse-item surface). At 18% - the
+   original alpha on .easy/.hard - 7 of 18 palettes fell short of 4.5:1 by up
+   to ~0.5 (an 18% wash of a color this saturated pulls the background close
+   enough to the text's own hue to matter; it is not a conversion mistake,
+   just too strong at these hues). 11% clears 4.5:1 everywhere with room to
+   spare (worst case per token: success in Summer dark 4.62:1, error in
+   Christmas dark 4.78:1, warning in Halloween light 5.14:1); used on all
+   three so the trio still reads as one family of pill. There is
+   no --cui-* token for "amber/medium" specifically, so .medium borrows
+   --cui-warning, the closest role. */
 .recipe-card .pill.easy,
 .browse-item .pill.easy {
-  background: rgba(94, 234, 212, 0.18);
-  color: #8af0dd;
+  background: color-mix(in srgb, var(--cui-success) 11%, transparent);
+  color: var(--cui-success);
 }
 
 .recipe-card .pill.medium,
 .browse-item .pill.medium {
-  background: rgba(255, 178, 77, 0.18);
-  color: var(--butter);
+  background: color-mix(in srgb, var(--cui-warning) 11%, transparent);
+  color: var(--cui-warning);
 }
 
 .recipe-card .pill.hard,
 .browse-item .pill.hard {
-  background: rgba(255, 107, 139, 0.18);
-  color: #ffb0c0;
+  background: color-mix(in srgb, var(--cui-error) 11%, transparent);
+  color: var(--cui-error);
 }
 
 .recipe-card .summary {
@@ -1194,7 +1328,7 @@ select {
 
 .serving-stepper button:hover:not(:disabled) {
   background: var(--grad-primary);
-  color: #2a1840;
+  color: var(--cui-on-accent);
   transform: scale(1.12);
 }
 
@@ -1436,7 +1570,7 @@ select {
 .browse-item .made-pill {
   font-size: 12px;
   font-weight: 700;
-  color: #2a1840;
+  color: var(--cui-on-accent);
   background: var(--grad-warm);
   padding: 4px 11px;
   border-radius: 999px;
@@ -1472,18 +1606,25 @@ select {
   gap: 10px;
 }
 
+/* The wash was rgba(..., 0.09) before tokenizing and should have stayed at
+   9% - every other rule in that migration matched its source alpha exactly,
+   this one drifted to 12%. That's not cosmetic: a stronger wash pulls the
+   background toward the text's own color and LOWERS contrast, so 12% fails
+   in several palettes where 9% passes (worst measured: Halloween light
+   ~4.49-4.51:1 at 9%, vs ~4.29:1 at 12%). Border tokenized to match, same
+   0.45 alpha the literal already had. */
 .status-banner.error {
-  background: rgba(255, 107, 139, 0.09);
-  border-color: rgba(255, 107, 139, 0.45);
-  color: #ffb0c0;
+  background: color-mix(in srgb, var(--cui-error) 9%, transparent);
+  border-color: color-mix(in srgb, var(--cui-error) 45%, transparent);
+  color: var(--cui-error);
 }
 
 /* A question, not a failure — same shape as .error, warmer, and it wraps so
    the two buttons drop below the sentence on a phone. */
 .status-banner.warn {
-  background: rgba(255, 190, 92, 0.09);
-  border-color: rgba(255, 190, 92, 0.45);
-  color: #ffd9a0;
+  background: color-mix(in srgb, var(--cui-warning) 9%, transparent);
+  border-color: color-mix(in srgb, var(--cui-warning) 45%, transparent);
+  color: var(--cui-warning);
 }
 .plan-confirm {
   flex-wrap: wrap;
@@ -1766,20 +1907,35 @@ select {
   font-weight: 700;
 }
 
+/* Was a hardcoded literal (the exact dark-mode --cui-success hex, so it
+   never moved with theme). Tokenized at 11%, matching the pill wash fix
+   above - this chip is the same "status color as text on its own wash"
+   shape. That clears 4.5:1 everywhere this chip sits on --bg-1 (RecipeRow).
+   It also appears on .meal-card's --bg-2 (a visually "recessed," slightly
+   darker-toned surface in several light palettes), where --cui-success as
+   TEXT is not one of the pairings this file's review verified - even at 0%
+   wash Halloween light is only 4.16:1 there - so a handful of light
+   palettes stay under 4.5:1 on that surface at any visible wash strength.
+   Not one of the numbered findings above and not fixable from here without
+   either a new token or moving this chip off --bg-2; flagging rather than
+   picking a number that only looks like a fix. */
 .cov-chip.complete {
-  background: rgba(52, 211, 153, 0.16);
-  color: var(--mint);
+  background: color-mix(in srgb, var(--cui-success) 11%, transparent);
+  color: var(--cui-success);
 }
 
 .miss-chip {
-  background: rgba(248, 113, 113, 0.14);
-  color: #fca5a5;
+  background: color-mix(in srgb, var(--cui-error) 14%, transparent);
+  color: var(--cui-error);
   font-weight: 600;
 }
 
+/* Was a hardcoded literal (the exact dark-mode --cui-warning hex). 15% stays
+   - already clears 4.5:1 everywhere on --bg-1 (worst 4.85:1, Halloween
+   light). */
 .short-chip {
-  background: rgba(251, 191, 36, 0.15);
-  color: var(--tangerine);
+  background: color-mix(in srgb, var(--cui-warning) 15%, transparent);
+  color: var(--cui-warning);
   font-weight: 600;
 }
 
@@ -1790,7 +1946,7 @@ select {
 }
 
 .pill.cat {
-  background: rgba(124, 106, 247, 0.16);
+  background: color-mix(in srgb, var(--cui-accent) 16%, transparent);
   color: var(--accent-soft);
 }
 
@@ -1804,6 +1960,12 @@ select {
 
 /* ── Recipe detail: coverage banner, per-line "not in pantry", actions ── */
 
+/* Both were hardcoded literals (the dark-mode --cui-warning/--cui-success
+   hexes), so the banner stayed the same amber/green regardless of theme.
+   Alphas kept exactly as they were (9%/35%, 10%/40%): the sentence itself is
+   --fg, not the status color, so this wash isn't the same
+   text-on-its-own-tint shape as the chips above and has no comparable
+   4.5:1 risk (worst case measured well past 9:1). */
 .cov-banner {
   display: flex;
   align-items: center;
@@ -1811,14 +1973,14 @@ select {
   font-size: 13px;
   padding: 11px 14px;
   border-radius: 14px;
-  background: rgba(251, 191, 36, 0.09);
-  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: color-mix(in srgb, var(--cui-warning) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cui-warning) 35%, transparent);
   color: var(--fg);
 }
 
 .cov-banner.complete {
-  background: rgba(52, 211, 153, 0.1);
-  border-color: rgba(52, 211, 153, 0.4);
+  background: color-mix(in srgb, var(--cui-success) 10%, transparent);
+  border-color: color-mix(in srgb, var(--cui-success) 40%, transparent);
 }
 
 .cov-banner .fa-icon {
@@ -1834,7 +1996,7 @@ select {
 
 .ing-missing {
   font-size: 11px;
-  color: #fca5a5;
+  color: var(--cui-error);
   margin-top: 2px;
   padding-left: 10px;
   display: inline-flex;
@@ -1936,13 +2098,17 @@ select {
 
 .plan-step.active .plan-step-dot {
   background: var(--grad-primary);
-  color: #fff;
+  color: var(--cui-on-accent);
   border-color: transparent;
 }
 
+/* No current call site (superseded by the slim progress bar below), but same
+   defect if reintroduced: a hardcoded literal that never moved with theme.
+   11% matches the pill-wash fix above, same text-on-its-own-wash shape and
+   same reason 18% isn't safe here. */
 .plan-step.done .plan-step-dot {
-  background: rgba(52, 211, 153, 0.18);
-  color: var(--mint);
+  background: color-mix(in srgb, var(--cui-success) 11%, transparent);
+  color: var(--cui-success);
   border-color: transparent;
 }
 
@@ -2081,14 +2247,31 @@ select {
   height: 9px;
 }
 
+/* Was a hardcoded literal (the dark-mode --cui-success hex). This chip sits
+   directly on the page canvas (--cui-bg, via .ing-group in PlanWeekScreen),
+   a tighter surface than the --bg-1 cards above - Halloween light only has
+   ~4.9% of headroom before the wash itself drags text-on-its-own-tint under
+   4.5:1 there, so this one needs a much fainter wash than its siblings. 4%
+   clears everywhere (worst 4.55:1, Halloween light). */
 .token-chip.on-hand {
-  background: rgba(52, 211, 153, 0.14);
-  color: var(--mint);
+  background: color-mix(in srgb, var(--cui-success) 4%, transparent);
+  color: var(--cui-success);
 }
 
+/* Was a hardcoded literal (the dark-mode --cui-warning hex). Sits on
+   .meal-card's --bg-2. 15% (its original alpha) measured under 4.5:1 in
+   Halloween light once the wash tracks the theme's own, much darker,
+   light-mode warning hue (3.72:1) - the old fixed literal was a bright
+   dark-mode-tuned amber that happened to read fine there by coincidence, not
+   by design. 8% recovers most of that room (worst 4.45:1, Fall light) but
+   Halloween light stays short even here (4.08:1); this is the same
+   --bg-2-in-light-palettes ceiling noted on .cov-chip.complete above; a
+   fainter wash keeps chasing it without ever fully catching it (0% wash is
+   still only 0.4% of headroom in Halloween light), so flagging it rather
+   than picking a number that only looks like a fix. */
 .token-chip.to-buy {
-  background: rgba(251, 191, 36, 0.15);
-  color: var(--tangerine);
+  background: color-mix(in srgb, var(--cui-warning) 8%, transparent);
+  color: var(--cui-warning);
 }
 
 .token-chip.want {
@@ -2182,7 +2365,7 @@ select {
   gap: 12px;
   padding: 24px;
   border-radius: 22px;
-  background: linear-gradient(135deg, rgba(124, 106, 247, 0.2), rgba(74, 158, 255, 0.05) 70%),
+  background: linear-gradient(135deg, color-mix(in srgb, var(--cui-accent) 20%, transparent), color-mix(in srgb, var(--cui-accent-hover) 5%, transparent) 70%),
     var(--bg-1);
   border: 1px solid var(--cui-accent-tint);
   box-shadow: var(--cui-shadow-accent);
@@ -2280,7 +2463,7 @@ select {
 }
 
 .stat-tile.accent {
-  background: linear-gradient(135deg, rgba(124, 106, 247, 0.14), transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--cui-accent) 14%, transparent), transparent);
   border-color: var(--cui-accent-tint);
 }
 
@@ -2464,7 +2647,7 @@ select {
   height: 46px;
   border-radius: 14px;
   background: var(--grad-primary);
-  color: #fff;
+  color: var(--cui-on-accent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2521,10 +2704,17 @@ select {
 .seg-btn:hover {
   color: var(--cui-fg);
 }
+/* Opaque accent fill, not a wash: --cui-on-accent only has a contrast
+   guarantee against a solid --cui-accent/--cui-accent-hover surface. The
+   previous color-mix(..., transparent) pair here read on top of .seg's own
+   rgba(0,0,0,0.22) scrim, which is a translucent composite with no such
+   guarantee (measured as low as 1.88:1 in Fall dark). See DECISIONS.md
+   2026-09-10 - this is that mistake, twice - and don't put on-accent back on
+   anything less than the plain --grad-primary fill below. */
 .seg-btn.active {
-  color: #fff;
-  background: linear-gradient(135deg, rgba(124, 106, 247, 0.6), rgba(74, 158, 255, 0.45));
-  box-shadow: 0 0 0 1px var(--cui-accent-tint), 0 4px 12px rgba(124, 106, 247, 0.25);
+  color: var(--cui-on-accent);
+  background: var(--grad-primary);
+  box-shadow: 0 0 0 1px var(--cui-accent-tint), 0 4px 12px color-mix(in srgb, var(--cui-accent) 25%, transparent);
 }
 
 .lib-header { display: flex; align-items: center; gap: 8px; }
@@ -2546,7 +2736,7 @@ select {
   padding: 0 4px;
   border-radius: 999px;
   background: var(--grad-primary);
-  color: #fff;
+  color: var(--cui-on-accent);
   font-size: 10px;
   font-weight: 700;
   display: inline-flex;
@@ -2609,11 +2799,21 @@ select {
 .step-num { flex: 0 0 auto; width: 20px; height: 20px; color: var(--fg-faint); margin-top: 1px; }
 .step-num .fa-icon { width: 18px; height: 18px; }
 .step-row.checked .step-num { color: var(--mint); }
-.step-row.current { border-color: var(--cui-accent-tint); box-shadow: 0 0 0 1px var(--cui-accent-tint), 0 4px 14px rgba(124, 106, 247, 0.18); }
+.step-row.current { border-color: var(--cui-accent-tint); box-shadow: 0 0 0 1px var(--cui-accent-tint), 0 4px 14px color-mix(in srgb, var(--cui-accent) 18%, transparent); }
 .ing-tag { flex: 0 0 auto; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; display: inline-flex; align-items: center; gap: 4px; }
-.ing-tag.miss { background: rgba(255, 122, 122, 0.16); color: #ff9b9b; }
+/* 16% measured under 4.5:1 in three dark palettes (Spring/Summer/Christmas,
+   ~4.37-4.45:1) for the same reason the pill wash needed nudging: error as
+   text on its own wash, over --bg-1 via .step-row. 14% matches the value
+   .miss-chip (same role, same idiom) already uses correctly; worst case
+   4.53:1 (Summer dark). Not one of the numbered findings above - found while
+   fixing the sibling .low rule below - but it's the identical bug, so fixed
+   in the same pass rather than left half-migrated in its own new way. */
+.ing-tag.miss { background: color-mix(in srgb, var(--cui-error) 14%, transparent); color: var(--cui-error); }
 .ing-tag.miss .fa-icon { width: 10px; height: 10px; }
-.ing-tag.low { background: rgba(255, 184, 108, 0.16); color: var(--tangerine); }
+/* Was a hardcoded literal (never moved with theme); --cui-warning is the
+   closest role for "low stock." 16% stays - it already clears 4.5:1
+   everywhere on --bg-1 (worst 4.76:1, Halloween light). */
+.ing-tag.low { background: color-mix(in srgb, var(--cui-warning) 16%, transparent); color: var(--cui-warning); }
 
 .guided-done {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -2657,7 +2857,7 @@ select {
 .chef-thread { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .chef-hint { margin: 0; font-size: 13px; color: var(--fg-dim); line-height: 1.5; }
 .chef-msg { max-width: 85%; padding: 9px 12px; border-radius: 14px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
-.chef-msg.user { align-self: flex-end; background: var(--grad-primary); color: #fff; border-bottom-right-radius: 4px; }
+.chef-msg.user { align-self: flex-end; background: var(--grad-primary); color: var(--cui-on-accent); border-bottom-right-radius: 4px; }
 .chef-msg.assistant { align-self: flex-start; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
 .chef-typing { opacity: 0.7; font-style: italic; }
 .chef-input { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--border); }
@@ -2891,7 +3091,7 @@ select {
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #2a1840;
+  color: var(--cui-on-accent);
   background: var(--grad-warm);
   padding: 2px 9px;
   border-radius: 999px;
@@ -2916,7 +3116,7 @@ select {
   gap: 6px;
 }
 .shopping-progress .all-done {
-  color: #8af0dd;
+  color: var(--cui-success);
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -2948,7 +3148,7 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #2a1840;
+  color: var(--cui-on-accent);
   flex: 0 0 auto;
   transition: background 0.15s, border-color 0.15s;
 }
@@ -3089,7 +3289,7 @@ select {
   padding: 6px 12px;
   cursor: pointer;
 }
-.chip-tab.active { color: #fff; background: var(--grad-primary); border-color: transparent; }
+.chip-tab.active { color: var(--cui-on-accent); background: var(--grad-primary); border-color: transparent; }
 .chip-default {
   font-size: 10px;
   font-weight: 700;
@@ -3148,7 +3348,7 @@ select {
   cursor: pointer;
   transition: all 0.12s;
 }
-.cat-chip.on { color: #fff; background: var(--grad-primary); border-color: transparent; }
+.cat-chip.on { color: var(--cui-on-accent); background: var(--grad-primary); border-color: transparent; }
 
 .exception-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .exception-kw {
@@ -3276,8 +3476,8 @@ select {
   padding: 10px 14px;
   margin-bottom: 8px;
 }
-.username-claimed svg { width: 14px; height: 14px; color: #8af0dd; }
-.fam-error { color: #ffb0c0; font-size: 13px; margin-top: 6px; }
+.username-claimed svg { width: 14px; height: 14px; color: var(--cui-success); }
+.fam-error { color: var(--cui-error); font-size: 13px; margin-top: 6px; }
 .fam-note { color: var(--fg-dim); font-size: 13px; margin-top: 4px; }
 
 .fam-pending-tag {
@@ -3332,7 +3532,7 @@ select {
   height: 48px;
   border-radius: 14px;
   background: var(--grad-warm);
-  color: #2a1840;
+  color: var(--cui-on-accent);
 }
 .join-badge svg { width: 22px; height: 22px; }
 .join-actions { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
@@ -3366,7 +3566,7 @@ select {
   justify-content: center;
   border-radius: 10px;
   background: var(--grad-warm);
-  color: #2a1840;
+  color: var(--cui-on-accent);
 }
 .invite-banner-icon svg { width: 16px; height: 16px; }
 .invite-banner-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
