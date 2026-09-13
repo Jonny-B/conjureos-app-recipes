@@ -61,6 +61,15 @@ export function AppearanceSheet({ onClose }: { onClose: () => void }) {
     ? (THEMES.find((t) => t.id === state.osTheme)?.label ?? state.osTheme)
     : "Conjure";
 
+  // What the pickers show, in every state, per the CSS comment above
+  // .appearance-controls: dimmed while following, but still showing what is
+  // applied. state.theme / state.flavor already resolve the app's own
+  // override over what ConjureOS is wearing; the "?? " below is only the
+  // last rung, for when neither axis has an opinion — the Conjure/dark
+  // default overrideConjureOS() itself falls back to.
+  const effectiveTheme: ThemeId = state.theme ?? "cnj";
+  const effectiveFlavor: Flavor = state.flavor ?? "dark";
+
   return (
     <div className="sheet-overlay" onClick={onClose}>
       <div
@@ -97,7 +106,7 @@ export function AppearanceSheet({ onClose }: { onClose: () => void }) {
             <span className="appearance-field-label">Theme</span>
             <select
               className="appearance-select"
-              value={state.userTheme ?? ""}
+              value={effectiveTheme}
               disabled={following}
               onChange={(e) => pickTheme(e.target.value)}
             >
@@ -116,9 +125,9 @@ export function AppearanceSheet({ onClose }: { onClose: () => void }) {
                 <button
                   key={f}
                   type="button"
-                  className={`appearance-flavor${state.userFlavor === f ? " on" : ""}`}
+                  className={`appearance-flavor${effectiveFlavor === f ? " on" : ""}`}
                   disabled={following}
-                  aria-pressed={state.userFlavor === f}
+                  aria-pressed={effectiveFlavor === f}
                   onClick={() => pickFlavor(f)}
                 >
                   <Icon name={f === "dark" ? "moon" : "sun"} />

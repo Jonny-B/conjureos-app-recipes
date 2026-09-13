@@ -29,6 +29,14 @@ interface Env {
   fromShell(theme: string | null, flavor: string | null): void;
   /** The same message from a page that is not the embedder. */
   fromElsewhere(theme: string | null, flavor: string | null): void;
+  /** Another tab writing this app's stored choice — real localStorage is
+   *  shared, so the write lands in `store` too, then the `storage` event
+   *  fires here exactly as it would in a second real tab. */
+  fromOtherTab(theme: string | null, flavor: string | null): void;
+  /** The raw `storage` event a write or `removeItem` elsewhere causes here.
+   *  Lower-level than fromOtherTab, for the cases it does not cover: a
+   *  different key, and a removal (`newValue: null`). */
+  fireStorage(key: string, newValue: string | null): void;
   posted: unknown[];
 }
 
@@ -37,6 +45,7 @@ function makeEnv({ embedded = true }: { embedded?: boolean } = {}): Env {
   const store: Record<string, string> = {};
   const posted: unknown[] = [];
   let onMessage: ((ev: MessageEvent) => void) | null = null;
+  let onStorage: ((ev: StorageEvent) => void) | null = null;
 
   const parent = { postMessage: (m: unknown) => posted.push(m) };
   const win = {
@@ -56,8 +65,9 @@ function makeEnv({ embedded = true }: { embedded?: boolean } = {}): Env {
         store[k] = v;
       },
     },
-    addEventListener: (type: string, fn: (ev: MessageEvent) => void) => {
+    addEventListener: (type: string, fn: (ev: unknown) => void) => {
       if (type === "message") onMessage = fn;
+      if (type === "storage") onStorage = fn;
     },
   } as unknown as Window & typeof globalThis;
   // Standalone is modelled as parent === self, which is what a top-level page
@@ -66,6 +76,9 @@ function makeEnv({ embedded = true }: { embedded?: boolean } = {}): Env {
 
   const fire = (source: unknown, theme: string | null, flavor: string | null) =>
     onMessage?.({ data: { type: "conjureos:theme", theme, flavor }, source } as MessageEvent);
+
+  const fireStorage = (key: string, newValue: string | null) =>
+    onStorage?.({ key, newValue } as StorageEvent);
 
   return {
     win,
@@ -77,6 +90,13 @@ function makeEnv({ embedded = true }: { embedded?: boolean } = {}): Env {
     },
     fromShell: (theme, flavor) => fire(parent, theme, flavor),
     fromElsewhere: (theme, flavor) => fire({}, theme, flavor),
+    fromOtherTab: (theme, flavor) => {
+      // Real localStorage is shared storage: another tab's write lands here
+      // too, which is exactly what makes a plain re-read the right fix.
+      store[STORAGE_KEY] = JSON.stringify({ theme, flavor });
+      fireStorage(STORAGE_KEY, store[STORAGE_KEY]!);
+    },
+    fireStorage,
   };
 }
 
@@ -251,6 +271,82 @@ const tests: Record<string, () => void> = {
     createAppearance(e.win).init();
     ok(!("data-theme" in e.attrs), "unknown palette not written through");
     ok(!("data-flavor" in e.attrs), "unknown flavor not written through");
+  },
+
+  "standalone, a message claiming to be ConjureOS is refused"() {
+    // The bug this guards: `win.parent && win.parent !== win && ev.source
+    // !== win.parent` short-circuits to false the moment win.parent === win
+    // (standalone), so the early return never fires and a message from ANY
+    // sender gets applied. makeEnv({embedded:false}) + fromElsewhere compose
+    // to reproduce exactly that: no embedder at all, plus a sender that is
+    // not one either.
+    const e = makeEnv({ embedded: false });
+    const t = createAppearance(e.win);
+    t.init();
+    e.fromElsewhere("hal", "dark");
+    ok(!("data-theme" in e.attrs), "no theme applied with no embedder to vouch for the sender");
+    ok(!("data-flavor" in e.attrs), "no flavor applied either");
+    ok(!t.resolve().inConjureOS, "inConjureOS stays false: nothing here is ConjureOS");
+  },
+
+  "a tab that never reloaded still hears another tab's write"() {
+    // Two tabs share one localStorage key. Without a storage listener, this
+    // tab's next write would re-serialize its own stale snapshot and
+    // silently clobber what the other tab just saved.
+    const e = makeEnv();
+    const t = createAppearance(e.win);
+    t.init();
+    e.fromOtherTab("hal", "light");
+    ok(e.attrs["data-theme"] === "hal", "the other tab's theme is applied here");
+    ok(e.attrs["data-flavor"] === "light", "and its flavor");
+    const a = t.resolve();
+    ok(
+      a.userTheme === "hal" && a.userFlavor === "light",
+      "this tab's own state now matches, so its next write will not clobber the other tab's",
+    );
+  },
+
+  "another tab clearing the stored choice is picked up here too"() {
+    // event.newValue is null when the key is removed elsewhere — this must
+    // reset the override, not leave the stale in-memory value in place.
+    const e = makeEnv();
+    const t = createAppearance(e.win);
+    t.init();
+    t.setTheme("hal");
+    ok(e.attrs["data-theme"] === "hal", "sanity: this tab's own override applied first");
+    delete e.store[STORAGE_KEY];
+    e.fireStorage(STORAGE_KEY, null);
+    ok(!("data-theme" in e.attrs), "cleared once another tab removes the stored choice");
+    ok(t.resolve().following, "back to following ConjureOS");
+  },
+
+  "a storage event for a different key is ignored"() {
+    // event.key must be checked against this app's own key — an unrelated
+    // key changing (another app on the same origin, say) must not re-apply.
+    const e = makeEnv();
+    const t = createAppearance(e.win);
+    t.init();
+    const seen: Appearance[] = [];
+    t.subscribe((a) => seen.push(a));
+    e.fireStorage("some.other.app.key", JSON.stringify({ theme: "hal", flavor: "dark" }));
+    ok(seen.length === 0, "an unrelated key must not re-apply this app's appearance");
+  },
+
+  "a partially-valid stored value keeps its axes independent, not fully unset"() {
+    // {"theme":"hal"} with no flavor key at all — a truncated write, or a
+    // future schema change. following reads false, correctly: the theme axis
+    // really is overridden. The flavor axis is still genuinely following
+    // ConjureOS, and must resolve to what ConjureOS is wearing (what the
+    // picker is meant to show), not to nothing.
+    const e = makeEnv();
+    e.inject("win", "light");
+    e.store[STORAGE_KEY] = JSON.stringify({ theme: "hal" });
+    const a = createAppearance(e.win).init();
+    ok(a.userTheme === "hal", "the stored theme override read back");
+    ok(a.userFlavor === null, "no stored flavor, so that axis is still following");
+    ok(!a.following, "the switch reads off: one axis really is overridden");
+    ok(a.theme === "hal", "the effective theme the picker shows is the override");
+    ok(a.flavor === "light", "the effective flavor the picker shows is what ConjureOS is wearing, not nothing");
   },
 };
 

@@ -126,12 +126,20 @@ export function createAppearance(
   const readStore = (): void => {
     try {
       const raw = win.localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
+      if (!raw) {
+        state.userTheme = null;
+        state.userFlavor = null;
+        return;
+      }
       const saved = JSON.parse(raw) as { theme?: unknown; flavor?: unknown };
       state.userTheme = asTheme(saved.theme);
       state.userFlavor = asFlavor(saved.flavor);
     } catch {
-      /* private mode, or a corrupt value. Both mean "no stored choice". */
+      // Private mode, or a corrupt value. Both mean "no stored choice" — and
+      // because another tab's `storage` event calls this a second time, it
+      // must actively clear rather than leave a stale value from before.
+      state.userTheme = null;
+      state.userFlavor = null;
     }
   };
 
@@ -212,15 +220,31 @@ export function createAppearance(
       flavor?: unknown;
     } | null;
     if (!data || data.type !== MSG) return;
-    // Only the embedder drives the OS layer. A message from anywhere else is
-    // some other page trying to restyle an app it does not own.
-    if (win.parent && win.parent !== win && ev.source !== win.parent) return;
+    // Only the embedder can speak for ConjureOS. With no embedder at all —
+    // this window is its own parent — there is no ConjureOS to speak for it,
+    // so we reject before even checking who sent the message.
+    const embedded = win.parent && win.parent !== win;
+    if (!embedded) return;
+    if (ev.source !== win.parent) return;
     const theme = asTheme(data.theme);
     const flavor = asFlavor(data.flavor);
     state.inConjureOS = true;
     if (theme === state.osTheme && flavor === state.osFlavor) return;
     state.osTheme = theme;
     state.osFlavor = flavor;
+    apply();
+  };
+
+  /**
+   * Two tabs of the app share one localStorage key. `storage` fires only in
+   * OTHER tabs than the one that wrote — never this one — which is exactly
+   * the case that matters: a tab left open since before another tab's write
+   * has to notice, or its own next write re-serializes a stale snapshot and
+   * silently clobbers what the other tab just saved.
+   */
+  const onStorage = (ev: StorageEvent): void => {
+    if (ev.key !== STORAGE_KEY) return;
+    readStore();
     apply();
   };
 
@@ -235,6 +259,7 @@ export function createAppearance(
       readStore();
       readBoot();
       win.addEventListener("message", onMessage);
+      win.addEventListener("storage", onStorage);
       // Announce ourselves, for the case where the shell booted before we did
       // and has no reason to broadcast again. Nothing listening means we simply
       // keep whatever the shim gave us.
