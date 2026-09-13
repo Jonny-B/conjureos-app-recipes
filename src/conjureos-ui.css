@@ -3,10 +3,21 @@
    imports to the jspm ESM CDN, which cannot serve it. So we vendor it here and
    import it by relative path (see src/main.tsx). Re-sync from the devDependency
    when the design tokens change:
+
      cp node_modules/@conjureos/ui/dist/ui.css src/conjureos-ui.css
-   src/theme.test.ts asserts this file still carries all nine palettes, so a
-   re-sync that lands an older build fails the suite instead of silently
-   flattening every theme back to one. */
+
+   That cp OVERWRITES THIS COMMENT along with the rest of the file — it is not
+   part of the upstream package, so nothing brings it back for you. Put this
+   header block back immediately after re-syncing — everything up to (not
+   including) the `/*! @conjureos/ui v...` version banner right below it is
+   this block, so pull it from git history (`git show
+   HEAD:src/conjureos-ui.css`, or `git diff` right after the cp) and prepend
+   it back — and commit it together with the new file, or the next person to
+   re-sync has no warning that this file must stay 1.x.
+   `scripts/theme.test.ts` asserts this file still carries all nine
+   `[data-theme="…"]` palette blocks, so a re-sync that lands an older,
+   single-palette build fails `npm test` instead of silently flattening
+   every theme back to one and making every picker option do nothing. */
 /*!
  * @conjureos/ui v1.0.3
  * MIT License, https://github.com/Jonny-B/conjureos-ui

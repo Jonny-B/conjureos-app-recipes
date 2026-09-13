@@ -23,17 +23,24 @@ Treat "`dist/recipes.html` loads clean" as the gate for any publish.
 Recipes follows the ConjureOS theme, and lets the user override it per-app.
 `src/theme.ts` is the ladder (this app's stored choice, then ConjureOS, then
 the Conjure default), `src/components/AppearanceSheet.tsx` is the UI behind the
-cog. `npm test` runs `scripts/theme.test.ts` against it: 15 cases, plain tsx,
-no framework.
+cog. `npm test` runs `scripts/theme.test.ts` against it: 21 cases, plain tsx,
+no framework — 20 exercise `theme.ts`'s own logic, and one instead reads
+`src/conjureos-ui.css` off disk to guard the re-sync below.
 
 `src/conjureos-ui.css` is a VENDORED copy of `@conjureos/ui` `dist/ui.css` and
 must stay at a 1.x version — 0.x had one dark palette, so an accidental
 re-sync from an older build flattens all nine themes back to one and every
-picker option does nothing. Re-sync with:
+picker option does nothing (`npm test` catches this: the guard case above
+fails if any of the nine `[data-theme="…"]` blocks goes missing). Re-sync
+with:
 
 ```
 cp node_modules/@conjureos/ui/dist/ui.css src/conjureos-ui.css
 ```
+
+That also wipes the header comment at the top of the file, which is not part
+of the upstream package — put it back from git history before committing the
+re-sync (the comment itself has the exact command).
 
 Never hardcode a colour in `src/styles.css`. Every literal is right in at most
 one of the eighteen theme/flavour combinations; `--cui-on-accent` in

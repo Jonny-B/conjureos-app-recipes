@@ -10,6 +10,7 @@
  * message listener. Assertions are written against what lands on <html>,
  * because that is the whole contract — everything else is bookkeeping.
  */
+import { readFileSync } from "node:fs";
 import { createAppearance, type Appearance } from "../src/theme";
 
 let failures = 0;
@@ -347,6 +348,21 @@ const tests: Record<string, () => void> = {
     ok(!a.following, "the switch reads off: one axis really is overridden");
     ok(a.theme === "hal", "the effective theme the picker shows is the override");
     ok(a.flavor === "light", "the effective flavor the picker shows is what ConjureOS is wearing, not nothing");
+  },
+
+  "the vendored @conjureos/ui stylesheet still carries all nine palettes"() {
+    // Every other case in this file exercises theme.ts's own logic and never
+    // reads a stylesheet at all, so a re-sync that lands an older,
+    // single-palette build (see CLAUDE.md's Appearance section) would pass
+    // the whole suite in silence while flattening every picker option to a
+    // no-op. This is the one case that actually reads
+    // src/conjureos-ui.css, which is what the header comment at the top of
+    // that file claims happens - read it from disk rather than importing it,
+    // since CSS has no exports to check against.
+    const css = readFileSync(new URL("../src/conjureos-ui.css", import.meta.url), "utf8");
+    const palettes = ["cnj", "hal", "fal", "win", "spr", "sum", "xms", "est", "cnd"];
+    const missing = palettes.filter((p) => !css.includes(`[data-theme="${p}"]`));
+    ok(missing.length === 0, `vendored stylesheet is missing palette(s): ${missing.join(", ")}`);
   },
 };
 
