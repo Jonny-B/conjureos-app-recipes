@@ -5,7 +5,8 @@ name: Publish to ConjureOS App Store
 # pipeline a user-imported store app goes through.
 #
 # Two Supabase projects (Phase 24 split), selected by trigger:
-#   - workflow_dispatch  -> DEV  project (test against dev.conjureos.pages.dev)
+#   - workflow_dispatch  -> the `target` input: DEV by default (test against
+#                           dev.conjureos.pages.dev), or PROD to ship for real
 #   - release published  -> PROD project (ships to real users)
 #
 # Only secret you must add per repo is the bot password (dev + prod) and a
@@ -18,6 +19,12 @@ on:
     types: [published]
   workflow_dispatch:
     inputs:
+      target:
+        description: Which project to publish to
+        required: true
+        default: dev
+        type: choice
+        options: [dev, prod]
       changelog:
         description: Changelog for this version
         required: false
@@ -94,9 +101,15 @@ jobs:
       # failed" while public catalog browse kept working. Defaulting to prod
       # means an unstamped publish is at worst correct for real users; dev
       # publishes still come through this workflow and get stamped to dev.
+      #
+      # This follows `target`, not just event_name: a dispatch with
+      # target=prod must stamp the PROD ref, or it reintroduces the bug above.
       - name: Stamp recipes-db backend URL into manifest
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          TARGET: ${{ inputs.target }}
         run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
+          if [ "$EVENT_NAME" = "release" ] || [ "$TARGET" = "prod" ]; then
             REF="${{ secrets.SUPABASE_PROD_PROJECT_REF }}"
           else
             REF="${{ secrets.SUPABASE_DEV_PROJECT_REF }}"
@@ -106,7 +119,7 @@ jobs:
 
       # workflow_dispatch -> DEV project. Test path; publishes to dev users.
       - name: Publish to App Store (dev)
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && inputs.target != 'prod'
         uses: ./.conjureos/.github/actions/publish-anchor-app
         with:
           supabase-url: https://${{ secrets.SUPABASE_DEV_PROJECT_REF }}.supabase.co
@@ -119,9 +132,10 @@ jobs:
           slug: recipes
           changelog: ${{ steps.changelog.outputs.text }}
 
-      # release published -> PROD project. Ships to real users.
+      # release published (or dispatch with target=prod) -> PROD project.
+      # Ships to real users.
       - name: Publish to App Store (prod)
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.target == 'prod')
         uses: ./.conjureos/.github/actions/publish-anchor-app
         with:
           supabase-url: https://${{ secrets.SUPABASE_PROD_PROJECT_REF }}.supabase.co
