@@ -1,73 +1,38 @@
 import { useEffect, useState } from "react";
 import {
   FLAVORS,
-  THEMES,
-  followConjureOS,
-  overrideConjureOS,
   resolve,
   setFlavor,
-  setTheme,
   subscribeAppearance,
   type Appearance,
   type Flavor,
-  type ThemeId,
 } from "../theme";
 import { Icon } from "../icons";
 
 /**
- * Recipes' own appearance controls.
+ * Recipes' own appearance control: light or dark. That's the whole sheet.
  *
- * One switch and two pickers, in that order because the switch decides whether
- * the pickers mean anything:
- *
- *   Use ConjureOS appearance   on  → the palette and light/dark follow the OS,
- *                                    live, and both pickers are disabled
- *                              off → Recipes keeps its own pair, and the
- *                                    pickers are how you set them
- *
- * Turning the switch OFF does not change how the app looks. It seeds both
- * axes from whatever is on screen and hands the controls over, so the act of
- * taking control is not also a restyle the user did not ask for. Turning it
- * back ON drops both overrides in one write, so the app never spends a frame
- * with the palette following the OS and the flavor not.
- *
- * Outside ConjureOS (`npm run dev`, the standalone dist smoke test) there is
- * no OS to follow. The switch stays, because the stored state is the same
- * either way and hiding it would make the two builds diverge, but the hint
- * says plainly that nothing is answering.
+ * The palette is locked to Spring, so there is nothing to pick there and no
+ * picker for it. Until the user taps one of these two buttons, the flavor
+ * tracks whatever ConjureOS is wearing, live; the first tap is a one-way
+ * door — from then on this app's own stored choice wins, in or out of
+ * ConjureOS, and this sheet has no control that hands it back.
  */
 export function AppearanceSheet({ onClose }: { onClose: () => void }) {
   const [state, setState] = useState<Appearance>(() => resolve());
 
-  // Also fires for pushes from ConjureOS, so the controls stay honest while
-  // someone changes the OS theme in another window with this sheet open.
+  // Also fires for pushes from ConjureOS, so the buttons stay honest while
+  // someone changes the OS flavor in another window with this sheet open —
+  // right up until the user's own choice takes over.
   useEffect(() => subscribeAppearance(setState), []);
-
-  const following = state.following;
-
-  const toggleFollow = () => {
-    setState(following ? overrideConjureOS() : followConjureOS());
-  };
-
-  const pickTheme = (raw: string) => {
-    setState(setTheme((raw || null) as ThemeId | null));
-  };
 
   const pickFlavor = (next: Flavor) => {
     setState(setFlavor(next));
   };
 
-  const osLabel = state.osTheme
-    ? (THEMES.find((t) => t.id === state.osTheme)?.label ?? state.osTheme)
-    : "Conjure";
-
-  // What the pickers show, in every state, per the CSS comment above
-  // .appearance-controls: dimmed while following, but still showing what is
-  // applied. state.theme / state.flavor already resolve the app's own
-  // override over what ConjureOS is wearing; the "?? " below is only the
-  // last rung, for when neither axis has an opinion — the Conjure/dark
-  // default overrideConjureOS() itself falls back to.
-  const effectiveTheme: ThemeId = state.theme ?? "cnj";
+  // Falls back to "dark" only to give a button something to highlight when
+  // nothing has an opinion yet (no stored choice, no ConjureOS to follow);
+  // it never writes an attribute on its own — see theme.ts.
   const effectiveFlavor: Flavor = state.flavor ?? "dark";
 
   return (
@@ -82,42 +47,7 @@ export function AppearanceSheet({ onClose }: { onClose: () => void }) {
         <div className="sheet-handle" />
         <h2 className="appearance-title">Appearance</h2>
 
-        <label className="appearance-follow">
-          <span className="appearance-follow-text">
-            <span className="appearance-follow-label">Use ConjureOS appearance</span>
-            <span className="appearance-follow-hint">
-              {state.inConjureOS
-                ? `ConjureOS is on ${osLabel}${state.osFlavor ? `, ${state.osFlavor}` : ""}.`
-                : "Nothing is answering — Recipes is running outside ConjureOS."}
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            className="appearance-switch"
-            checked={following}
-            onChange={toggleFollow}
-            role="switch"
-            aria-checked={following}
-          />
-        </label>
-
-        <div className="appearance-controls" aria-hidden={following}>
-          <label className="appearance-field">
-            <span className="appearance-field-label">Theme</span>
-            <select
-              className="appearance-select"
-              value={effectiveTheme}
-              disabled={following}
-              onChange={(e) => pickTheme(e.target.value)}
-            >
-              {THEMES.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
+        <div className="appearance-controls">
           <div className="appearance-field">
             <span className="appearance-field-label">Light or dark</span>
             <div className="appearance-flavors">
@@ -126,7 +56,6 @@ export function AppearanceSheet({ onClose }: { onClose: () => void }) {
                   key={f}
                   type="button"
                   className={`appearance-flavor${effectiveFlavor === f ? " on" : ""}`}
-                  disabled={following}
                   aria-pressed={effectiveFlavor === f}
                   onClick={() => pickFlavor(f)}
                 >
