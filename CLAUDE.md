@@ -20,19 +20,29 @@ Treat "`dist/recipes.html` loads clean" as the gate for any publish.
 
 ## Appearance
 
-Recipes follows the ConjureOS theme, and lets the user override it per-app.
-`src/theme.ts` is the ladder (this app's stored choice, then ConjureOS, then
-the Conjure default), `src/components/AppearanceSheet.tsx` is the UI behind the
-cog. `npm test` runs `scripts/theme.test.ts` against it: 21 cases, plain tsx,
-no framework — 20 exercise `theme.ts`'s own logic, and one instead reads
+Recipes is locked to the Spring palette (`spr`); the only appearance choice a
+user makes inside the app is light or dark. `src/theme.ts` holds that one
+axis — this app's own stored flavor choice if there is one, else whatever
+flavor ConjureOS is wearing, live, else nothing (the browser's own
+preference decides) — and `src/components/AppearanceSheet.tsx` is the
+two-button UI behind the cog. Picking Light or Dark there is a one-way door:
+from then on this app's own choice wins and the sheet has no control that
+hands it back (clearing site data is the only way to resume following
+ConjureOS). The palette itself is never a setting: `data-theme` is always
+written as `"spr"`, and `theme.ts` ignores the theme field of every
+appearance message ConjureOS sends — other apps on the same channel (Conjure
+Health, for one) still read it, Recipes just doesn't.
+
+`npm test` runs `scripts/theme.test.ts` against it: 19 cases, plain tsx, no
+framework — 18 exercise `theme.ts`'s own logic, and one instead reads
 `src/conjureos-ui.css` off disk to guard the re-sync below.
 
 `src/conjureos-ui.css` is a VENDORED copy of `@conjureos/ui` `dist/ui.css` and
-must stay at a 1.x version — 0.x had one dark palette, so an accidental
-re-sync from an older build flattens all nine themes back to one and every
-picker option does nothing (`npm test` catches this: the guard case above
-fails if any of the nine `[data-theme="…"]` blocks goes missing). Re-sync
-with:
+must stay at a 1.x version — 0.x had one dark palette and no light/dark axis,
+so an accidental re-sync from an older build would silently break the one
+appearance lever this app has left (`npm test` catches this: the guard case
+above fails if the `spr` palette block or either `[data-flavor="…"]`
+resolution selector goes missing). Re-sync with:
 
 ```
 cp node_modules/@conjureos/ui/dist/ui.css src/conjureos-ui.css
@@ -42,10 +52,11 @@ That also wipes the header comment at the top of the file, which is not part
 of the upstream package — put it back from git history before committing the
 re-sync (the comment itself has the exact command).
 
-Never hardcode a colour in `src/styles.css`. Every literal is right in at most
-one of the eighteen theme/flavour combinations; `--cui-on-accent` in
-particular is DARK in six of the nine palettes, so `color: #fff` on a filled
-button is a bug, not a shortcut.
+Never hardcode a colour in `src/styles.css`. Spring's own `--cui-on-accent` is
+DARK (`#0d1108`) in the dark flavour and white (`#fff`) in light, so
+`color: #fff` on a filled button is a bug in Spring dark specifically, not a
+shortcut — use the token, and check both flavours, which is now the whole
+axis there is to check.
 
 ## Versioning
 

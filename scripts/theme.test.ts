@@ -1,5 +1,7 @@
 /**
- * Tests for src/theme.ts — the appearance ladder behind the Appearance sheet.
+ * Tests for src/theme.ts — Recipes' one remaining appearance lever: light or
+ * dark. The palette is asserted constant throughout, because that is exactly
+ * the thing a regression here would silently undo.
  *
  * Plain tsx, no test framework. The repo has no runner and the only other
  * script here already runs under `npx -y tsx`, so adding vitest for one file
@@ -24,16 +26,17 @@ interface Env {
   win: Window & typeof globalThis;
   attrs: Record<string, string>;
   store: Record<string, string>;
-  /** Pretend ConjureOS injected an appearance before the app booted. */
+  /** Pretend ConjureOS injected an appearance before the app booted. Takes a
+   *  theme too, exactly like the real shim does — theme.ts must ignore it. */
   inject(theme: string | null, flavor: string | null): void;
-  /** Push a theme the way the shell's broadcast does. */
+  /** Push an appearance the way the shell's broadcast does. */
   fromShell(theme: string | null, flavor: string | null): void;
   /** The same message from a page that is not the embedder. */
   fromElsewhere(theme: string | null, flavor: string | null): void;
   /** Another tab writing this app's stored choice — real localStorage is
    *  shared, so the write lands in `store` too, then the `storage` event
    *  fires here exactly as it would in a second real tab. */
-  fromOtherTab(theme: string | null, flavor: string | null): void;
+  fromOtherTab(flavor: string | null): void;
   /** The raw `storage` event a write or `removeItem` elsewhere causes here.
    *  Lower-level than fromOtherTab, for the cases it does not cover: a
    *  different key, and a removal (`newValue: null`). */
@@ -91,10 +94,10 @@ function makeEnv({ embedded = true }: { embedded?: boolean } = {}): Env {
     },
     fromShell: (theme, flavor) => fire(parent, theme, flavor),
     fromElsewhere: (theme, flavor) => fire({}, theme, flavor),
-    fromOtherTab: (theme, flavor) => {
+    fromOtherTab: (flavor) => {
       // Real localStorage is shared storage: another tab's write lands here
       // too, which is exactly what makes a plain re-read the right fix.
-      store[STORAGE_KEY] = JSON.stringify({ theme, flavor });
+      store[STORAGE_KEY] = JSON.stringify({ flavor });
       fireStorage(STORAGE_KEY, store[STORAGE_KEY]!);
     },
     fireStorage,
@@ -102,37 +105,43 @@ function makeEnv({ embedded = true }: { embedded?: boolean } = {}): Env {
 }
 
 const STORAGE_KEY = "conjureos.recipes.appearance";
-const stored = (e: Env): { theme: unknown; flavor: unknown } | null =>
+const stored = (e: Env): { flavor?: unknown } | null =>
   e.store[STORAGE_KEY] ? JSON.parse(e.store[STORAGE_KEY]!) : null;
 
 const tests: Record<string, () => void> = {
-  "with nothing set, nothing is written"() {
-    // No data-theme means the Conjure palette; no data-flavor means the
-    // browser's own light/dark preference. Writing either would be a choice
-    // the user never made.
+  "the palette is always spr, with nothing else set"() {
     const e = makeEnv();
     createAppearance(e.win).init();
-    ok(!("data-theme" in e.attrs), "no theme attribute");
-    ok(!("data-flavor" in e.attrs), "no flavor attribute");
+    ok(e.attrs["data-theme"] === "spr", "spr written even with no OS and no stored choice");
+    ok(!("data-flavor" in e.attrs), "no flavor attribute: the browser's own preference decides");
   },
 
-  "the appearance ConjureOS injected is applied at boot"() {
-    // Before any message arrives — this is what stops the launch flash.
+  "the palette stays spr even when ConjureOS injects a different one"() {
+    // theme.ts must ignore the theme field of the shim entirely, not merely
+    // let the user's axis outrank it — there is no axis for it any more.
     const e = makeEnv();
     e.inject("win", "light");
     const a = createAppearance(e.win).init();
-    ok(e.attrs["data-theme"] === "win", "theme from the shim");
-    ok(e.attrs["data-flavor"] === "light", "flavor from the shim");
-    ok(a.inConjureOS, "and we know we are inside the shell");
+    ok(e.attrs["data-theme"] === "spr", "spr, not the injected win");
+    ok(e.attrs["data-flavor"] === "light", "flavor from the shim still applies");
+    ok(a.theme === "spr", "and the resolved value agrees");
   },
 
-  "a theme change in ConjureOS reaches a running app"() {
+  "the palette stays spr even when ConjureOS pushes a theme change"() {
     const e = makeEnv();
     e.inject("win", "light");
     createAppearance(e.win).init();
     e.fromShell("hal", "dark");
-    ok(e.attrs["data-theme"] === "hal", "pushed theme applied");
-    ok(e.attrs["data-flavor"] === "dark", "pushed flavor applied");
+    ok(e.attrs["data-theme"] === "spr", "still spr after a push claiming hal");
+    ok(e.attrs["data-flavor"] === "dark", "the flavor half of the same push still lands");
+  },
+
+  "a flavor change in ConjureOS reaches a running app that has not chosen yet"() {
+    const e = makeEnv();
+    e.inject("win", "light");
+    createAppearance(e.win).init();
+    e.fromShell("win", "dark");
+    ok(e.attrs["data-flavor"] === "dark", "pushed flavor applied while following");
   },
 
   "a message from anything but the embedder is refused"() {
@@ -140,7 +149,22 @@ const tests: Record<string, () => void> = {
     e.inject("win", "light");
     createAppearance(e.win).init();
     e.fromElsewhere("hal", "dark");
-    ok(e.attrs["data-theme"] === "win", "some other page cannot restyle Recipes");
+    ok(e.attrs["data-flavor"] === "light", "some other page cannot restyle Recipes");
+  },
+
+  "standalone, a message claiming to be ConjureOS is refused"() {
+    // The bug this guards: `win.parent && win.parent !== win && ev.source
+    // !== win.parent` short-circuits to false the moment win.parent === win
+    // (standalone), so the early return never fires and a message from ANY
+    // sender gets applied. makeEnv({embedded:false}) + fromElsewhere compose
+    // to reproduce exactly that: no embedder at all, plus a sender that is
+    // not one either.
+    const e = makeEnv({ embedded: false });
+    const t = createAppearance(e.win);
+    t.init();
+    e.fromElsewhere("hal", "dark");
+    ok(!("data-flavor" in e.attrs), "no flavor applied with no embedder to vouch for the sender");
+    ok(e.attrs["data-theme"] === "spr", "palette is unaffected either way — it was never on the table");
   },
 
   "the app subscribes on boot, in case the shell booted first"() {
@@ -155,106 +179,43 @@ const tests: Record<string, () => void> = {
   "standalone, there is no OS layer and no subscribe"() {
     const e = makeEnv({ embedded: false });
     const a = createAppearance(e.win).init();
-    ok(!a.inConjureOS, "inConjureOS is false");
     ok(e.posted.length === 0, "nothing posted to ourselves");
     ok(a.following, "following is still the default state");
+    ok(a.theme === "spr", "and the palette is spr regardless");
   },
 
-  "the app's own choice outranks ConjureOS"() {
+  "the app's own flavor choice outranks ConjureOS"() {
     const e = makeEnv();
     e.inject("win", "light");
     const t = createAppearance(e.win);
     t.init();
-    t.setTheme("cnd");
-    ok(e.attrs["data-theme"] === "cnd", "Recipes' own palette wins");
-    ok(e.attrs["data-flavor"] === "light", "the axis not overridden still follows the OS");
-    ok(t.resolve().osTheme === "win", "what the OS is wearing is still readable");
-  },
-
-  "an override survives a reload"() {
-    const e = makeEnv();
-    const t = createAppearance(e.win);
-    t.init();
-    t.setTheme("hal");
-    t.setFlavor("dark");
-    const reloaded = createAppearance(e.win);
-    const a = reloaded.init();
-    ok(e.attrs["data-theme"] === "hal", "theme read back");
-    ok(e.attrs["data-flavor"] === "dark", "flavor read back");
-    ok(!a.following, "and it is still an override, not a follow");
-  },
-
-  "turning the switch OFF does not change how the app looks"() {
-    // The whole reason overrideConjureOS seeds from the resolved value: taking
-    // control should hand you the controls set to what you were already
-    // looking at, not restyle the app as a side effect of a toggle.
-    const e = makeEnv();
-    e.inject("xms", "light");
-    const t = createAppearance(e.win);
-    t.init();
-    const a = t.overrideConjureOS();
-    ok(e.attrs["data-theme"] === "xms", "same palette after taking over");
-    ok(e.attrs["data-flavor"] === "light", "same flavor after taking over");
-    ok(a.userTheme === "xms" && a.userFlavor === "light", "both axes are now the app's");
+    const a = t.setFlavor("dark");
+    ok(e.attrs["data-flavor"] === "dark", "Recipes' own flavor wins");
+    ok(a.osFlavor === "light", "what the OS is wearing is still readable");
     ok(!a.following, "the switch reads off");
   },
 
-  "taking over with nothing to inherit lands somewhere usable"() {
-    // Standalone there is no OS value, and leaving both axes null would show
-    // the user a picker with no selection while the switch says "off".
-    const e = makeEnv({ embedded: false });
-    const t = createAppearance(e.win);
-    t.init();
-    const a = t.overrideConjureOS();
-    ok(a.userTheme === "cnj", "falls back to Conjure");
-    ok(a.userFlavor === "dark", "and to dark");
-  },
-
-  "turning the switch back ON gives both axes up in one write"() {
-    // One write, not two: a pair of writes leaves a frame where the palette
-    // follows the OS and the flavor has not caught up.
+  "once chosen, a later OS push no longer moves the flavor"() {
     const e = makeEnv();
-    e.inject("win", "light");
+    e.inject("win", "dark");
     const t = createAppearance(e.win);
     t.init();
-    t.overrideConjureOS();
-    t.setTheme("hal");
     t.setFlavor("dark");
-
-    const seen: Appearance[] = [];
-    t.subscribe((a) => seen.push(a));
-    const a = t.followConjureOS();
-
-    ok(seen.length === 1, `one notification, got ${seen.length}`);
-    ok(a.following, "following again");
-    ok(e.attrs["data-theme"] === "win", "back to the OS palette");
-    ok(e.attrs["data-flavor"] === "light", "and the OS flavor");
-    ok(stored(e)?.theme === null && stored(e)?.flavor === null, "both overrides cleared on disk");
+    e.fromShell("win", "light");
+    ok(e.attrs["data-flavor"] === "dark", "the user's choice still wins after a later push");
+    ok(t.resolve().osFlavor === "light", "the OS value keeps updating underneath, just unused");
   },
 
-  "while following, a later OS change still lands"() {
+  "a choice survives a reload"() {
     const e = makeEnv();
-    e.inject("win", "light");
     const t = createAppearance(e.win);
     t.init();
-    t.overrideConjureOS();
-    t.followConjureOS();
-    e.fromShell("est", "dark");
-    ok(e.attrs["data-theme"] === "est", "the app is genuinely following again");
-  },
-
-  "subscribers hear OS pushes, not just their own writes"() {
-    const e = makeEnv();
-    e.inject("win", null);
-    const t = createAppearance(e.win);
-    t.init();
-    let last: Appearance | null = null;
-    t.subscribe((a) => {
-      last = a;
-    });
-    e.fromShell("sum", "dark");
-    ok(last !== null, "listener fired");
-    ok((last as unknown as Appearance)?.theme === "sum", "with the new value");
+    t.setFlavor("light");
+    const reloaded = createAppearance(e.win);
+    const a = reloaded.init();
+    ok(e.attrs["data-flavor"] === "light", "flavor read back");
+    ok(e.attrs["data-theme"] === "spr", "palette unaffected, as always");
+    ok(!a.following, "and it is still a choice, not a follow");
   },
 
   "a corrupt stored value is ignored rather than thrown on"() {
@@ -264,30 +225,23 @@ const tests: Record<string, () => void> = {
     ok(a.following, "treated as no stored choice");
   },
 
-  "a stored palette that no longer exists is dropped"() {
-    // A palette could be retired between releases; the app must not write
-    // data-theme="brg" and render against a palette that is not there.
+  "a stored flavor that is not dark or light is dropped"() {
     const e = makeEnv();
-    e.store[STORAGE_KEY] = JSON.stringify({ theme: "brg", flavor: "neon" });
-    createAppearance(e.win).init();
-    ok(!("data-theme" in e.attrs), "unknown palette not written through");
+    e.store[STORAGE_KEY] = JSON.stringify({ flavor: "neon" });
+    const a = createAppearance(e.win).init();
     ok(!("data-flavor" in e.attrs), "unknown flavor not written through");
+    ok(a.following, "treated as no stored choice");
   },
 
-  "standalone, a message claiming to be ConjureOS is refused"() {
-    // The bug this guards: `win.parent && win.parent !== win && ev.source
-    // !== win.parent` short-circuits to false the moment win.parent === win
-    // (standalone), so the early return never fires and a message from ANY
-    // sender gets applied. makeEnv({embedded:false}) + fromElsewhere compose
-    // to reproduce exactly that: no embedder at all, plus a sender that is
-    // not one either.
-    const e = makeEnv({ embedded: false });
-    const t = createAppearance(e.win);
-    t.init();
-    e.fromElsewhere("hal", "dark");
-    ok(!("data-theme" in e.attrs), "no theme applied with no embedder to vouch for the sender");
-    ok(!("data-flavor" in e.attrs), "no flavor applied either");
-    ok(!t.resolve().inConjureOS, "inConjureOS stays false: nothing here is ConjureOS");
+  "a value stored by the old theme-and-flavor sheet still reads its flavor"() {
+    // Before this reversal, this same key held {theme, flavor}. An upgrade
+    // must not treat that as corrupt — it should read the flavor back and
+    // simply never look at the stale theme.
+    const e = makeEnv();
+    e.store[STORAGE_KEY] = JSON.stringify({ theme: "cnd", flavor: "light" });
+    const a = createAppearance(e.win).init();
+    ok(a.userFlavor === "light", "the old record's flavor still reads back");
+    ok(e.attrs["data-theme"] === "spr", "and the old record's theme is simply never consulted");
   },
 
   "a tab that never reloaded still hears another tab's write"() {
@@ -297,27 +251,25 @@ const tests: Record<string, () => void> = {
     const e = makeEnv();
     const t = createAppearance(e.win);
     t.init();
-    e.fromOtherTab("hal", "light");
-    ok(e.attrs["data-theme"] === "hal", "the other tab's theme is applied here");
-    ok(e.attrs["data-flavor"] === "light", "and its flavor");
-    const a = t.resolve();
+    e.fromOtherTab("light");
+    ok(e.attrs["data-flavor"] === "light", "the other tab's flavor is applied here");
     ok(
-      a.userTheme === "hal" && a.userFlavor === "light",
+      t.resolve().userFlavor === "light",
       "this tab's own state now matches, so its next write will not clobber the other tab's",
     );
   },
 
   "another tab clearing the stored choice is picked up here too"() {
     // event.newValue is null when the key is removed elsewhere — this must
-    // reset the override, not leave the stale in-memory value in place.
+    // reset the choice, not leave the stale in-memory value in place.
     const e = makeEnv();
     const t = createAppearance(e.win);
     t.init();
-    t.setTheme("hal");
-    ok(e.attrs["data-theme"] === "hal", "sanity: this tab's own override applied first");
+    t.setFlavor("light");
+    ok(e.attrs["data-flavor"] === "light", "sanity: this tab's own choice applied first");
     delete e.store[STORAGE_KEY];
     e.fireStorage(STORAGE_KEY, null);
-    ok(!("data-theme" in e.attrs), "cleared once another tab removes the stored choice");
+    ok(!("data-flavor" in e.attrs), "cleared once another tab removes the stored choice");
     ok(t.resolve().following, "back to following ConjureOS");
   },
 
@@ -329,40 +281,41 @@ const tests: Record<string, () => void> = {
     t.init();
     const seen: Appearance[] = [];
     t.subscribe((a) => seen.push(a));
-    e.fireStorage("some.other.app.key", JSON.stringify({ theme: "hal", flavor: "dark" }));
+    e.fireStorage("some.other.app.key", JSON.stringify({ flavor: "light" }));
     ok(seen.length === 0, "an unrelated key must not re-apply this app's appearance");
   },
 
-  "a partially-valid stored value keeps its axes independent, not fully unset"() {
-    // {"theme":"hal"} with no flavor key at all — a truncated write, or a
-    // future schema change. following reads false, correctly: the theme axis
-    // really is overridden. The flavor axis is still genuinely following
-    // ConjureOS, and must resolve to what ConjureOS is wearing (what the
-    // picker is meant to show), not to nothing.
+  "subscribers hear OS pushes, not just their own writes"() {
     const e = makeEnv();
-    e.inject("win", "light");
-    e.store[STORAGE_KEY] = JSON.stringify({ theme: "hal" });
-    const a = createAppearance(e.win).init();
-    ok(a.userTheme === "hal", "the stored theme override read back");
-    ok(a.userFlavor === null, "no stored flavor, so that axis is still following");
-    ok(!a.following, "the switch reads off: one axis really is overridden");
-    ok(a.theme === "hal", "the effective theme the picker shows is the override");
-    ok(a.flavor === "light", "the effective flavor the picker shows is what ConjureOS is wearing, not nothing");
+    e.inject("win", null);
+    const t = createAppearance(e.win);
+    t.init();
+    let last: Appearance | null = null;
+    t.subscribe((a) => {
+      last = a;
+    });
+    e.fromShell("win", "dark");
+    ok(last !== null, "listener fired");
+    ok((last as unknown as Appearance)?.flavor === "dark", "with the new value");
   },
 
-  "the vendored @conjureos/ui stylesheet still carries all nine palettes"() {
+  "the vendored @conjureos/ui stylesheet still carries all nine palettes and the flavor switch"() {
     // Every other case in this file exercises theme.ts's own logic and never
     // reads a stylesheet at all, so a re-sync that lands an older,
     // single-palette build (see CLAUDE.md's Appearance section) would pass
-    // the whole suite in silence while flattening every picker option to a
-    // no-op. This is the one case that actually reads
-    // src/conjureos-ui.css, which is what the header comment at the top of
-    // that file claims happens - read it from disk rather than importing it,
-    // since CSS has no exports to check against.
+    // the whole suite in silence. Recipes only ever sets data-theme="spr",
+    // but that block and the light/dark resolution selectors both have to
+    // exist in a genuine 1.x build for the one lever this app has left —
+    // light or dark — to do anything at all. This is the one case that
+    // actually reads src/conjureos-ui.css, which is what the header comment
+    // at the top of that file claims happens - read it from disk rather than
+    // importing it, since CSS has no exports to check against.
     const css = readFileSync(new URL("../src/conjureos-ui.css", import.meta.url), "utf8");
     const palettes = ["cnj", "hal", "fal", "win", "spr", "sum", "xms", "est", "cnd"];
     const missing = palettes.filter((p) => !css.includes(`[data-theme="${p}"]`));
     ok(missing.length === 0, `vendored stylesheet is missing palette(s): ${missing.join(", ")}`);
+    ok(css.includes('[data-flavor="dark"]'), "vendored stylesheet is missing the dark flavor selector");
+    ok(css.includes('[data-flavor="light"]'), "vendored stylesheet is missing the light flavor selector");
   },
 };
 

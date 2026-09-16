@@ -1,5 +1,6 @@
 /**
- * Appearance for the Recipes app: follow ConjureOS, or don't.
+ * Appearance for the Recipes app: the palette is locked to Spring, and light
+ * or dark is the one thing left to choose.
  *
  * This is the app half of the ConjureOS theme handshake, which
  * `@conjureos/ui` also ships as `theme.js`. We do NOT load that file: it is a
@@ -10,102 +11,74 @@
  * typecheck. It implements the same contract, and `theme.test.ts` pins it
  * against the same rules.
  *
- * Precedence, highest first:
- *   1. what the user chose in Recipes' own settings   (localStorage)
- *   2. what ConjureOS is wearing                      (shim value, then messages)
- *   3. nothing — meaning the Conjure palette and the browser's light/dark
+ * Two things this app wears, only one of them negotiable:
  *
- * "Use ConjureOS appearance" in the settings sheet is level 1 being empty.
- * That is a real, selectable state and not merely the absence of a choice: a
- * user who tries Halloween needs a way back to following the OS, and a picker
- * that only lists nine palettes has no way back.
+ *   theme   always "spr" (Spring). ConjureOS still broadcasts its own
+ *           palette on the same channel everything else arrives on —
+ *           Recipes receives the message and ignores that field. There is
+ *           no picker for it because there is nothing to pick.
+ *   flavor  light or dark. Precedence, highest first:
+ *             1. what the user chose in Recipes' own settings  (localStorage)
+ *             2. what ConjureOS is wearing                     (shim, then messages)
+ *             3. nothing — the browser's own light/dark preference decides
+ *           Step 1 is a one-way door: once the user taps Light or Dark in
+ *           the appearance sheet, this app's own choice wins from then on
+ *           and step 2 stops being consulted. There is no control that hands
+ *           it back; clearing site data is the only way to resume following.
  *
  * Outside ConjureOS — `npm run dev`, or the standalone `dist/recipes.html`
- * smoke test — level 2 is simply empty and the app behaves like any other
- * site that remembers a theme choice.
+ * smoke test — step 2 is simply empty and flavor falls straight to step 3.
  */
 
-export interface ThemeOption {
-  id: ThemeId;
-  label: string;
-}
-
-export type ThemeId =
-  | "cnj"
-  | "hal"
-  | "fal"
-  | "win"
-  | "spr"
-  | "sum"
-  | "xms"
-  | "est"
-  | "cnd";
 export type Flavor = "dark" | "light";
 
-/** The nine palettes, in the order ConjureOS lists them. */
-export const THEMES: readonly ThemeOption[] = [
-  { id: "cnj", label: "Conjure" },
-  { id: "hal", label: "Halloween" },
-  { id: "fal", label: "Fall" },
-  { id: "win", label: "Winter" },
-  { id: "spr", label: "Spring" },
-  { id: "sum", label: "Summer" },
-  { id: "xms", label: "Christmas" },
-  { id: "est", label: "Easter" },
-  { id: "cnd", label: "Candyland" },
-];
-
+/** In display order in the appearance sheet. */
 export const FLAVORS: readonly Flavor[] = ["dark", "light"];
 
-/** Where Recipes remembers its own override. Namespaced so it cannot collide
- *  with another app that happens to share this origin. */
+/** Recipes' one and only palette. Fixed at build time, not a setting. */
+export const PALETTE = "spr";
+
+/** Where Recipes remembers its own flavor choice. Namespaced so it cannot
+ *  collide with another app that happens to share this origin. Unchanged
+ *  from when this key also carried a theme override, so upgrading from an
+ *  older version reads the flavor back rather than starting blank; a stale
+ *  `theme` field, if present, is simply never read. */
 const STORAGE_KEY = "conjureos.recipes.appearance";
 /** The message type both halves of the ConjureOS handshake agree on. */
 const MSG = "conjureos:theme";
 
-const THEME_IDS: readonly string[] = THEMES.map((t) => t.id);
-
-const asTheme = (v: unknown): ThemeId | null =>
-  typeof v === "string" && THEME_IDS.includes(v) ? (v as ThemeId) : null;
-
 const asFlavor = (v: unknown): Flavor | null =>
   v === "dark" || v === "light" ? v : null;
 
-/** What the app resolved to, and enough of the layers to drive a picker. */
+/** What the app resolved to, and enough of the layers to drive the sheet. */
 export interface Appearance {
-  /** Applied palette. null means the Conjure default. */
-  theme: ThemeId | null;
-  /** Applied flavor. null means follow the browser's preference. */
+  /** Always "spr" — never a user or OS choice. */
+  theme: "spr";
+  /** Applied flavor: userFlavor if set, else osFlavor, else null — which
+   *  leaves data-flavor unset and the browser's own preference decides. */
   flavor: Flavor | null;
-  /** This app's own override, null on an axis that is following ConjureOS. */
-  userTheme: ThemeId | null;
+  /** This app's own stored choice. null means still following ConjureOS. */
   userFlavor: Flavor | null;
-  /** True while BOTH axes follow ConjureOS — what the System switch shows. */
-  following: boolean;
-  /** What ConjureOS is wearing, whether or not it won. */
-  osTheme: ThemeId | null;
+  /** What ConjureOS is wearing, whether or not userFlavor is winning over it. */
   osFlavor: Flavor | null;
-  /** False outside ConjureOS, where following the OS is not an option. */
-  inConjureOS: boolean;
+  /** True while userFlavor is null — the state before the user's first tap. */
+  following: boolean;
 }
 
 interface HostBridge {
-  appearance?: { theme?: unknown; flavor?: unknown };
+  appearance?: { flavor?: unknown };
 }
 
 /**
- * Everything below is built by a factory rather than living at module scope,
- * mirroring `@conjureos/ui`'s own resolver. The app uses the single instance
- * exported at the bottom; the factory is what lets `scripts/theme.test.ts`
- * start from a clean slate per case instead of fighting a shared singleton.
+ * Built by a factory rather than living at module scope, mirroring
+ * `@conjureos/ui`'s own resolver. The app uses the single instance exported
+ * at the bottom; the factory is what lets `scripts/theme.test.ts` start from
+ * a clean slate per case instead of fighting a shared singleton.
  */
 export interface AppearanceController {
   init(): Appearance;
   resolve(): Appearance;
-  setTheme(theme: ThemeId | null): Appearance;
-  setFlavor(flavor: Flavor | null): Appearance;
-  followConjureOS(): Appearance;
-  overrideConjureOS(): Appearance;
+  setFlavor(flavor: Flavor): Appearance;
   subscribe(fn: (a: Appearance) => void): () => void;
 }
 
@@ -113,11 +86,8 @@ export function createAppearance(
   win: Window & typeof globalThis = window,
 ): AppearanceController {
   const state = {
-    userTheme: null as ThemeId | null,
     userFlavor: null as Flavor | null,
-    osTheme: null as ThemeId | null,
     osFlavor: null as Flavor | null,
-    inConjureOS: false,
     started: false,
   };
 
@@ -127,18 +97,15 @@ export function createAppearance(
     try {
       const raw = win.localStorage.getItem(STORAGE_KEY);
       if (!raw) {
-        state.userTheme = null;
         state.userFlavor = null;
         return;
       }
-      const saved = JSON.parse(raw) as { theme?: unknown; flavor?: unknown };
-      state.userTheme = asTheme(saved.theme);
+      const saved = JSON.parse(raw) as { flavor?: unknown };
       state.userFlavor = asFlavor(saved.flavor);
     } catch {
       // Private mode, or a corrupt value. Both mean "no stored choice" — and
       // because another tab's `storage` event calls this a second time, it
       // must actively clear rather than leave a stale value from before.
-      state.userTheme = null;
       state.userFlavor = null;
     }
   };
@@ -147,7 +114,7 @@ export function createAppearance(
     try {
       win.localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ theme: state.userTheme, flavor: state.userFlavor }),
+        JSON.stringify({ flavor: state.userFlavor }),
       );
     } catch {
       /* storage blocked. The choice still applies for this session. */
@@ -155,51 +122,44 @@ export function createAppearance(
   };
 
   /**
-   * The OS layer as it stands at boot.
+   * The OS flavor as it stands at boot.
    *
-   * ConjureOS injects `window.__conjureos.appearance` into the page before any
-   * app code runs, precisely so an app that follows the OS does not paint one
-   * frame in the wrong palette while the subscribe round-trip completes.
+   * ConjureOS injects `window.__conjureos.appearance` into the page before
+   * any app code runs, precisely so a load that ends up following the OS
+   * does not paint one frame in the wrong flavor while the subscribe
+   * round-trip completes.
    */
   const readBoot = (): void => {
     try {
       const injected = (win as unknown as { __conjureos?: HostBridge })
         .__conjureos?.appearance;
       if (!injected) return;
-      // Presence of the bridge is what tells us we are inside the shell —
-      // NOT whether a theme was set. A user who never opened Settings sends
-      // two nulls, and that is still ConjureOS talking.
-      state.inConjureOS = true;
-      state.osTheme = asTheme(injected.theme);
       state.osFlavor = asFlavor(injected.flavor);
     } catch {
-      /* no host bridge: we are standalone, and level 2 stays empty */
+      /* no host bridge: we are standalone, and the OS layer stays empty */
     }
   };
 
   const resolve = (): Appearance => ({
-    theme: state.userTheme ?? state.osTheme,
+    theme: PALETTE,
     flavor: state.userFlavor ?? state.osFlavor,
-    userTheme: state.userTheme,
     userFlavor: state.userFlavor,
-    following: state.userTheme === null && state.userFlavor === null,
-    osTheme: state.osTheme,
     osFlavor: state.osFlavor,
-    inConjureOS: state.inConjureOS,
+    following: state.userFlavor === null,
   });
 
   /**
-   * Write the two attributes onto <html>.
+   * Write the palette and, if resolved, the flavor onto <html>.
    *
-   * Absence is meaningful, so an unset axis REMOVES its attribute rather than
-   * writing an empty string: no `data-theme` means the Conjure palette, and no
-   * `data-flavor` means the browser's own light/dark preference decides.
+   * data-theme is always written: the palette is fixed, not merely
+   * defaulted. data-flavor is written only when resolved — absence is
+   * meaningful, so an unset axis REMOVES the attribute rather than writing
+   * an empty string, and the browser's own light/dark preference decides.
    */
   const apply = (): Appearance => {
     const next = resolve();
     const el = win.document.documentElement;
-    if (next.theme) el.setAttribute("data-theme", next.theme);
-    else el.removeAttribute("data-theme");
+    el.setAttribute("data-theme", next.theme);
     if (next.flavor) el.setAttribute("data-flavor", next.flavor);
     else el.removeAttribute("data-flavor");
 
@@ -214,23 +174,18 @@ export function createAppearance(
   };
 
   const onMessage = (ev: MessageEvent): void => {
-    const data = ev.data as {
-      type?: unknown;
-      theme?: unknown;
-      flavor?: unknown;
-    } | null;
+    const data = ev.data as { type?: unknown; flavor?: unknown } | null;
     if (!data || data.type !== MSG) return;
     // Only the embedder can speak for ConjureOS. With no embedder at all —
     // this window is its own parent — there is no ConjureOS to speak for it,
-    // so we reject before even checking who sent the message.
+    // so we reject before even checking who sent the message. Security, not
+    // theming: this shape does not change no matter how many axes are above
+    // it.
     const embedded = win.parent && win.parent !== win;
     if (!embedded) return;
     if (ev.source !== win.parent) return;
-    const theme = asTheme(data.theme);
     const flavor = asFlavor(data.flavor);
-    state.inConjureOS = true;
-    if (theme === state.osTheme && flavor === state.osFlavor) return;
-    state.osTheme = theme;
+    if (flavor === state.osFlavor) return;
     state.osFlavor = flavor;
     apply();
   };
@@ -274,47 +229,13 @@ export function createAppearance(
     return apply();
   };
 
-  /** null means "follow ConjureOS on this axis". */
-  const setTheme = (theme: ThemeId | null): Appearance => {
-    state.userTheme = theme;
-    writeStore();
-    return apply();
-  };
-
-  /** null means "follow ConjureOS", which off-shell means the browser. */
-  const setFlavor = (flavor: Flavor | null): Appearance => {
+  /**
+   * The user's one choice, made from the appearance sheet. A one-way door:
+   * there is no control that hands it back to ConjureOS, so unlike the old
+   * two-axis ladder this never takes null.
+   */
+  const setFlavor = (flavor: Flavor): Appearance => {
     state.userFlavor = flavor;
-    writeStore();
-    return apply();
-  };
-
-  /**
-   * Hand both axes back to ConjureOS at once — the System switch going on.
-   *
-   * One write rather than `setTheme(null)` then `setFlavor(null)`, so listeners
-   * see a single consistent change instead of a frame where the palette follows
-   * the OS but the flavor has not caught up yet.
-   */
-  const followConjureOS = (): Appearance => {
-    state.userTheme = null;
-    state.userFlavor = null;
-    writeStore();
-    return apply();
-  };
-
-  /**
-   * Take both axes over, seeded with whatever is on screen right now — the
-   * System switch going off.
-   *
-   * Seeding matters: switching off must not change how the app looks. It hands
-   * the user the controls set to what they were already looking at, and the
-   * next change is theirs. Falls back to Conjure + dark off-shell, where there
-   * is nothing to inherit and an unset axis would leave the pickers blank.
-   */
-  const overrideConjureOS = (): Appearance => {
-    const current = resolve();
-    state.userTheme = current.theme ?? "cnj";
-    state.userFlavor = current.flavor ?? "dark";
     writeStore();
     return apply();
   };
@@ -327,15 +248,7 @@ export function createAppearance(
     };
   };
 
-  return {
-    init,
-    resolve,
-    setTheme,
-    setFlavor,
-    followConjureOS,
-    overrideConjureOS,
-    subscribe,
-  };
+  return { init, resolve, setFlavor, subscribe };
 }
 
 /**
@@ -350,13 +263,8 @@ const appearance = (): AppearanceController => (instance ??= createAppearance())
 
 export const initAppearance = (): Appearance => appearance().init();
 export const resolve = (): Appearance => appearance().resolve();
-export const setTheme = (theme: ThemeId | null): Appearance =>
-  appearance().setTheme(theme);
-export const setFlavor = (flavor: Flavor | null): Appearance =>
+export const setFlavor = (flavor: Flavor): Appearance =>
   appearance().setFlavor(flavor);
-export const followConjureOS = (): Appearance => appearance().followConjureOS();
-export const overrideConjureOS = (): Appearance =>
-  appearance().overrideConjureOS();
 export const subscribeAppearance = (
   fn: (a: Appearance) => void,
 ): (() => void) => appearance().subscribe(fn);

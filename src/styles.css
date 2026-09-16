@@ -257,37 +257,12 @@ select {
   font-weight: 700;
   color: var(--cui-fg);
 }
-.appearance-follow {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--cui-bg-2);
-  border: 1px solid var(--cui-border);
-  cursor: pointer;
-}
-.appearance-follow-text { display: flex; flex-direction: column; gap: 3px; flex: 1 1 auto; }
-.appearance-follow-label { font-size: 14px; font-weight: 600; color: var(--cui-fg); }
-.appearance-follow-hint { font-size: 12px; color: var(--cui-fg-mute); }
-.appearance-switch {
-  flex: 0 0 auto;
-  width: 20px;
-  height: 20px;
-  accent-color: var(--cui-accent);
-  cursor: pointer;
-}
 .appearance-controls {
   display: flex;
   flex-direction: column;
   gap: 14px;
   padding: 14px 12px 4px;
-  /* Dimmed rather than hidden while ConjureOS is being followed: the controls
-     still SHOW what is applied, which is the answer to "what am I on?" — and
-     a panel whose contents vanish reads as a bug rather than a mode. */
-  transition: opacity 0.15s ease;
 }
-.appearance-controls[aria-hidden="true"] { opacity: 0.45; }
 .appearance-field { display: flex; flex-direction: column; gap: 6px; }
 .appearance-field-label {
   font-size: 12px;
@@ -295,17 +270,6 @@ select {
   letter-spacing: 0.02em;
   color: var(--cui-fg-mute);
 }
-.appearance-select {
-  width: 100%;
-  font: inherit;
-  font-size: 14px;
-  padding: 9px 11px;
-  border-radius: 10px;
-  color: var(--cui-fg);
-  background: var(--cui-bg-1);
-  border: 1px solid var(--cui-border);
-}
-.appearance-select:disabled { cursor: not-allowed; }
 .appearance-flavors { display: flex; gap: 8px; }
 .appearance-flavor {
   flex: 1 1 0;
@@ -325,14 +289,13 @@ select {
   transition: background 0.12s ease, border-color 0.12s ease;
 }
 .appearance-flavor svg { width: 14px; height: 14px; }
-.appearance-flavor:hover:not(:disabled) { border-color: var(--cui-border-strong); }
+.appearance-flavor:hover { border-color: var(--cui-border-strong); }
 .appearance-flavor.on {
   background: var(--cui-accent);
   border-color: var(--cui-accent);
   color: var(--cui-on-accent);
 }
 .appearance-flavor.on svg { color: var(--cui-on-accent); }
-.appearance-flavor:disabled { cursor: not-allowed; }
 .appearance-done { justify-content: center; font-weight: 600; margin-top: 6px; }
 .sheet-sep { height: 1px; background: var(--cui-border); margin: 6px 12px; }
 .sheet-cancel {
