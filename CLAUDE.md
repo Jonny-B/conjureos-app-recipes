@@ -64,7 +64,21 @@ Bump `version` in BOTH `package.json` and `src/version.ts` together. CI fails th
 
 ## Catalog
 
-`src/data/catalog.ts` is generated from a scraped AllRecipes dump (cached under `scripts/.cache/`, gitignored). Rebuild with `npx -y tsx scripts/build-catalog.ts --limit 1500`. The catalog is scraped third-party content: get a licensing review before any public/prod publish. Each recipe keeps its source URL.
+The catalog is **USDA MyPlate** — 1,120 recipes, US federal government content,
+public domain. It lives in the `recipes` table (`provenance='usda-myplate'`) and
+is fetched from `recipes-db` at runtime; it is NOT bundled and NOT in
+`src/data/catalog.ts`, which no longer exists (0.30.0 stopped shipping it on
+devices).
+
+**The scraped AllRecipes corpus is gone** (2026-09-17): 3,170 rows deleted from
+prod, 3,169 from dev. Do not regenerate it. `scripts/build-catalog.ts` and
+`scripts/rewrite-catalog.ts` remain in the repo as history and still reference
+the old cached dump under `scripts/.cache/` — running either would reintroduce
+exactly the content that was deliberately removed, and the licensing question
+that came with it. Reasoning in ConjureOS `DECISIONS.md` (2026-09-17).
+
+No licensing review is needed before a prod publish any more. That gate existed
+solely for the scraped corpus.
 
 ## Publishing
 
