@@ -3086,6 +3086,94 @@ button.useup-row:hover { background: var(--bg-2); }
   text-decoration-thickness: 1.5px;
 }
 
+/* ── Plan tab: week score, presence, nudge ────────────────────────────
+ * The score strip is the only place in the app where a number is the point,
+ * so it gets the top of the type scale and nothing else competes with it. */
+
+.week-score {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: var(--hair);
+  border-radius: var(--r-2);
+  background: var(--bg-1);
+  margin-bottom: 14px;
+}
+.score-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.score-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.score-value {
+  font-size: var(--t-4xl);
+  font-weight: var(--cui-weight-bold);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.score-label {
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-dim);
+  font-weight: var(--cui-weight-semibold);
+  line-height: 1.25;
+}
+.score-note { margin: 2px 0 0; font-size: var(--t-md); line-height: 1.45; }
+
+.plan-header-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+}
+.plan-presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--t-md);
+  color: var(--fg-dim);
+  min-width: 0;
+}
+.plan-presence .fa-icon { width: 12px; height: 12px; flex: 0 0 auto; }
+.plan-share-btn { margin-left: auto; white-space: nowrap; }
+.plan-header-row > .link-btn { margin-left: auto; }
+
+.nudge {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border: var(--hair);
+  border-radius: var(--r-2);
+  background: var(--bg-1);
+  margin-top: 18px;
+}
+.nudge-label { font-size: var(--t-lg); font-weight: var(--cui-weight-semibold); }
+.nudge-sub { margin: 0; font-size: var(--t-md); line-height: 1.45; }
+.nudge-row { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+.nudge-input {
+  flex: 1 1 200px;
+  min-width: 0;
+  min-height: 44px;
+  background: var(--bg-0);
+  border: var(--hair);
+  border-radius: var(--r-1);
+  color: var(--fg);
+  font: inherit;
+  padding: 10px 12px;
+  outline: none;
+}
+.nudge-input:focus { border-color: var(--cui-accent); }
+.nudge-row .btn { flex: 0 0 auto; min-height: 44px; }
+
 /* ── The List tab ─────────────────────────────────────────────────────
  * Designed for one hand, in a shop, in bad light. Every decision here comes
  * from that: 56px rows, a 26px box, the WHOLE row as the target, and no

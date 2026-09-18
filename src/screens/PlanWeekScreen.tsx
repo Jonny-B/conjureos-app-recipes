@@ -44,6 +44,7 @@ function uniq(a: string[]): string[] {
 export function PlanWeekScreen({
   pantry,
   initialInclude = null,
+  initialMoodText = null,
   catalogVersion = 0,
   families = [],
   defaultFamilyId = null,
@@ -58,6 +59,13 @@ export function PlanWeekScreen({
    * first thing you can do with it is take one out.
    */
   initialInclude?: string[] | null;
+  /**
+   * A sentence from the Plan tab's nudge box, dropped into the mood step with
+   * the free-text mode already selected. Deliberately NOT auto-run: the user
+   * still sees their own words, can change the meal count, and presses the
+   * button — so a stray tap on the landing never spends two model calls.
+   */
+  initialMoodText?: string | null;
   /** Bumped by App when the catalog reloads from the DB, so the memo re-runs. */
   catalogVersion?: number;
   /**
@@ -77,12 +85,12 @@ export function PlanWeekScreen({
   onPersist: (plan: WeekPlan, familyId: string | null) => Promise<void>;
 }) {
   const [step, setStep] = useState<Step>("mood");
-  const [moodMode, setMoodMode] = useState<MoodMode>("ingredients");
+  const [moodMode, setMoodMode] = useState<MoodMode>(initialMoodText ? "text" : "ingredients");
   const [includeChips, setIncludeChips] = useState<string[]>(() =>
     uniq((initialInclude ?? []).map(sanitizeName).filter(Boolean)).slice(0, 8),
   );
   const [chipInput, setChipInput] = useState("");
-  const [freeText, setFreeText] = useState("");
+  const [freeText, setFreeText] = useState(initialMoodText ?? "");
   const [mealCount, setMealCount] = useState(5);
   const [seed, setSeed] = useState<PlanCandidate | null>(null);
   const [seedQuery, setSeedQuery] = useState("");

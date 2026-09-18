@@ -202,6 +202,16 @@ export interface PlannedRecipe {
   id: string;
   title: string;
   recipe: Recipe;
+  /**
+   * The recipe's catalog category, kept so the week score can count distinct
+   * cuisines without re-looking-up every pick in a catalog the device no
+   * longer holds. Optional because plans saved before the week-score strip
+   * existed don't have it — the strip says "variety unknown" rather than
+   * claiming a number it can't compute.
+   */
+  category?: string;
+  /** Derived flags ("quick", "vegetarian", …), same reason as `category`. */
+  tags?: string[];
   /** Canonical ingredient names already covered by the pantry. */
   pantryCovered: string[];
   /** Canonical names this pick first added to the shared shopping set. */

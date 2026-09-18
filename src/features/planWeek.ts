@@ -230,6 +230,8 @@ export function planWeek(input: PlanWeekInput): WeekPlan {
       id: s.c.id,
       title: s.c.title,
       recipe: s.c.recipe,
+      category: s.c.category || undefined,
+      tags: s.c.tags?.length ? s.c.tags : undefined,
       pantryCovered: covered,
       marginalNew: marginal, // filled below
       haveCount: covered.length,
@@ -281,6 +283,8 @@ export function planFromChosen(
       id: s.c.id,
       title: s.c.title,
       recipe: s.c.recipe,
+      category: s.c.category || undefined,
+      tags: s.c.tags?.length ? s.c.tags : undefined,
       pantryCovered: covered,
       marginalNew: [],
       haveCount: covered.length,

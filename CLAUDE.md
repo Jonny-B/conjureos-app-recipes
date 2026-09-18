@@ -48,9 +48,18 @@ Health, for one) still read it, Conjure Pantry just doesn't.
 
 `npm test` runs `scripts/theme.test.ts` against it: 19 cases, plain tsx, no
 framework — 18 exercise `theme.ts`'s own logic, and one instead reads
-`src/conjureos-ui.css` off disk to guard the re-sync below. It then runs
-`scripts/shelfLife.test.ts` (see **Waste risk** below). Same shape, no
-framework; both must pass.
+`src/conjureos-ui.css` off disk to guard the re-sync below. It then runs three
+more files in the same shape, and all four must pass:
+
+| File | Guards |
+|---|---|
+| `scripts/theme.test.ts` | the one appearance lever, and the vendored stylesheet |
+| `scripts/shelfLife.test.ts` | the waste-risk table (see **Waste risk** below) |
+| `scripts/weekScore.test.ts` | the Plan tab's score strip |
+| `scripts/realtimePresence.test.ts` | the Phoenix presence reducer |
+
+There is still no test runner and no framework. Four plain files did not justify
+adding vitest; if a fifth needs a mock or a DOM, that is the moment to revisit.
 
 `src/conjureos-ui.css` is a VENDORED copy of `@conjureos/ui` `dist/ui.css` and
 must stay at a 1.x version — 0.x had one dark palette and no light/dark axis,

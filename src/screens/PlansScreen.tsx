@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { PantryItem, WeekPlan } from "../types";
+import type { PantryItem, PlannedRecipe, WeekPlan } from "../types";
+import { prettyIngredient } from "../features/scaling";
 import { importVfsPlansOnce, planTitle } from "../features/planStorage";
 import { PlanWriter } from "../features/planSync";
 import {
@@ -10,7 +11,12 @@ import {
   type AppProfile,
   type PlanRecord,
 } from "../bridge/recipesApi";
-import { subscribeFamilyChannels, type RealtimeHandle } from "../bridge/realtime";
+import {
+  subscribeFamilyChannels,
+  type PresenceMember,
+  type RealtimeHandle,
+} from "../bridge/realtime";
+import { scoreWeek, scoreSummary } from "../features/weekScore";
 import { PlanWeekScreen } from "./PlanWeekScreen";
 import { FamilyScreen } from "./FamilyScreen";
 import { StoreEditor } from "./StoreEditor";
@@ -146,6 +152,16 @@ export function PlansScreen({
   const [viewingId, setViewingId] = useState<string | null>(null);
   /** A failed share / delete. Rendered on the landing; cleared on the next try. */
   const [actionError, setActionError] = useState<string | null>(null);
+  /**
+   * Who else is on each family channel right now, by channel name.
+   *
+   * "Share the plan" is only half the pillar — the other half is knowing the
+   * other person is actually there, which is what turns a shared plan from a
+   * document into a room. Empty is the normal state and renders nothing.
+   */
+  const [presence, setPresence] = useState<Record<string, PresenceMember[]>>({});
+  /** The free-text nudge on the landing, handed to the wizard's mood step. */
+  const [nudge, setNudge] = useState("");
   // The last-viewed plan id to restore once, after the first plans load.
   const restoreRef = useRef<string | null>(readLastView()?.planId ?? null);
   const rt = useRef<RealtimeHandle | null>(null);
@@ -253,6 +269,15 @@ export function PlansScreen({
   // whether the channel list changed.
   const profileValue = profile.status === "ok" ? profile.value : null;
   const planList = plans.status === "ok" ? plans.value : null;
+  /**
+   * Our own identity, for presence. In refs rather than in the effect's deps:
+   * the socket must not be torn down and rebuilt because a profile refresh
+   * handed back a new object with the same id in it.
+   */
+  const selfIdRef = useRef<string | null>(null);
+  const selfNameRef = useRef<string | null>(null);
+  selfIdRef.current = profileValue?.userId ?? null;
+  selfNameRef.current = profileValue?.username ? `@${profileValue.username}` : null;
 
   const realtimeUrl = profileValue?.realtimeUrl ?? "";
   const anonKey = profileValue?.anonKey ?? "";
@@ -278,11 +303,18 @@ export function PlansScreen({
       url: realtimeUrl,
       anonKey,
       channels,
+      // Announce ourselves so the rest of the family can see we're looking at
+      // the week too. The key is the user id, which is what presenceMembers
+      // filters us out by; the name is whatever we'd be called in the family
+      // list, and null is fine (it renders as "someone else").
+      presence: { key: selfIdRef.current ?? "", name: selfNameRef.current },
+      onPresence: (channel, who) => setPresence((prev) => ({ ...prev, [channel]: who })),
       onMessage: () => {
         if (refetchTimer.current) clearTimeout(refetchTimer.current);
         refetchTimer.current = setTimeout(() => void loadPlans(), 400);
       },
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [realtimeUrl, anonKey, channelKey, loadPlans]);
 
   // Tear the socket down — and cancel any in-flight debounced refetch, which
@@ -428,6 +460,8 @@ export function PlansScreen({
    * closes, so opening "New" by hand afterwards starts empty.
    */
   const seededRef = useRef<string[] | null>(null);
+  /** Free text the wizard should open its mood step already carrying. */
+  const nudgeRef = useRef<string | null>(null);
 
   // A header-cog intent (Family / Stores / New) opens that sub-screen.
   useEffect(() => {
@@ -520,12 +554,15 @@ export function PlansScreen({
       <PlanWeekScreen
         pantry={pantry}
         initialInclude={seededRef.current}
+        initialMoodText={nudgeRef.current}
         catalogVersion={catalogVersion}
         families={families}
         defaultFamilyId={defaultFamilyId()}
         onPersist={persistNewPlan}
         onDone={() => {
           seededRef.current = null;
+          nudgeRef.current = null;
+          setNudge("");
           setMode("landing");
           void loadPlans();
         }}
@@ -578,6 +615,7 @@ export function PlansScreen({
           className="btn plans-new"
           onClick={() => {
             seededRef.current = null;
+            nudgeRef.current = null;
             setMode("new");
           }}
           aria-label="New plan"
@@ -618,6 +656,21 @@ export function PlansScreen({
       ) : (
         current && (
           <>
+            {focus === "plan" && (
+              <PlanHeader
+                rec={current}
+                families={families}
+                presentMembers={
+                  current.familyId
+                    ? presence[
+                        `family-${families.find((f) => f.id === current.familyId)?.channelToken ?? ""}`
+                      ] ?? []
+                    : []
+                }
+                onShare={(familyId) => void sharePlan(current.id, familyId)}
+                onSetUpFamily={() => setMode("family")}
+              />
+            )}
             {focus === "list" ? (
               <ListScreen
                 rec={current}
@@ -633,6 +686,17 @@ export function PlansScreen({
                 isLatest={viewing === 0}
                 familyName={current.familyId ? familyName(current.familyId) : null}
                 dateLabel={formatDate(current.data.createdAt)}
+              />
+            )}
+            {focus === "plan" && (
+              <NudgeBox
+                value={nudge}
+                onChange={setNudge}
+                onGo={() => {
+                  seededRef.current = null;
+                  nudgeRef.current = nudge.trim();
+                  setMode("new");
+                }}
               />
             )}
             {active.length > 1 && (
@@ -758,6 +822,8 @@ function PlanView({
         </div>
       </div>
 
+      <WeekScoreStrip plan={plan} />
+
       <section className="home-section">
         <div className="home-section-head">
           <h3>This week's meals</h3>
@@ -768,15 +834,191 @@ function PlanView({
               <div className="title-block">
                 <div className="title">{pick.title}</div>
                 <div className="meta">
-                  {pick.haveCount}/{pick.totalCount} on hand
-                  {pick.marginalNew.length > 0 && ` · ${pick.marginalNew.length} to buy`}
+                  {pick.category && (
+                    <>
+                      <span className="pill cat">{pick.category}</span>{" "}
+                    </>
+                  )}
+                  {pick.recipe.cookTime > 0 && `${pick.recipe.cookTime} min`}
                 </div>
+                <PickChips pick={pick} />
               </div>
             </div>
           ))}
         </div>
       </section>
     </div>
+  );
+}
+
+/**
+ * The week score: the planner's two objectives, side by side.
+ *
+ * The planner is trading waste reduction off against variety, and without this
+ * strip that trade-off is invisible — a week that came out samey just looks
+ * like a bad app. Two numbers and one plain sentence; deliberately not a grade,
+ * because a letter score on someone's dinner would be insufferable.
+ */
+function WeekScoreStrip({ plan }: { plan: WeekPlan }) {
+  const s = scoreWeek(plan);
+  if (s.meals === 0) return null;
+  return (
+    <section className="week-score">
+      <div className="score-row">
+        <div className="score-tile">
+          <span className="score-value">{s.pantryUsed}</span>
+          <span className="score-label">used up</span>
+        </div>
+        <div className="score-tile">
+          <span className="score-value">{s.varietyUnknown ? "\u2014" : s.cuisines}</span>
+          {/* "kinds", not "kinds of meal": the longer label wrapped to two
+              lines and left the three tiles sitting at different heights. The
+              sentence underneath carries the meaning. */}
+          <span className="score-label">{s.cuisines === 1 && !s.varietyUnknown ? "kind" : "kinds"}</span>
+        </div>
+        <div className="score-tile">
+          <span className="score-value">{s.toBuy}</span>
+          <span className="score-label">to buy</span>
+        </div>
+      </div>
+      <p className="score-note muted">{scoreSummary(s)}</p>
+      {s.cuisineNames.length > 0 && (
+        <div className="cov-strip">
+          {s.cuisineNames.map((c) => (
+            <span key={c} className="token-chip">
+              {c}
+            </span>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
+ * The same have / short / missing idiom the recipe rows use, built from what a
+ * PLANNED pick actually stores (counts and a marginal-buy list) rather than
+ * from a CoverageResult the plan never kept.
+ */
+function PickChips({ pick }: { pick: PlannedRecipe }) {
+  if (pick.totalCount === 0) return null;
+  const shown = pick.marginalNew.slice(0, 3);
+  const extra = pick.marginalNew.length - shown.length;
+  return (
+    <div className="cov-strip">
+      <span className={`cov-chip${pick.marginalNew.length === 0 ? " complete" : ""}`}>
+        {pick.haveCount}/{pick.totalCount} have
+      </span>
+      {shown.map((n) => (
+        <span key={n} className="miss-chip">
+          {prettyIngredient(n)}
+        </span>
+      ))}
+      {extra > 0 && <span className="more-chip">+{extra} more</span>}
+    </div>
+  );
+}
+
+/**
+ * Who this week belongs to, who else is looking at it, and one tap to change
+ * that. The cog still carries the full per-family list for the multi-family
+ * case; this is the common one — you have one family, and sharing a week
+ * should not be a menu dive.
+ */
+function PlanHeader({
+  rec,
+  families,
+  presentMembers,
+  onShare,
+  onSetUpFamily,
+}: {
+  rec: PlanRecord;
+  families: { id: string; name: string }[];
+  presentMembers: PresenceMember[];
+  onShare: (familyId: string | null) => void;
+  onSetUpFamily: () => void;
+}) {
+  const shared = !!rec.familyId;
+  const only = families.length === 1 ? families[0] : null;
+  return (
+    <div className="plan-header-row">
+      {shared ? (
+        <span className="plan-presence">
+          <Icon name="user" />
+          {presentMembers.length === 0
+            ? "Shared \u00b7 nobody else here right now"
+            : presentMembers.length === 1
+              ? `${presentMembers[0]!.name ?? "Someone else"} is looking at this too`
+              : `${presentMembers.length} others are looking at this`}
+        </span>
+      ) : (
+        <span className="plan-presence faint">
+          <Icon name="user" /> Just yours
+        </span>
+      )}
+      {!shared && only && (
+        <button className="btn secondary plan-share-btn" onClick={() => onShare(only.id)}>
+          <Icon name="user" /> Share with {only.name}
+        </button>
+      )}
+      {!shared && families.length === 0 && (
+        <button className="link-btn" onClick={onSetUpFamily}>
+          Set up a family
+        </button>
+      )}
+      {shared && rec.mine && (
+        <button className="link-btn" onClick={() => onShare(null)}>
+          Make private
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * "Busy Tuesday, no fish."
+ *
+ * The nudge does not re-plan in place: it opens the wizard with the sentence
+ * already in its mood step, which is the one place that owns the planner's
+ * inputs (pantry, favourites, blocked recipes, the destination). Re-running it
+ * from here would mean a second copy of all of that, drifting from the first.
+ * One extra tap, and the user can still adjust the meal count before spending
+ * the call.
+ */
+function NudgeBox({
+  value,
+  onChange,
+  onGo,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onGo: () => void;
+}) {
+  return (
+    <section className="nudge">
+      <label className="nudge-label" htmlFor="plan-nudge">
+        Want a different week?
+      </label>
+      <p className="nudge-sub muted">
+        Say what you're after in your own words and it becomes the starting point for the next
+        plan.
+      </p>
+      <div className="nudge-row">
+        <input
+          id="plan-nudge"
+          type="text"
+          className="nudge-input"
+          value={value}
+          maxLength={300}
+          placeholder="busy week, two vegetarian nights, nothing with fish"
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && value.trim() && onGo()}
+        />
+        <button className="btn" disabled={!value.trim()} onClick={onGo}>
+          <Icon name="wand" /> Re-plan
+        </button>
+      </div>
+    </section>
   );
 }
 
