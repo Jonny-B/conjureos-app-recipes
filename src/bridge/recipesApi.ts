@@ -251,7 +251,23 @@ export async function fetchCatalogFacets(): Promise<{
  */
 export async function planWeekRemote(args: {
   constraints: Record<string, unknown>;
+  /**
+   * CANONICAL ingredient names, not raw pantry labels.
+   *
+   * The server matches these against the catalog's canonical `tokens` by set
+   * membership, so "baby spinach" has to arrive as "spinach" or it matches
+   * nothing. Use `canonicalOnHand()` — the raw `.name` list this used to send
+   * scored zero pantry coverage for anything not already in canonical form,
+   * which is the app's entire objective quietly not firing.
+   */
   onHand: string[];
+  /**
+   * Canonical name → waste risk in 0..1, from the shelf-life model. Optional:
+   * omit it and the planner uses the un-weighted pantry objective.
+   */
+  onHandRisk?: Record<string, number>;
+  /** "quick" biases the week toward weeknight recipes. */
+  effort?: "quick" | "any";
   excludeIds?: string[];
   favoriteIds?: string[];
   pinnedId?: string;

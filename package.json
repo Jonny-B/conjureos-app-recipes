@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.50.0",
+  "version": "0.51.0",
   "description": "A pantry app that happens to know recipes. Scan your shelves and fridge so it knows what you own, plan a week that uses it up without cooking the same thing twice, and shop from a list ordered by your own store's aisles.",
   "type": "module",
   "license": "MIT",
@@ -759,7 +759,7 @@
       },
       "planWeek": {
         "permission": "actions.read",
-        "description": "Build a week of meals around the user's pantry and return it as a PROPOSAL. Does not save anything \u2014 the user commits a plan in the app. Honours their blocked list automatically.",
+        "description": "Build a week of meals around the user's pantry and return it as a PROPOSAL. The week is chosen as a SET: it maximises the distinct pantry items used up across all the meals \u2014 weighted toward what is closest to going off \u2014 while keeping the meals varied in cuisine, protein and method, so it is not the same dinner five times. Does not save anything: the user commits a plan in the app. Honours their blocked list automatically.",
         "params": {
           "type": "object",
           "properties": {
@@ -800,6 +800,14 @@
                 "maxLength": 40
               },
               "maxItems": 10
+            },
+            "effort": {
+              "type": "string",
+              "enum": [
+                "quick",
+                "any"
+              ],
+              "description": "\"quick\" biases the week toward weeknight recipes. Use it when the user says they are busy or short on time, not merely because they asked for simple food."
             }
           }
         },

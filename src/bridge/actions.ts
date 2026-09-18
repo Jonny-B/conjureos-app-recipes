@@ -109,7 +109,12 @@ import {
 import { loadBlocked, loadBlockedForWrite, blockRecipe, unblockRecipe } from "../features/blocked";
 import { loadStoresState } from "../features/storeLayout";
 import { scaleRecipe } from "../features/scaling";
-import { planFromChosen, type PlanCandidate } from "../features/planWeek";
+import {
+  canonicalOnHand,
+  planFromChosen,
+  wasteRiskByIngredient,
+  type PlanCandidate,
+} from "../features/planWeek";
 import * as api from "./recipesApi";
 
 declare global {
@@ -636,6 +641,9 @@ async function planWeek(rawParams?: unknown): Promise<Record<string, unknown>> {
   const cuisines = asOptionalStringArray(p.cuisines, "cuisines", 10, 40);
   const avoid = asOptionalStringArray(p.avoid, "avoid", 20, 60);
   const dietary = asOptionalStringArray(p.dietary, "dietary", 10, 40);
+  // Anything other than the literal "quick" leaves the effort axis alone, so a
+  // caller sending junk gets the ordinary week rather than an error.
+  const effort = p.effort === "quick" ? ("quick" as const) : undefined;
 
   // Lenient on purpose, unlike every read action above. Those REPORT state, so
   // a false empty is a false statement. This one CONSUMES state to build a
@@ -645,11 +653,22 @@ async function planWeek(rawParams?: unknown): Promise<Record<string, unknown>> {
   // dot-file hiccupped would be the worse trade.
   const pantry = await loadPantry();
   const blocked = [...(await loadBlocked())];
-  const constraints = { mealCount, includeIngredients: include, cuisines, avoid, dietary };
+  const constraints = {
+    mealCount,
+    includeIngredients: include,
+    cuisines,
+    avoid,
+    dietary,
+    ...(effort ? { effort } : {}),
+  };
   const res = await api.planWeekRemote({
     constraints: constraints as unknown as Record<string, unknown>,
-    onHand: pantry.map((i) => i.name),
+    // Canonical + waste-weighted, exactly like the in-app wizard. An
+    // orchestrator asking for a week should get the same week the user would.
+    onHand: canonicalOnHand(ingredientsFromPantry(pantry)),
+    onHandRisk: wasteRiskByIngredient(pantry),
     excludeIds: blocked,
+    ...(effort ? { effort } : {}),
   });
   const chosen: PlanCandidate[] = res.recipes.map((r) => ({
     id: r.id, title: r.title, recipe: r, category: r.category, tags: r.tags, isFavorite: false,

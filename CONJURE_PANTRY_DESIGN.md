@@ -316,6 +316,40 @@ at and Back needed a `cookOrigin` to find its way home. It is an overlay now:
 the tab underneath stays mounted and merely hidden, so a half-confirmed scan or
 a search three screens deep is exactly where you left it.
 
+### §7 — the planner objective, and the bug that made it moot
+
+`ConjureOS supabase/functions/recipes-db/planner.ts`, extracted from that
+function's `index.ts` so it is a pure module with 30 unit tests in ConjureOS's
+own vitest suite rather than something only observable through a deployment.
+
+The set objective is the four changes the brief asked for: the waste term is
+**submodular** (the credit for a pantry item goes to the first recipe that uses
+it, and decays after), **waste risk** weights it (so the week reaches for the
+spinach that turns on Thursday, not the rice that keeps a year), **diversity**
+runs on cuisine + protein + method, and **effort** is a real axis — "busy week"
+in the nudge box sets `effort: "quick"`, tag-based rather than `cookTime`-based
+because the USDA corpus has no times at all and a minutes term could never fire.
+
+Two subtleties that look like arithmetic and are product decisions: variety
+picks the recipe but never ends the week (candidates are ranked on the full
+gain, admitted on the gain without the sameness penalty, because a repeated
+cuisine is a worse week and a missing dinner is a broken one), and overlap is
+discounted for the token that defines the protein (buying rice once and using
+it three times is the point; sharing the chicken is the same dinner twice).
+
+**The bug underneath it all:** the server matched the client's on-hand names
+against the catalog's canonical `tokens` by plain set membership, and the
+client was sending RAW pantry names. "baby spinach" met "spinach" nowhere, so
+any pantry entry not already in canonical form scored zero coverage and the
+planner planned as if the cupboard were bare — the app's entire objective
+quietly not firing, with no error anywhere. The local client-side planner had
+always canonicalised; only the remote path diverged. Fixed on both sides.
+
+That local planner is now deleted. It had no caller (selection moved
+server-side when the catalog stopped shipping on devices) and was kept "so
+plans are identical", which is exactly backwards: two copies of an objective
+drift, and only one of them was running.
+
 ### §2 — the store listing is a manual step
 
 `scripts/publish-app.mjs` only writes `display_name` / `description` on

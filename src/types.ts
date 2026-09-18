@@ -195,6 +195,15 @@ export interface MoodConstraints {
   avoid: string[];
   /** How many meals to plan (1-7). */
   mealCount: number;
+  /**
+   * How much time they have. "quick" biases the planner toward weeknight
+   * recipes; absent or "any" leaves it alone.
+   *
+   * This is what makes "busy week" in the nudge box mean something. It is a
+   * TAG-based signal rather than a cookTime one on purpose: the USDA corpus
+   * carries no times at all, so a minutes-based effort term could never fire.
+   */
+  effort?: "quick" | "any";
 }
 
 /** One recipe chosen for the week, with its overlap/coverage breakdown. */

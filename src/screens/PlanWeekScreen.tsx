@@ -17,7 +17,9 @@ import {
   interpretMood,
   seedConstraintsFromRecipe,
   buildOnHand,
+  canonicalOnHand,
   canonicalTokens,
+  wasteRiskByIngredient,
   type PlanCandidate,
 } from "../features/planWeek";
 import { planWeekRemote } from "../bridge/recipesApi";
@@ -251,7 +253,14 @@ export function PlanWeekScreen({
     try {
       const res = await planWeekRemote({
         constraints: c as unknown as Record<string, unknown>,
-        onHand: onHand.map((i) => i.name),
+        // Canonical, not raw: see planWeekRemote's own note. Sending `.name`
+        // meant "baby spinach" met the catalog's "spinach" nowhere.
+        onHand: canonicalOnHand(onHand),
+        // What is closest to being thrown out, so the week reaches for that
+        // rather than for whatever happens to score well. Pantry rows only —
+        // anything merged in from a fresh scan has just been seen.
+        onHandRisk: wasteRiskByIngredient(pantry ?? []),
+        ...(c.effort === "quick" ? { effort: "quick" as const } : {}),
         // Blocked recipes are excluded on EVERY run, not just the one where
         // the user pressed thumbs-down.
         excludeIds: [...new Set([...exclude, ...blocked])],
