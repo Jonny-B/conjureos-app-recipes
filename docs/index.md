@@ -1,6 +1,6 @@
-# Recipes — Documentation
+# Conjure Pantry — Documentation
 
-This folder is the source of truth for how the Recipes app works, why it is
+This folder is the source of truth for how Conjure Pantry works, why it is
 built the way it is, and the rules we follow when we change it. It exists to
 do two jobs:
 

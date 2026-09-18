@@ -1,7 +1,7 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.44.0",
-  "description": "Recipes for ConjureOS: browse a catalog, keep a pantry, get suggestions ranked by what you have, and plan a week of meals that shares a shopping list.",
+  "version": "0.45.0",
+  "description": "A pantry app that happens to know recipes. Scan your shelves and fridge so it knows what you own, plan a week that uses it up without cooking the same thing twice, and shop from a list ordered by your own store's aisles.",
   "type": "module",
   "license": "MIT",
   "author": "Jonny-B",
@@ -10,8 +10,8 @@
     "url": "https://github.com/Jonny-B/conjureos-app-recipes.git"
   },
   "conjureos": {
-    "displayName": "Recipes",
-    "icon": "fa:utensils",
+    "displayName": "Conjure Pantry",
+    "icon": "fa:basket-shopping",
     "permissions": [
       "ai.complete",
       "vfs.read",
@@ -1006,9 +1006,9 @@
       }
     },
     "promptSuggestions": [
-      "Show me recipes I can make with what's in my fridge",
-      "What's quick to cook with chicken and rice?",
-      "What did I cook this week?"
+      "What's in my pantry that I should use up first?",
+      "Plan a week of dinners from what I already have",
+      "What's on my shopping list this week?"
     ]
   },
   "//": "No Vite. `npm run dev` is the esbuild dev server from @conjureos/pack; the published build goes through ConjureOS @bundle in CI (same as a user-published app). Bump `version` here AND in src/version.ts together.",

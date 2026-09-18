@@ -1,6 +1,12 @@
-# Recipes for ConjureOS
+# Conjure Pantry
 
-A recipe app with four jobs: cook from what's in your fridge, browse a catalog of ~1,200 recipes, keep a pantry so suggestions rank by what you already have, and plan a week of meals that share one shopping list.
+**A pantry app that happens to know recipes.** The promise is to use up what you already have.
+
+Two mechanics carry it. **Scan your shelves and fridge** — a camera pass turns a shelf into a stocked ingredient list, so the app knows what you own without you typing it. **Plan a week that maximises what you use up while staying varied** — not eight recipes that each want tomatoes, but six different dinners that between them finish the tomatoes, the half bag of spinach and the rice.
+
+Around those: plan the week with your family, share the plan by link, and shop from a list ordered by your own store's aisles.
+
+> **The store slug is still `recipes`, on purpose.** It is the dedupe key for every installed copy, so changing it would put a second app on every device instead of updating the one that is there. Slug is plumbing; nobody sees it.
 
 The first Phase 12a anchor app for [ConjureOS](https://github.com/Jonny-B/ConjureOS). A pure React + TypeScript source project (no Vite). Developed locally with `conj-pack dev` and **published to the ConjureOS App Store from CI**, where it's built by ConjureOS `@bundle`: the exact same pipeline a user-published app goes through.
 

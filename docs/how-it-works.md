@@ -1,6 +1,6 @@
 # How It Works — the keystone doc
 
-This is the end-to-end explanation of the Recipes app: what it does, how it's
+This is the end-to-end explanation of Conjure Pantry: what it does, how it's
 structured, why those structures exist, and the rules we follow to change and
 ship it. Read it top to bottom once; reference it forever.
 

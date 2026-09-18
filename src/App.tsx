@@ -170,7 +170,7 @@ export function App() {
     <div className="app">
       <header className="topbar">
         <span className="brand-mark">
-          <Icon name="utensils" />
+          <Icon name="basket-shopping" />
         </span>
         <span className="topbar-title">{TAB_TITLE[tab]}</span>
         <button className="topbar-cog" aria-label="Settings" onClick={() => setCogOpen(true)}>
