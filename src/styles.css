@@ -1050,8 +1050,12 @@ select {
   letter-spacing: 0.01em;
 }
 
-.recipe-card .pill,
-.browse-item .pill {
+/* Unscoped. These were `.recipe-card .pill, .browse-item .pill`, so the same
+   markup rendered as a styled chip in a feed row and as bare text anywhere
+   else — visible the moment "Tonight's pick" moved onto the Recipes tab and
+   its difficulty pill turned into a plain word next to a styled category one.
+   A pill is a pill wherever it is. */
+.pill {
   display: inline-block;
   font-size: var(--t-xs);
   padding: 3px 11px;
@@ -1075,20 +1079,17 @@ select {
    three so the trio still reads as one family of pill. There is
    no --cui-* token for "amber/medium" specifically, so .medium borrows
    --cui-warning, the closest role. */
-.recipe-card .pill.easy,
-.browse-item .pill.easy {
+.pill.easy {
   background: color-mix(in srgb, var(--cui-success) 11%, transparent);
   color: var(--cui-success);
 }
 
-.recipe-card .pill.medium,
-.browse-item .pill.medium {
+.pill.medium {
   background: color-mix(in srgb, var(--cui-warning) 11%, transparent);
   color: var(--cui-warning);
 }
 
-.recipe-card .pill.hard,
-.browse-item .pill.hard {
+.pill.hard {
   background: color-mix(in srgb, var(--cui-error) 11%, transparent);
   color: var(--cui-error);
 }
@@ -1373,27 +1374,37 @@ select {
   height: 12px;
 }
 
+/* A LIST, not a stack of cards. One hairline between rows, one border round
+   the lot, so a feed reads as a single object you scan down rather than as
+   twenty little boxes. Same idiom as the pantry stock list and the shopping
+   list — they are all the same kind of thing. */
 .browse-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  border: var(--hair);
+  border-radius: var(--r-1);
+  overflow: hidden;
 }
 
 .browse-item {
   background: var(--bg-1);
-  border: var(--hair);
-  border-radius: var(--r-2);
-  padding: 15px 20px;
+  /* `border: none` FIRST: these are <button>s, and overriding only border-top
+     leaves the UA's default on the other three sides. */
+  border: none;
+  border-top: var(--hair);
+  border-radius: 0;
+  padding: 13px 14px;
   display: flex;
   align-items: center;
   gap: 14px;
+  min-height: 44px;
   cursor: pointer;
-  transition: background 0.18s, border-color 0.18s;
+  transition: background 0.18s;
 }
+.browse-item:first-child { border-top: none; }
 
 .browse-item:hover {
   background: var(--bg-2);
-  border-color: var(--cui-border-strong);
 }
 
 .browse-item .title-block {
@@ -1654,6 +1665,15 @@ select {
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     align-items: start;
     gap: 14px;
+    /* A grid of rows is no longer one object, so the container border and the
+       shared dividers come off and each row carries its own outline again. */
+    border: none;
+    border-radius: 0;
+    overflow: visible;
+  }
+  .browse-screen > .browse-list > .browse-item {
+    border: var(--hair);
+    border-radius: var(--r-1);
   }
 
   /* Controls should NOT inherit the content width the way lists do. A
@@ -2455,7 +2475,7 @@ select {
   background: var(--cui-accent);
 }
 
-.lib-header { display: flex; align-items: center; gap: 8px; }
+.lib-header { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
 .lib-header .browse-filter { flex: 1; }
 .lib-icon {
   position: relative;
@@ -2969,11 +2989,11 @@ button.useup-row:hover { background: var(--bg-2); }
 }
 .recipe-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-/* Thumbnail on a browse/feed row. */
+/* Thumbnail on a browse/feed row. Square, like everything else. */
 .browse-thumb {
   flex: 0 0 auto;
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   border-radius: var(--r-1);
   overflow: hidden;
   background: var(--bg-2);
@@ -3293,6 +3313,14 @@ button.useup-row:hover { background: var(--bg-2); }
   color: var(--fg-dim);
 }
 .buy-aisles .cat-chip { min-height: 40px; }
+
+/* The library feed under the search bar gets a count line, so "1,120 recipes"
+   is a fact you can see rather than a claim in the marketing copy. */
+.lib-count {
+  font-size: var(--t-sm);
+  color: var(--fg-faint);
+  margin: -4px 0 2px;
+}
 
 /* Print: the aisle blocks take over from the old .shopping-group markup. */
 @media print {

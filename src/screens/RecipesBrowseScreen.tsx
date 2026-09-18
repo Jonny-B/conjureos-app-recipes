@@ -385,6 +385,13 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
         </button>
       )}
 
+      {loaded && ranked.length > 0 && (
+        <p className="lib-count">
+          {ranked.length.toLocaleString()} recipe{ranked.length === 1 ? "" : "s"}
+          {pantryIng.length > 0 && " · every row shows how much of it your pantry covers"}
+        </p>
+      )}
+
       {!loaded ? (
         <div className="center-spinner"><div className="spinner" /></div>
       ) : ranked.length === 0 ? (

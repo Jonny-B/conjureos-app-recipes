@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.49.0",
+  "version": "0.50.0",
   "description": "A pantry app that happens to know recipes. Scan your shelves and fridge so it knows what you own, plan a week that uses it up without cooking the same thing twice, and shop from a list ordered by your own store's aisles.",
   "type": "module",
   "license": "MIT",

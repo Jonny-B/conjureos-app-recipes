@@ -42,8 +42,9 @@ export function RecipeRow({
             </>
           )}
           <span className={`pill ${r.difficulty}`}>{r.difficulty}</span>
-          {" · "}
-          {r.cookTime} min
+          {/* The USDA corpus carries no times, so an unguarded "{cookTime} min"
+              prints "0 min" on all 1,120 rows. Guarded at every call site. */}
+          {r.cookTime > 0 && ` · ${r.cookTime} min`}
           {r.nutrition && ` · ~${r.nutrition.calories} cal`}
           {fi.kind === "saved" && " · saved"}
         </div>
