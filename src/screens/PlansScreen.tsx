@@ -32,6 +32,17 @@ import { Icon } from "../icons";
 
 type Scope = "my" | "family";
 type Mode = "landing" | "new" | "family" | "stores";
+/**
+ * Which half of a plan this render is about.
+ *
+ * A week plan is two things — the meals, and the shopping list they add up to —
+ * and they are used in two different places: the meals at the kitchen table,
+ * the list standing in a shop holding a phone one-handed. They are now two
+ * tabs, and App mounts this screen ONCE for both so there is one backend load,
+ * one realtime subscription and one PlanWriter between them. Two mounts would
+ * mean two writers racing on the same check-offs.
+ */
+export type PlanFocus = "plan" | "list";
 
 /**
  * Three-state load, never two. A bare `T | null` forces "still loading" and
@@ -96,6 +107,7 @@ function writeLastDestination(v: string): void {
  * edit persists through recipes-db, which broadcasts to the rest of the family.
  */
 export function PlansScreen({
+  focus = "plan",
   pantry,
   catalogVersion = 0,
   intent = null,
@@ -103,6 +115,8 @@ export function PlansScreen({
   onCogItems,
   familyEpoch = 0,
 }: {
+  /** Which half of the plan to show — see PlanFocus. */
+  focus?: PlanFocus;
   pantry: PantryItem[] | null;
   catalogVersion?: number;
   /**
@@ -570,10 +584,14 @@ export function PlansScreen({
         </div>
       ) : active.length === 0 ? (
         <div className="home-nudge">
-          <Icon name="calendar-days" />
+          <Icon name={focus === "list" ? "list-check" : "calendar-days"} />
           <div>
-            {scope === "my" ? (
-              <><strong>No plans yet.</strong> Plan a week and get one deduped shopping list.</>
+            {focus === "list" ? (
+              <><strong>No list yet.</strong> The shopping list is what's left over once a week is
+              planned around your pantry — plan one and it fills in.</>
+            ) : scope === "my" ? (
+              <><strong>No plans yet.</strong> Plan a week around what's in your pantry and get one
+              deduped shopping list for the rest.</>
             ) : (
               <><strong>No family plans yet.</strong> Make a new plan here, or share one of yours to the family.</>
             )}
@@ -586,6 +604,7 @@ export function PlansScreen({
         current && (
           <>
             <PlanView
+              focus={focus}
               rec={current}
               isLatest={viewing === 0}
               familyName={current.familyId ? familyName(current.familyId) : null}
@@ -596,7 +615,13 @@ export function PlansScreen({
             {active.length > 1 && (
               <section className="home-section">
                 <div className="home-section-head">
-                  <h3>{scope === "my" ? "Previous plans" : "Other family plans"}</h3>
+                  <h3>
+                    {focus === "list"
+                      ? "Another week's list"
+                      : scope === "my"
+                        ? "Previous plans"
+                        : "Other family plans"}
+                  </h3>
                 </div>
                 <div className="browse-list">
                   {active.map((p, i) =>
@@ -653,7 +678,7 @@ function LoadError({
       <div className="home-nudge">
         <Icon name="triangle-exclamation" />
         <div>
-          <strong>Couldn't reach Recipes.</strong> Check your connection — nothing has been lost,
+          <strong>Couldn't reach Conjure Pantry.</strong> Check your connection — nothing has been lost,
           we just can't load your plans and families right now.
           {message && (
             <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
@@ -672,6 +697,7 @@ function LoadError({
 // ── one saved plan, read-only + check-off ────────────────────────────────
 
 function PlanView({
+  focus,
   rec,
   isLatest,
   familyName,
@@ -679,6 +705,7 @@ function PlanView({
   onUncheckAll,
   onManageStores,
 }: {
+  focus: PlanFocus;
   rec: PlanRecord;
   isLatest: boolean;
   familyName: string | null;
@@ -852,25 +879,31 @@ function PlanView({
         </div>
       </div>
 
-      <section className="home-section">
-        <div className="home-section-head">
-          <h3>This week's meals</h3>
-        </div>
-        <div className="browse-list">
-          {(plan.picks ?? []).map((pick) => (
-            <div key={pick.id} className="browse-item" style={{ cursor: "default" }}>
-              <div className="title-block">
-                <div className="title">{pick.title}</div>
-                <div className="meta">
-                  {pick.haveCount}/{pick.totalCount} on hand
-                  {pick.marginalNew.length > 0 && ` · ${pick.marginalNew.length} to buy`}
+      {focus === "plan" && (
+        <section className="home-section">
+          <div className="home-section-head">
+            <h3>This week's meals</h3>
+          </div>
+          <div className="browse-list">
+            {(plan.picks ?? []).map((pick) => (
+              <div key={pick.id} className="browse-item" style={{ cursor: "default" }}>
+                <div className="title-block">
+                  <div className="title">{pick.title}</div>
+                  <div className="meta">
+                    {pick.haveCount}/{pick.totalCount} on hand
+                    {pick.marginalNew.length > 0 && ` · ${pick.marginalNew.length} to buy`}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      )}
 
+      {/* Conditional, NOT `hidden` — `.home-section` sets `display: flex`, which
+          beats the UA's low-specificity `[hidden] { display: none }` and would
+          leave the whole shopping list on screen under the meals. */}
+      {focus === "list" && (
       <section className="home-section">
         <div className="home-section-head">
           <h3>Shopping list</h3>
@@ -962,6 +995,7 @@ function PlanView({
           ))
         )}
       </section>
+      )}
     </div>
   );
 }

@@ -1,19 +1,16 @@
 import { useEffect, useState } from "react";
 import type { PantryItem, Recipe, RecipeSource, SavedRecipe } from "./types";
-import { HomeScreen } from "./screens/HomeScreen";
 import { RecipesBrowseScreen } from "./screens/RecipesBrowseScreen";
 import { StudioScreen } from "./screens/StudioScreen";
 import { AdminScreen } from "./screens/AdminScreen";
 import { PantryScreen } from "./screens/PantryScreen";
 import { PlansScreen } from "./screens/PlansScreen";
 import { GuidedCook } from "./screens/GuidedCook";
-import { RecipesScreen } from "./screens/RecipesScreen";
-import { generateFromDescription } from "./features/recipes";
 import { registerActions } from "./bridge/actions";
 import { vfs } from "./bridge/vfs";
 import { joinFamily } from "./bridge/recipesApi";
 import { ensureCatalogLoaded } from "./features/catalog";
-import { loadPantry, ingredientsFromPantry } from "./features/pantry";
+import { loadPantry } from "./features/pantry";
 import { markMade, unmarkMade, saveRecipe } from "./features/storage";
 import { useWhoami } from "./hooks/useWhoami";
 import { useRole } from "./hooks/useRole";
@@ -22,8 +19,17 @@ import type { IconName } from "./icons";
 import { AppearanceSheet } from "./components/AppearanceSheet";
 import { APP_VERSION } from "./version";
 
-type Tab = "home" | "recipes" | "cook" | "plan" | "studio" | "admin";
-type CookMode = "kitchen" | "describe";
+/**
+ * The four pillars, in the order the promise makes sense: what you HAVE, what
+ * you'll COOK with it, what you still need to BUY, and the library you pick
+ * from. Pantry is home — "not just a recipe app" has to be the first thing you
+ * see, and a screen that opens on recipe rows cannot say it.
+ *
+ * `studio` and `admin` are role-gated and appended to the bar at runtime.
+ * There is no `cook` tab: the guided cook is an overlay driven by `cookTarget`
+ * (below), so Back returns you to whichever tab you left, with its state intact.
+ */
+type Tab = "pantry" | "plan" | "list" | "recipes" | "studio" | "admin";
 /** A plans sub-screen to open from the header cog (available on any tab). */
 export type PlansIntent = "family" | "stores" | "new";
 /** An action a screen contributes to the header settings sheet. */
@@ -41,10 +47,10 @@ const HANDOFF_PATH = "/home/Documents/Recipes/.family-invite.json";
 const HANDOFF_TTL_MS = 60 * 60 * 1000;
 
 const TAB_TITLE: Record<Tab, string> = {
-  home: "Home",
+  pantry: "Pantry",
+  plan: "Plan",
+  list: "List",
   recipes: "Recipes",
-  cook: "Cook",
-  plan: "Plans",
   studio: "Studio",
   admin: "Admin",
 };
@@ -54,13 +60,11 @@ interface CookTarget {
   saved: SavedRecipe | null;
 }
 
-// "cook" is no longer a bottom-bar tab — the two cooking entry points (from my
-// kitchen / describe a dish) live on Home now, and the guided cook is reached by
-// tapping a recipe. It stays a routable screen (below), just off the nav.
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
-  { id: "home", label: "Home", icon: "house" },
+  { id: "pantry", label: "Pantry", icon: "boxes-stacked" },
+  { id: "plan", label: "Plan", icon: "calendar-days" },
+  { id: "list", label: "List", icon: "list-check" },
   { id: "recipes", label: "Recipes", icon: "utensils" },
-  { id: "plan", label: "Plans", icon: "calendar-days" },
 ];
 
 export function App() {
@@ -75,14 +79,11 @@ export function App() {
   if (role === "chef" || role === "admin")
     tabs.push({ id: "studio" as Tab, label: "Studio", icon: "wand" as IconName });
   if (role === "admin") tabs.push({ id: "admin" as Tab, label: "Admin", icon: "sliders" as IconName });
-  const [tab, setTab] = useState<Tab>("home");
+  const [tab, setTab] = useState<Tab>("pantry");
   const [recipeSource, setRecipeSource] = useState<RecipeSource>("all");
   /** Bumped when a family is joined from the invite prompt — see PlansScreen. */
   const [familyEpoch, setFamilyEpoch] = useState(0);
-  const [cookMode, setCookMode] = useState<CookMode>("kitchen");
   const [cookTarget, setCookTarget] = useState<CookTarget | null>(null);
-  // The tab the guided cook was launched from, so Back returns there.
-  const [cookOrigin, setCookOrigin] = useState<Tab>("cook");
   const [pantry, setPantry] = useState<PantryItem[] | null>(null);
   const [catalogVersion, setCatalogVersion] = useState(0);
   // A family invite code handed over by the ConjureOS shell (from a
@@ -94,7 +95,7 @@ export function App() {
   const [plansIntent, setPlansIntent] = useState<PlansIntent | null>(null);
   const [cogExtras, setCogExtras] = useState<CogItem[]>([]);
   // Appearance lives behind the cog rather than on a tab: it is set once and
-  // then almost never, so it should not cost a slot in a three-tab bar.
+  // then almost never, so it should not cost a slot in a four-tab bar.
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const goPlans = (intent: PlansIntent) => {
     setCookTarget(null);
@@ -138,7 +139,7 @@ export function App() {
   useEffect(() => {
     registerActions().catch((err) => {
       // eslint-disable-next-line no-console
-      console.warn("[recipes] action registration failed:", err);
+      console.warn("[pantry] action registration failed:", err);
     });
     loadPantry().then(setPantry).catch(() => setPantry([]));
     ensureCatalogLoaded()
@@ -146,25 +147,19 @@ export function App() {
       .catch(() => {});
   }, []);
 
-  // Every "cook this" doorway routes here: load the recipe into the guided cook
-  // and switch to the Cook tab.
-  const startCook = (recipe: Recipe, saved: SavedRecipe | null = null) => {
-    setCookOrigin(tab);
-    setCookTarget({ recipe, saved });
-    setTab("cook");
-  };
-  const endCook = () => {
-    setCookTarget(null);
-    setTab(cookOrigin);
-  };
-  const openKitchen = () => {
-    setCookMode("kitchen");
-    setTab("cook");
-  };
-  const openDescribe = () => {
-    setCookMode("describe");
-    setTab("cook");
-  };
+  /**
+   * Every "cook this" doorway routes here.
+   *
+   * The guided cook used to be a TAB, which meant starting a cook unmounted
+   * whatever you were looking at and Back had to remember where to put you
+   * (`cookOrigin`). It's an overlay now: the tab underneath stays mounted and
+   * merely hidden, so a scan half-confirmed on the Pantry tab, or a search
+   * three screens into the library, is exactly where you left it.
+   */
+  const startCook = (recipe: Recipe, saved: SavedRecipe | null = null) => setCookTarget({ recipe, saved });
+  const endCook = () => setCookTarget(null);
+
+  const cooking = !!cookTarget;
 
   return (
     <div className="app">
@@ -178,81 +173,72 @@ export function App() {
         </button>
       </header>
       <main className="app-body">
-        {tab === "home" && (
-          <HomeScreen
+        {/* Each tab's content is HIDDEN, not unmounted, while the guided cook is
+            open — see startCook. */}
+        <div hidden={cooking}>
+          {tab === "pantry" && (
+            <PantryScreen
+              pantry={pantry}
+              onChange={setPantry}
+              onCook={startCook}
+              onPlanWeek={() => goPlans("new")}
+              onBrowse={() => {
+                setRecipeSource("all");
+                setTab("recipes");
+              }}
+              catalogVersion={catalogVersion}
+            />
+          )}
+          {/* Plan and List are two views of the SAME data, so they share one
+              mounted screen: one backend load, one realtime subscription, one
+              PlanWriter. Rendering them as two elements would double all three
+              and let two writers race on the same shopping-list ticks. */}
+          {(tab === "plan" || tab === "list") && (
+            <PlansScreen
+              focus={tab === "list" ? "list" : "plan"}
+              pantry={pantry}
+              catalogVersion={catalogVersion}
+              intent={plansIntent}
+              onIntentConsumed={() => setPlansIntent(null)}
+              onCogItems={setCogExtras}
+              familyEpoch={familyEpoch}
+            />
+          )}
+          {tab === "recipes" && (
+            <RecipesBrowseScreen
+              source={recipeSource}
+              onSourceChange={setRecipeSource}
+              pantry={pantry}
+              onCook={startCook}
+              catalogVersion={catalogVersion}
+            />
+          )}
+          {tab === "studio" && <StudioScreen />}
+          {tab === "admin" && <AdminScreen myEmail={myEmail} />}
+        </div>
+        {cookTarget && (
+          <GuidedCook
+            // `key` remounts the cook when the recipe changes, so its
+            // lazy state initializers re-read the stored session instead
+            // of carrying the previous recipe's ticks into this one.
+            key={cookTarget.saved?.path ?? cookTarget.recipe.title}
+            recipe={cookTarget.recipe}
             pantry={pantry}
-            onNavigate={setTab}
-            onViewFavorites={() => {
-              setRecipeSource("favorites");
-              setTab("recipes");
-            }}
-            onOpenKitchen={openKitchen}
-            onDescribe={openDescribe}
-            onCook={startCook}
-            catalogVersion={catalogVersion}
+            saved={!!cookTarget.saved}
+            savedPath={cookTarget.saved?.path ?? null}
+            onBack={endCook}
+            onMade={() => (cookTarget.saved ? markMade(cookTarget.saved).then(() => {}) : Promise.resolve())}
+            // `cookTarget.saved` is the row as it was BEFORE the mark (we
+            // never refresh it here), so its lastMadeAt is exactly the
+            // value the undo needs to restore.
+            onUnmade={
+              cookTarget.saved
+                ? () => unmarkMade(cookTarget.saved!).then(() => {})
+                : undefined
+            }
+            onSave={(r) => saveRecipe(r).then(() => {})}
           />
         )}
-        {tab === "recipes" && (
-          <RecipesBrowseScreen
-            source={recipeSource}
-            onSourceChange={setRecipeSource}
-            pantry={pantry}
-            onCook={startCook}
-            catalogVersion={catalogVersion}
-          />
-        )}
-        {tab === "cook" && (
-          <>
-            {/* CookTab stays mounted (just hidden) under the guided cook so the
-                describe results / choose search / scan progress survive the
-                "pick → cook → back to pick another" detour. */}
-            <div hidden={!!cookTarget}>
-              <CookTab
-                mode={cookMode}
-                pantry={pantry}
-                onPantryChange={setPantry}
-                onCook={startCook}
-                onExit={() => setTab("home")}
-                catalogVersion={catalogVersion}
-              />
-            </div>
-            {cookTarget && (
-              <GuidedCook
-                // `key` remounts the cook when the recipe changes, so its
-                // lazy state initializers re-read the stored session instead
-                // of carrying the previous recipe's ticks into this one.
-                key={cookTarget.saved?.path ?? cookTarget.recipe.title}
-                recipe={cookTarget.recipe}
-                pantry={pantry}
-                saved={!!cookTarget.saved}
-                savedPath={cookTarget.saved?.path ?? null}
-                onBack={endCook}
-                onMade={() => (cookTarget.saved ? markMade(cookTarget.saved).then(() => {}) : Promise.resolve())}
-                // `cookTarget.saved` is the row as it was BEFORE the mark (we
-                // never refresh it here), so its lastMadeAt is exactly the
-                // value the undo needs to restore.
-                onUnmade={
-                  cookTarget.saved
-                    ? () => unmarkMade(cookTarget.saved!).then(() => {})
-                    : undefined
-                }
-                onSave={(r) => saveRecipe(r).then(() => {})}
-              />
-            )}
-          </>
-        )}
-        {tab === "plan" && (
-          <PlansScreen
-            pantry={pantry}
-            catalogVersion={catalogVersion}
-            intent={plansIntent}
-            onIntentConsumed={() => setPlansIntent(null)}
-            onCogItems={setCogExtras}
-            familyEpoch={familyEpoch}
-          />
-        )}
-        {tab === "studio" && <StudioScreen />}
-        {tab === "admin" && <AdminScreen myEmail={myEmail} />}
       </main>
       <nav className="tabbar">
         {tabs.map((t) => (
@@ -338,7 +324,7 @@ export function App() {
             setPendingJoin(null);
             setCookTarget(null);
             setTab("plan");
-            // setTab alone is a no-op when Plans is already the open tab, so the
+            // setTab alone is a no-op when Plan is already the open tab, so the
             // new family's plans wouldn't appear until the user navigated away
             // and back. Bump the epoch so PlansScreen reloads either way.
             setFamilyEpoch((n) => n + 1);
@@ -351,7 +337,7 @@ export function App() {
 
 /**
  * Shown when the shell hands over a family invite code (from a `?joinFamily=`
- * link). Confirm → join → land on the Plans tab with the new family.
+ * link). Confirm → join → land on the Plan tab with the new family.
  */
 function FamilyJoinPrompt({
   code,
@@ -414,144 +400,3 @@ function FamilyJoinPrompt({
     </div>
   );
 }
-
-/**
- * The two cooking flows, launched from Home: cook from your kitchen (scan /
- * pantry loop) or describe a dish for the AI. Back exits to Home. The guided,
- * step-by-step cook is layered over this by App when a recipe is chosen.
- */
-function CookTab({
-  mode,
-  pantry,
-  onPantryChange,
-  onCook,
-  onExit,
-  catalogVersion,
-}: {
-  mode: CookMode;
-  pantry: PantryItem[] | null;
-  onPantryChange: (items: PantryItem[]) => void;
-  onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
-  onExit: () => void;
-  catalogVersion: number;
-}) {
-  if (mode === "describe") return <DescribePane pantry={pantry} onBack={onExit} onCook={onCook} />;
-  return (
-    <PantryScreen
-      pantry={pantry}
-      onChange={onPantryChange}
-      onBack={onExit}
-      onCook={onCook}
-      catalogVersion={catalogVersion}
-    />
-  );
-}
-
-/** Describe a dish → AI writes recipes → pick one → guided cook. */
-function DescribePane({
-  pantry,
-  onBack,
-  onCook,
-}: {
-  pantry: PantryItem[] | null;
-  onBack: () => void;
-  onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
-}) {
-  const [text, setText] = useState("");
-  const [useHave, setUseHave] = useState(false);
-  const [state, setState] = useState<
-    { kind: "input" } | { kind: "generating" } | { kind: "recipes"; recipes: Recipe[] }
-  >({ kind: "input" });
-  const [error, setError] = useState<string | null>(null);
-
-  const hasPantry = !!(pantry && pantry.length);
-  const seed = () => (useHave && hasPantry ? ingredientsFromPantry(pantry ?? []) : undefined);
-
-  const go = async () => {
-    if (!text.trim()) return;
-    setError(null);
-    setState({ kind: "generating" });
-    try {
-      const recipes = await generateFromDescription(text, seed());
-      setState({ kind: "recipes", recipes });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setState({ kind: "input" });
-    }
-  };
-
-  if (state.kind === "generating")
-    return <FullscreenSpinner label="Writing your recipe…" sub="Three takes on your idea. ~10 seconds." />;
-
-  if (state.kind === "recipes")
-    return (
-      <div className="browse-screen">
-        <BackBar label="Describe again" onBack={() => setState({ kind: "input" })} />
-        <RecipesScreen
-          recipes={state.recipes}
-          ingredients={seed() ?? []}
-          onEditIngredients={() => setState({ kind: "input" })}
-          onRestart={() => setState({ kind: "input" })}
-          onCook={(r) => onCook(r, null)}
-        />
-      </div>
-    );
-
-  return (
-    <div className="describe-pane">
-      <BackBar label="Home" onBack={onBack} />
-      <h2>Describe a dish</h2>
-      <p className="muted" style={{ marginTop: 0 }}>
-        What are you in the mood for? An ingredient, a cuisine, a craving — I'll write a recipe for it.
-      </p>
-      <textarea
-        className="describe-input"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="e.g. something cozy with chicken and rice, ready in 30 minutes"
-        maxLength={400}
-        rows={3}
-      />
-      <label className={`describe-toggle${hasPantry ? "" : " disabled"}`}>
-        <input
-          type="checkbox"
-          checked={useHave && hasPantry}
-          disabled={!hasPantry}
-          onChange={(e) => setUseHave(e.target.checked)}
-        />
-        Use what's in my kitchen
-        {!hasPantry && <span className="faint"> — scan or add items first</span>}
-      </label>
-      {error && (
-        <div className="status-banner error">
-          <Icon name="triangle-exclamation" />
-          <span>{error}</span>
-        </div>
-      )}
-      <button className="btn" disabled={!text.trim()} onClick={go}>
-        <Icon name="wand" /> Create recipe
-      </button>
-    </div>
-  );
-}
-
-function FullscreenSpinner({ label, sub }: { label: string; sub?: string }) {
-  return (
-    <div className="center-spinner">
-      <div className="spinner" />
-      <div style={{ fontWeight: 500 }}>{label}</div>
-      {sub && <div className="muted" style={{ fontSize: 13 }}>{sub}</div>}
-    </div>
-  );
-}
-
-function BackBar({ label, onBack }: { label: string; onBack: () => void }) {
-  return (
-    <div className="detail-actions">
-      <button className="btn ghost" onClick={onBack}>
-        <Icon name="chevron-down" className="back-caret" /> {label}
-      </button>
-    </div>
-  );
-}
-

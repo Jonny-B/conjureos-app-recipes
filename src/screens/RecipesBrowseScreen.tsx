@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { FeedRecipe, PantryItem, Recipe, RecipeSource, SavedRecipe } from "../types";
+import type { CatalogRecipe, FeedRecipe, PantryItem, Recipe, RecipeSource, SavedRecipe } from "../types";
 import { getCatalog, categories, toRecipe, loadRecipeBody, withRecipeBody } from "../features/catalog";
 import {
   listSavedRecipesResult,
@@ -14,8 +14,12 @@ import { RecipeRow } from "../components/RecipeRow";
 import { RecipeDetail } from "./RecipeDetail";
 import { CreateScreen } from "./CreateScreen";
 import { SnapRecipeScreen } from "./SnapRecipeScreen";
+import { DescribeScreen } from "./DescribeScreen";
+import { CHEF_NAME } from "./StudioScreen";
+import { fetchChefLatest } from "../bridge/recipesApi";
 import { ingredientsFromPantry } from "../features/pantry";
-import { computeCoverage } from "../features/scaling";
+import { computeCoverage, prettyIngredient } from "../features/scaling";
+import { buildCoverage, buildScored, daySeed, type Scored } from "../features/recommend";
 import { Icon } from "../icons";
 import { ErrorBanner, useActionError } from "../components/ErrorBanner";
 
@@ -37,7 +41,14 @@ const SOURCE_TABS: { id: RecipeSource; label: string }[] = [
 ];
 
 const PAGE_SIZE = 60;
-type Mode = "list" | "write" | "snap";
+/**
+ * The three ways a recipe gets INTO the library, all behind the one "+" in the
+ * control bar. "Describe a dish" used to be a tile on the Home screen; Home is
+ * gone, and an AI that writes a recipe belongs beside the two other ways of
+ * adding one, not on a screen of its own. (Design rule: AI is the verb inside a
+ * pillar, never a tab.)
+ */
+type Mode = "list" | "write" | "snap" | "describe";
 
 function keyOf(fi: FeedRecipe): string {
   return fi.kind === "catalog" ? `c:${fi.id}` : `s:${fi.recipe.path}`;
@@ -54,6 +65,9 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
   const [mode, setMode] = useState<Mode>("list");
   const [filterOpen, setFilterOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  /** Re-rolls the top recommendation past its equal-scored ties. */
+  const [shuffle, setShuffle] = useState(0);
+  const [chefPick, setChefPick] = useState<CatalogRecipe | null>(null);
 
   const catalog = useMemo(() => getCatalog(), [catalogVersion]);
 
@@ -76,6 +90,12 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
   useEffect(() => {
     refresh();
   }, [refresh]);
+  // Chef Payson's newest promoted recipe (best-effort; absent if none/offline).
+  useEffect(() => {
+    fetchChefLatest(1)
+      .then((list) => setChefPick(list[0] ?? null))
+      .catch(() => {});
+  }, []);
 
   const feedItems = useMemo<FeedRecipe[]>(() => {
     const savedItems: FeedRecipe[] = saved.map((r) => ({ kind: "saved", recipe: r, favorite: !!r.favorite }));
@@ -117,6 +137,30 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
   const pantryIng = useMemo(() => (pantry ? ingredientsFromPantry(pantry) : []), [pantry]);
   const covFor = (fi: FeedRecipe) =>
     pantryIng.length > 0 ? computeCoverage(fi.recipe, pantryIng) ?? undefined : undefined;
+
+  /**
+   * "Tonight's pick" — the library's one recommendation, scored against the
+   * pantry (see features/recommend.ts). It came off the old Home screen when
+   * Home did; here it heads the library, which is where a recipe suggestion
+   * belongs in a pantry-first app.
+   *
+   * Deliberately hidden the moment someone is searching or filtering: a
+   * suggestion is help when you are browsing and an obstacle when you already
+   * know what you are looking for.
+   */
+  const browsing = source === "all" && !query.trim() && category === "all";
+  const covByKey = useMemo(
+    () => (browsing ? buildCoverage(catalog, saved, pantryIng, pantryIng.length > 0) : new Map()),
+    [browsing, catalog, saved, pantryIng],
+  );
+  const scored = useMemo(
+    () => (browsing ? buildScored(catalog, saved, favs, covByKey, daySeed()) : []),
+    [browsing, catalog, saved, favs, covByKey],
+  );
+  // Rotate through the top of the ranking rather than re-sorting: the ordering
+  // is already the answer, the shuffle just walks it.
+  const heroPool = scored.slice(0, 12);
+  const hero: Scored | null = heroPool.length ? heroPool[shuffle % heroPool.length]! : null;
 
   const categoryOptions = useMemo<DropdownOption<string>[]>(
     () => [
@@ -173,12 +217,15 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
     return { kind: "saved", recipe: s, favorite: !!s.favorite };
   }, [selected, favs, saved]);
 
-  // ── Add-a-recipe sub-views (by hand / by picture), hosted in Recipes ──
-  if (mode === "write" || mode === "snap") {
+  // ── Add-a-recipe sub-views (by hand / by picture / by description) ──
+  if (mode === "write" || mode === "snap" || mode === "describe") {
     const back = () => {
       setMode("list");
       refresh();
     };
+    if (mode === "describe") {
+      return <DescribeScreen pantry={pantry} onBack={back} onCook={onCook} />;
+    }
     return (
       <div className="browse-screen">
         <div className="detail-actions">
@@ -299,7 +346,43 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
           <button className="btn secondary" onClick={() => { setAddOpen(false); setMode("snap"); }}>
             <Icon name="camera" /> Snap a photo
           </button>
+          <button className="btn secondary" onClick={() => { setAddOpen(false); setMode("describe"); }}>
+            <Icon name="wand" /> Describe a dish
+          </button>
         </div>
+      )}
+
+      {browsing && hero && (
+        <HeroPick
+          scored={hero}
+          onView={() => run(async () => setSelected(await withRecipeBody(hero.fi)))}
+          onShuffle={() => setShuffle((n) => n + 1)}
+          canShuffle={heroPool.length > 1}
+        />
+      )}
+
+      {browsing && chefPick && (
+        <button
+          className="chef-promo"
+          onClick={() =>
+            run(async () =>
+              setSelected(
+                await withRecipeBody({
+                  kind: "catalog" as const,
+                  id: chefPick.id,
+                  recipe: chefPick,
+                  favorite: favs.has(chefPick.id),
+                }),
+              ),
+            )
+          }
+        >
+          <span className="chef-promo-eyebrow">
+            <Icon name="utensils" /> {CHEF_NAME}'s newest recipe
+          </span>
+          <span className="chef-promo-title">{chefPick.title}</span>
+          {chefPick.summary && <span className="chef-promo-sub">{chefPick.summary}</span>}
+        </button>
       )}
 
       {!loaded ? (
@@ -328,6 +411,65 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * The library's one recommendation. Lifted verbatim off the old Home screen,
+ * minus its glow and gradient wash (the visual language has one hero surface
+ * and it says so with an accent hairline now).
+ */
+function HeroPick({
+  scored,
+  onView,
+  onShuffle,
+  canShuffle,
+}: {
+  scored: Scored;
+  onView: () => void;
+  onShuffle: () => void;
+  canShuffle: boolean;
+}) {
+  const r = scored.fi.recipe;
+  const cov = scored.cov;
+  return (
+    <article className="hero-card">
+      {canShuffle && (
+        <button className="hero-refresh" onClick={onShuffle} aria-label="Another idea" title="Another idea">
+          <Icon name="rotate" />
+        </button>
+      )}
+      <div className="hero-eyebrow">
+        <Icon name="wand" /> Tonight's pick
+      </div>
+      <h3 className="hero-title">{r.title}</h3>
+      <div className="hero-meta">
+        {scored.fi.kind === "catalog" && <span className="pill cat">{scored.fi.recipe.category}</span>}
+        <span className={`pill ${r.difficulty}`}>{r.difficulty}</span>
+        {/* The USDA corpus carries no times, so a `0 min` pill would print on
+            all 1,120 rows. Fixed at 0.43.1; do not drop the guard. */}
+        {r.cookTime > 0 && <span className="pill">{r.cookTime} min</span>}
+        {r.nutrition && <span className="pill">~{r.nutrition.calories} cal</span>}
+      </div>
+      <div className={`hero-why${cov && cov.missing === 0 ? " have" : ""}`}>
+        <Icon name={cov && cov.missing === 0 ? "check" : "circle-info"} />
+        {scored.reason}
+      </div>
+      {cov && cov.missing > 0 && (cov.missingNames.length > 0 || cov.shortNames.length > 0) && (
+        <div className="cov-strip">
+          {cov.missingNames.slice(0, 4).map((n) => (
+            <span key={n} className="miss-chip">
+              {prettyIngredient(n)}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="hero-actions">
+        <button className="btn" onClick={onView}>
+          View recipe
+        </button>
+      </div>
+    </article>
   );
 }
 

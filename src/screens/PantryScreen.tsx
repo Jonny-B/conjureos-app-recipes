@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { CapturedPhoto, Ingredient, PantryItem, Recipe, SavedRecipe } from "../types";
 import {
   addPantryItem,
@@ -14,22 +14,27 @@ import { computeCoverage } from "../features/scaling";
 import { CaptureScreen } from "./CaptureScreen";
 import { RecipesScreen } from "./RecipesScreen";
 import { RecipeRow } from "../components/RecipeRow";
+import { ResumeCook } from "../components/ResumeCook";
+import { loadCookSession, type CookSession } from "../features/cookSession";
+import { listSavedRecipes } from "../features/storage";
 import { Icon } from "../icons";
 
 interface Props {
   pantry: PantryItem[] | null;
   onChange: (items: PantryItem[]) => void;
-  /** Return to the Cook launcher. */
-  onBack?: () => void;
   /** Start the guided cook for a recipe (savedRecipe null — kitchen cooks catalog/AI recipes). */
   onCook?: (recipe: Recipe, saved: SavedRecipe | null) => void;
+  /** Open the week planner (the Plan tab's wizard). */
+  onPlanWeek?: () => void;
+  /** Open the recipe library. */
+  onBrowse?: () => void;
   catalogVersion?: number;
 }
 
 type Mode = "list" | "capture" | "identifying" | "confirm";
 type Gen = { kind: "idle" } | { kind: "generating" } | { kind: "recipes"; recipes: Recipe[] };
 
-export function PantryScreen({ pantry, onChange, onBack, onCook, catalogVersion = 0 }: Props) {
+export function PantryScreen({ pantry, onChange, onCook, onPlanWeek, onBrowse, catalogVersion = 0 }: Props) {
   const [mode, setMode] = useState<Mode>("list");
   const [scanned, setScanned] = useState<Ingredient[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -104,14 +109,14 @@ export function PantryScreen({ pantry, onChange, onBack, onCook, catalogVersion 
       <div className="center-spinner">
         <div className="spinner" />
         <div style={{ fontWeight: 500 }}>Cooking up ideas…</div>
-        <div className="muted" style={{ fontSize: 13 }}>Three recipes from what you have. ~10 seconds.</div>
+        <div className="muted">Three recipes from what you have. ~10 seconds.</div>
       </div>
     );
   }
   if (gen.kind === "recipes") {
     return (
       <div className="browse-screen">
-        <BackBar label="Back to kitchen" onBack={() => setGen({ kind: "idle" })} />
+        <BackBar label="Back to my pantry" onBack={() => setGen({ kind: "idle" })} />
         <RecipesScreen
           recipes={gen.recipes}
           ingredients={ingredientsFromPantry(pantry ?? [])}
@@ -126,7 +131,7 @@ export function PantryScreen({ pantry, onChange, onBack, onCook, catalogVersion 
   if (mode === "capture") {
     return (
       <div className="browse-screen">
-        <BackBar label="Back to kitchen" onBack={() => setMode("list")} />
+        <BackBar label="Back to my pantry" onBack={() => setMode("list")} />
         {error && (
           <div className="status-banner error">
             <Icon name="wand" />
@@ -136,8 +141,8 @@ export function PantryScreen({ pantry, onChange, onBack, onCook, catalogVersion 
         <CaptureScreen
           onIdentify={onScanned}
           initialPhotos={lastPhotos}
-          title="Add to your kitchen"
-          emptyHint="Snap your fridge or shelves — I'll list what I see so you can add it in a tap."
+          title="Scan your shelves"
+          emptyHint="Snap your fridge, a shelf, a cupboard — I'll list what I see so you can add it in a tap."
           actionLabel={(n) => `Find items in ${n} photo${n === 1 ? "" : "s"} →`}
         />
       </div>
@@ -169,8 +174,9 @@ export function PantryScreen({ pantry, onChange, onBack, onCook, catalogVersion 
     <KitchenList
       pantry={pantry}
       onChange={onChange}
-      onBack={onBack}
       onCook={onCook}
+      onPlanWeek={onPlanWeek}
+      onBrowse={onBrowse}
       onScan={() => {
         setError(null);
         setMode("capture");
@@ -186,16 +192,18 @@ export function PantryScreen({ pantry, onChange, onBack, onCook, catalogVersion 
 function KitchenList({
   pantry,
   onChange,
-  onBack,
   onCook,
+  onPlanWeek,
+  onBrowse,
   onScan,
   onInvent,
   catalogVersion,
 }: {
   pantry: PantryItem[] | null;
   onChange: (items: PantryItem[]) => void;
-  onBack?: () => void;
   onCook?: (recipe: Recipe, saved: SavedRecipe | null) => void;
+  onPlanWeek?: () => void;
+  onBrowse?: () => void;
   onScan: () => void;
   onInvent: () => void;
   catalogVersion: number;
@@ -207,6 +215,20 @@ function KitchenList({
   const [editing, setEditing] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  /**
+   * A cook left running, if there is one. There is no Cook tab in the bottom
+   * bar — the guided cook is an overlay — so without this banner a persisted
+   * session would survive and be unreachable. This is the home tab, so this is
+   * where it belongs.
+   */
+  const [resumable, setResumable] = useState<CookSession | null>(null);
+  const [savedRows, setSavedRows] = useState<SavedRecipe[]>([]);
+  useEffect(() => {
+    setResumable(loadCookSession());
+    // Only so a resumed cook can re-attach to the library row it came from
+    // ("I made this" needs the saved recipe, not just the recipe body).
+    listSavedRecipes().then(setSavedRows).catch(() => setSavedRows([]));
+  }, []);
 
   const items = pantry ?? [];
   const hasItems = items.length > 0;
@@ -249,10 +271,17 @@ function KitchenList({
 
   return (
     <div className="browse-screen">
-      {onBack && <BackBar label="Cook" onBack={onBack} />}
+      {resumable && (
+        <ResumeCook
+          session={resumable}
+          saved={savedRows}
+          onResume={(r, s) => onCook?.(r, s)}
+          onForget={() => setResumable(null)}
+        />
+      )}
 
       <div className="kitchen-top">
-        <h2>My kitchen</h2>
+        <h2>My pantry</h2>
         <button className="btn" onClick={onScan}>
           <Icon name="camera" /> Scan
         </button>
@@ -267,8 +296,8 @@ function KitchenList({
 
       {!hasItems ? (
         <div className="empty-state">
-          <Icon name="carrot" className="empty-icon" />
-          <div>Your kitchen is empty. Scan your fridge to fill it fast, or add items by hand.</div>
+          <Icon name="boxes-stacked" className="empty-icon" />
+          <div>Nothing in your pantry yet. Scan a shelf or your fridge to fill it fast, or add items by hand.</div>
           <button className="btn secondary" onClick={() => setShowAdd(true)}>
             <Icon name="plus" /> Add by hand
           </button>
@@ -342,10 +371,36 @@ function KitchenList({
                   ))}
                 </div>
               ) : (
-                <p className="muted" style={{ fontSize: 13 }}>Add a few more items and matches will show here.</p>
+                <p className="muted">Add a few more items and matches will show here.</p>
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {hasItems && onPlanWeek && (
+        <div className="home-nudge">
+          <Icon name="calendar-days" />
+          <div>
+            <strong>Plan the week around this.</strong> A week of different dinners that between
+            them use up what's above, and one shopping list for whatever's left.
+          </div>
+          <button className="btn" onClick={onPlanWeek}>
+            <Icon name="calendar-days" /> Plan my week
+          </button>
+        </div>
+      )}
+
+      {!hasItems && onBrowse && (
+        <div className="home-nudge">
+          <Icon name="utensils" />
+          <div>
+            <strong>Just browsing?</strong> The recipe library is still here — 1,120 of them,
+            and every row shows how much of it you already own once your pantry has anything in it.
+          </div>
+          <button className="btn secondary" onClick={onBrowse}>
+            <Icon name="magnifying-glass" /> Browse recipes
+          </button>
         </div>
       )}
     </div>
@@ -372,8 +427,11 @@ function ScanConfirm({
     <div className="browse-screen">
       <BackBar label="Cancel" onBack={onBack} />
       <div>
-        <div style={{ fontSize: 18, fontWeight: 600 }}>Found {scanned.length} items</div>
-        <div className="muted" style={{ fontSize: 13 }}>Uncheck anything that isn't yours, then add the rest to your kitchen.</div>
+        <h2 style={{ margin: 0 }}>Found {scanned.length} items</h2>
+        <div className="muted">
+          Everything here is editable — uncheck what isn't yours, drop what it got wrong, fix an
+          amount. Nothing is added to your pantry until you say so.
+        </div>
       </div>
       <div className="ing-group">
         {scanned.map((ing) => (
@@ -392,7 +450,7 @@ function ScanConfirm({
       </div>
       <div className="capture-buttons" style={{ marginTop: 8 }}>
         <button className="btn" disabled={included.length === 0} onClick={onCommit}>
-          <Icon name="plus" /> Add {included.length} to kitchen
+          <Icon name="plus" /> Add {included.length} to my pantry
         </button>
       </div>
     </div>

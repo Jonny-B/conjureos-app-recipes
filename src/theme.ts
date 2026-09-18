@@ -1,5 +1,5 @@
 /**
- * Appearance for the Recipes app: the palette is locked to Spring, and light
+ * Appearance for Conjure Pantry: the palette is locked to Spring, and light
  * or dark is the one thing left to choose.
  *
  * This is the app half of the ConjureOS theme handshake, which
