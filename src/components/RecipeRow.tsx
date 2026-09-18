@@ -42,8 +42,11 @@ export function RecipeRow({
             </>
           )}
           <span className={`pill ${r.difficulty}`}>{r.difficulty}</span>
-          {" · "}
-          {r.cookTime} min
+          {/* cookTime 0 means UNKNOWN, not instant. The USDA corpus carries no
+              times at all, so this printed "0 min" on all 1,120 recipes in
+              prod — a confident wrong answer on a field cooks plan around.
+              Omitted, separator and all. */}
+          {r.cookTime > 0 && ` · ${r.cookTime} min`}
           {r.nutrition && ` · ~${r.nutrition.calories} cal`}
           {fi.kind === "saved" && " · saved"}
         </div>
