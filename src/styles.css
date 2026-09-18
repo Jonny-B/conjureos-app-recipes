@@ -1,15 +1,23 @@
-/* Recipe app — Modern-Whimsy visual language for ConjureOS.
- * A playful candy-on-plum night kitchen: rounded display type, soft
- * multi-hue glows, bouncy interactions. Tokens still echo the kernel's
- * :root so the app reads as a first-class citizen inside the shell. */
-
-/* The app's tokens are re-pointed at @conjureos/ui's Modern Whimsy tokens so
-   the whole app inherits ConjureOS's canonical palette, shadows, and motion
-   from one place. Defined on `.cui-ui` (the <body> wrapper) rather than :root
-   because the --cui-* tokens live on .cui-ui — a custom property can only read
-   another one defined on the same element or an ancestor, and :root (html) is
-   the parent of body, not a descendant. Old token NAMES are kept so every
-   existing rule keeps working; only the VALUES change. */
+/* Conjure Pantry — squared-off, hairline-defined visual language.
+ *
+ * This replaced "Modern Whimsy" (rounded everything, multi-hue glows, bouncy
+ * hovers, a candy wash on the canvas). The rules, in the order they matter:
+ *
+ *   1. Every radius comes from the scale below. No component picks its own.
+ *   2. Borders carry the structure. Not shadows — one shadow token exists and
+ *      only genuinely floating layers may use it.
+ *   3. The canvas is flat. A tinted background makes a hairline vanish.
+ *   4. One gradient, on one element per screen: the primary action.
+ *   5. Hierarchy comes from the type scale, because nothing else is left to
+ *      carry it.
+ *   6. Never hard-code a colour. Spring's --cui-on-accent is DARK in the dark
+ *      flavour and white in the light one, so `color: #fff` on a filled button
+ *      is a real bug, not a shortcut. Both flavours get checked, every time.
+ *
+ * Tokens are defined on `.cui-ui` (the <body> wrapper) rather than :root
+ * because the --cui-* tokens live on .cui-ui — a custom property can only read
+ * another one defined on the same element or an ancestor, and :root (html) is
+ * the parent of body, not a descendant. */
 .cui-ui {
   --bg-0: var(--cui-bg);
   --bg-1: var(--cui-bg-1);
@@ -19,8 +27,11 @@
   --fg-dim: var(--cui-fg-mute);
   --fg-faint: var(--cui-fg-dim);
 
-  /* Accent: purple primary + indigo soft. The old pink (bubblegum) was app
-     drift off the canonical palette; it now resolves to the indigo soft accent. */
+  /* Legacy aliases from the whimsy era. The NAMES lie — there is no grape,
+     bubblegum or tangerine in Spring — but each one resolves to a canonical
+     --cui-* token, so the colours are correct even where the name is not.
+     Left in place because renaming ~100 call sites changes no pixel; when you
+     touch a rule that uses one, prefer the --cui-* token it points at. */
   --grape: var(--cui-accent);
   --bubblegum: var(--cui-accent-soft);
   --tangerine: var(--cui-warn);
@@ -33,31 +44,83 @@
   --accent-soft: var(--cui-accent-soft);
   --accent-warm: var(--cui-warn);
   --border: var(--cui-border);
-  --border-soft: var(--cui-border);
   --danger: var(--cui-error);
   --success: var(--cui-success);
 
-  /* Vivid purple→blue for filled buttons + active pills (the signature
-     gradient applied as an opaque fill, not the soft hero wash).
-     Both stops of BOTH gradients below must come from the --cui-accent /
-     --cui-accent-hover pair, because --cui-on-accent (the label every call
-     site pairs these with) is calibrated ONLY against that pair. --grad-warm
-     used to run --cui-accent-soft -> --cui-accent - accent-soft is a
-     deprecated alias for --cui-link, a color chosen for TEXT, not for a
-     fill that carries on-accent - and on-accent-on-link measured as low as
-     2.11:1 (Christmas dark). Reordering the same two accent stops instead
-     of introducing a third color keeps every consumer of --grad-warm inside
-     the one calibrated pair; see DECISIONS.md 2026-09-10. If this ever needs
-     a third stop, it has to be --cui-accent or --cui-accent-hover again, not
-     --cui-link/--cui-accent-soft, --cui-fg, or any other un-calibrated
-     token. */
-  --grad-primary: linear-gradient(135deg, var(--cui-accent), var(--cui-accent-hover));
-  --grad-warm: linear-gradient(135deg, var(--cui-accent-hover), var(--cui-accent));
-  --shadow-glow: var(--cui-shadow-accent);
-  --shadow-soft: var(--cui-shadow);
+  /* ── Radius scale ─────────────────────────────────────────────────────
+     Squared-off angles are the language now, and the point of a scale is
+     that no component picks its own curve. This file used to carry 106
+     hard-coded border-radius declarations across 15 distinct values; every
+     one of them resolves from here. If you want a radius that is not on
+     this list, the answer is one of these five, not a sixteenth value. */
+  --r-0: 0;        /* full-bleed edges, dividers, progress bars, indicators */
+  --r-1: 2px;      /* the default: cards, rows, inputs, sheets, buttons */
+  --r-2: 4px;      /* the largest radius in the app: sheets, image frames */
+  --r-pill: 999px; /* RATIONED — status chips and count badges ONLY. A pill
+                      says "this is data"; structure goes square. */
+  --r-circle: 50%; /* the spinner, and nothing else */
 
-  /* Reserved bouncy curve for character moments (error banner rise, etc.). */
-  --bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* ── Type scale ───────────────────────────────────────────────────────
+     With the ornament gone (glows, washes, gradients, bouncy hovers),
+     hierarchy has to come from size and weight instead, so those need a
+     scale of their own. Same rule: pick a step, don't invent a size. */
+  --t-micro: 10px; /* uppercase micro-tags */
+  --t-xs: 11px;    /* eyebrows, meta lines, chip text */
+  --t-sm: 12px;    /* secondary text */
+  --t-md: 13px;    /* dense UI text, quiet controls */
+  --t-base: 14px;  /* body */
+  --t-lg: 15px;    /* row titles */
+  --t-xl: 17px;    /* card titles */
+  --t-2xl: 20px;   /* section heads, the top bar */
+  --t-3xl: 25px;   /* screen titles */
+  --t-4xl: 32px;   /* the one number on a screen that matters */
+
+  /* ── Structure ────────────────────────────────────────────────────────
+     Borders carry the structure now, not shadows. --cui-border is already
+     a hairline (10% of the foreground in dark, 14% in light) — "almost not
+     there" is the brief, and low contrast is exactly what makes a 2px
+     corner read as deliberate rather than as a rounding error. */
+  --hair: 1px solid var(--cui-border);
+  --hair-strong: 1px solid var(--cui-border-strong);
+
+  /* The accent-flavoured line and wash — for the hero's edge, an active
+     control, a hover.
+
+     These do NOT come from --cui-accent-mute / --cui-accent-tint, which look
+     like the right tokens and are not: both are DEPRECATED aliases pointing
+     at --cui-support-tint / --cui-support-line, i.e. the SUPPORT hue. In
+     Spring that is pink (rgba(165,61,122,…)), so every "accent" hairline and
+     hover wash in this app was a pink one on a green app. Invisible while
+     glows and washes carried the depth; not invisible now that a hairline is
+     the whole structure. Derived from --cui-accent instead, so they track
+     whatever the palette actually is.
+
+     12% is measured, not chosen: --cui-accent-soft as text on this wash over
+     the page canvas is 4.54:1 in Spring light at 14% and has no room to
+     spare, so the wash stays under it. Anything sitting on --bg-3 (the
+     dropdown menu) must use --cui-fg for its label, because accent-soft on
+     bg-3 is ~3.6:1 in Spring light at ANY wash strength, 0% included. */
+  --accent-line: color-mix(in srgb, var(--cui-accent) 45%, transparent);
+  --accent-wash: color-mix(in srgb, var(--cui-accent) 12%, transparent);
+  --hair-accent: 1px solid var(--accent-line);
+
+  /* ONE shadow, and only genuinely floating layers get it: bottom sheets,
+     dropdowns, popovers. Cards, rows, tiles and buttons get --hair.
+     Direction-agnostic on purpose — a bottom sheet needs the falloff going
+     UP and a dropdown needs it going down, and one token serves both. */
+  --shadow-float: 0 0 24px rgba(0, 0, 0, 0.28);
+
+  /* ONE gradient, on ONE element per screen: the primary action (.btn).
+     Everything that used to carry it — active pills, badges, step dots,
+     progress bars, hero washes — is a flat --cui-accent now.
+     Both stops must stay inside the --cui-accent / --cui-accent-hover pair,
+     because --cui-on-accent (the label every call site pairs this with) is
+     calibrated ONLY against that pair. --grad-warm was the same two stops
+     reversed and had no consumers left once the rationing was done, so it
+     is gone; wanting a second gradient back is the rationing failing, not a
+     missing token. Never reach for --cui-link / --cui-accent-soft, --cui-fg
+     or any other un-calibrated token as a stop (DECISIONS.md 2026-09-10). */
+  --grad-primary: linear-gradient(135deg, var(--cui-accent), var(--cui-accent-hover));
 }
 
 * {
@@ -74,22 +137,20 @@ body,
 
 body {
   font-family: var(--cui-font-sans);
-  /* Clean, flat canvas (matches the Conjure Health app shell) — the old
-     animated blur-blobs read as hazy/dated; a single, static, very-faint
-     top wash keeps a hint of depth without the murk. */
-  background:
-    radial-gradient(120% 60% at 50% -10%, var(--cui-accent-mute), transparent 60%),
-    var(--bg-0);
-  background-attachment: fixed;
+  /* Flat, and deliberately so. The canvas used to paint a radial accent wash
+     at the top; a hairline border is the only depth cue this language has,
+     and a tinted background is the one thing that makes a 10%-opacity
+     hairline disappear. Flat --bg-0 is what keeps the structure legible. */
+  background: var(--bg-0);
   color: var(--fg);
-  font-size: 14px;
+  font-size: var(--t-base);
   -webkit-font-smoothing: antialiased;
   position: relative;
   overflow: hidden;
 }
 
-/* Modern Whimsy uses system fonts only (no web fonts); headings and controls
-   share the same sans stack as body, differentiated by weight/size. */
+/* System fonts only (no web fonts); headings and controls share the same sans
+   stack as body, differentiated by the type scale and weight alone. */
 h1, h2, h3, h4,
 .app-header h1,
 .btn,
@@ -145,7 +206,7 @@ select {
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--cui-border);
+  border-bottom: var(--hair);
   background: color-mix(in srgb, var(--bg-0) 82%, transparent);
   backdrop-filter: blur(12px);
   flex-shrink: 0;
@@ -156,10 +217,9 @@ select {
   place-items: center;
   width: 34px;
   height: 34px;
-  border-radius: 10px;
+  border-radius: var(--r-1);
   color: var(--cui-on-accent);
-  background: var(--grad-primary);
-  box-shadow: var(--cui-shadow-accent);
+  background: var(--cui-accent);
 }
 
 .brand-mark .fa-icon {
@@ -168,8 +228,8 @@ select {
 }
 
 .topbar-title {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: var(--t-2xl);
+  font-weight: var(--cui-weight-bold);
   letter-spacing: 0.01em;
 }
 
@@ -184,7 +244,7 @@ select {
   height: 38px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
+  border-radius: var(--r-1);
   border: 1px solid transparent;
   background: transparent;
   color: var(--fg-dim, var(--cui-fg-mute));
@@ -210,18 +270,18 @@ select {
   width: 100%;
   max-width: 520px;
   background: var(--bg-1, var(--cui-bg-1));
-  border: 1px solid var(--cui-border);
+  border: var(--hair);
   border-bottom: none;
-  border-radius: 18px 18px 0 0;
+  border-radius: var(--r-2) var(--r-2) 0 0;
   padding: 8px 10px calc(14px + env(safe-area-inset-bottom));
-  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-float);
   animation: sheetUp 0.18s cubic-bezier(0.22, 1, 0.36, 1);
 }
 @keyframes sheetUp { from { transform: translateY(14px); opacity: 0.6; } to { transform: translateY(0); opacity: 1; } }
 .sheet-handle {
   width: 38px;
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--r-0);
   background: var(--cui-border);
   margin: 6px auto 10px;
 }
@@ -231,12 +291,12 @@ select {
   gap: 12px;
   width: 100%;
   font: inherit;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--t-lg);
+  font-weight: var(--cui-weight-semibold);
   color: var(--fg);
   background: transparent;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--r-1);
   padding: 14px 14px;
   cursor: pointer;
   text-align: left;
@@ -253,8 +313,8 @@ select {
    combinations: it is where they are chosen. */
 .appearance-title {
   margin: 2px 12px 10px;
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--t-lg);
+  font-weight: var(--cui-weight-bold);
   color: var(--cui-fg);
 }
 .appearance-controls {
@@ -265,8 +325,8 @@ select {
 }
 .appearance-field { display: flex; flex-direction: column; gap: 6px; }
 .appearance-field-label {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--t-sm);
+  font-weight: var(--cui-weight-semibold);
   letter-spacing: 0.02em;
   color: var(--cui-fg-mute);
 }
@@ -278,14 +338,14 @@ select {
   justify-content: center;
   gap: 7px;
   font: inherit;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--t-md);
+  font-weight: var(--cui-weight-semibold);
   padding: 9px 10px;
-  border-radius: 10px;
+  border-radius: var(--r-1);
   cursor: pointer;
   color: var(--cui-fg);
   background: var(--cui-bg-1);
-  border: 1px solid var(--cui-border);
+  border: var(--hair);
   transition: background 0.12s ease, border-color 0.12s ease;
 }
 .appearance-flavor svg { width: 14px; height: 14px; }
@@ -296,12 +356,12 @@ select {
   color: var(--cui-on-accent);
 }
 .appearance-flavor.on svg { color: var(--cui-on-accent); }
-.appearance-done { justify-content: center; font-weight: 600; margin-top: 6px; }
+.appearance-done { justify-content: center; font-weight: var(--cui-weight-semibold); margin-top: 6px; }
 .sheet-sep { height: 1px; background: var(--cui-border); margin: 6px 12px; }
 .sheet-cancel {
   justify-content: center;
   color: var(--fg-dim, var(--cui-fg-mute));
-  font-weight: 700;
+  font-weight: var(--cui-weight-bold);
   margin-top: 2px;
 }
 .sheet-cancel svg { display: none; }
@@ -323,7 +383,7 @@ select {
 .tabbar {
   display: flex;
   flex-shrink: 0;
-  border-top: 1px solid var(--cui-border);
+  border-top: var(--hair);
   background: color-mix(in srgb, var(--bg-0) 88%, transparent);
   backdrop-filter: blur(12px);
 }
@@ -340,8 +400,8 @@ select {
   justify-content: center;
   gap: 4px;
   padding: 10px 4px;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--t-xs);
+  font-weight: var(--cui-weight-semibold);
   cursor: pointer;
   transition: color var(--cui-duration) var(--cui-ease);
 }
@@ -360,14 +420,13 @@ select {
   top: 0;
   width: 26px;
   height: 3px;
-  border-radius: 0 0 3px 3px;
+  border-radius: var(--r-0);
   background: var(--cui-accent);
 }
 
 .tab-icon {
   display: grid;
   place-items: center;
-  transition: transform var(--cui-duration) var(--cui-ease);
 }
 
 .tab-icon .fa-icon {
@@ -375,149 +434,15 @@ select {
   height: 20px;
 }
 
-.tab.active .tab-icon {
-  transform: translateY(-1px) scale(1.06);
-}
-
 .tab-label {
   line-height: 1;
-}
-
-.nav-btn {
-  background: transparent;
-  border: none;
-  color: var(--cui-fg-mute);
-  padding: 7px 16px;
-  border-radius: var(--cui-radius-pill);
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: var(--cui-weight-medium);
-  white-space: nowrap;
-  transition: background var(--cui-duration-fast) var(--cui-ease),
-              color var(--cui-duration-fast) var(--cui-ease);
-}
-
-.nav-btn:hover {
-  color: var(--cui-fg);
-  background: var(--cui-accent-mute);
-}
-
-/* Pill-shaped active state: opaque accent-gradient backing + accent-tint ring
-   + soft accent glow (the canonical Modern Whimsy selected-affordance).
-   --cui-on-accent is only calibrated against an OPAQUE --cui-accent fill —
-   the previous version painted this as a color-mix(..., transparent) wash
-   over .nav-btn's own background, which is nowhere near opaque and read as
-   low as 1.88:1 in Fall dark. --grad-primary is accent -> accent-hover with
-   nothing mixed toward transparent, so on-accent stays correct here; don't
-   reintroduce a translucent stop under this label (see DECISIONS.md
-   2026-09-10, and --grad-warm above for the same mistake in a gradient). */
-.nav-btn.active {
-  color: var(--cui-on-accent);
-  background: var(--grad-primary);
-  box-shadow: 0 0 0 1px var(--cui-accent-tint),
-              0 4px 12px color-mix(in srgb, var(--cui-accent) 25%, transparent);
-}
-
-/* ── Info popover (version + USDA quota) ──────────────────────────────
- * Small "i" button at the right end of the header nav. Tap to peek at
- * version + USDA quota; click outside or press Escape to close. Doesn't
- * block any other interaction in the app. Colors track the candy-on-plum
- * palette so it reads as part of the same app, not a bolt-on.
- */
-.info-wrap {
-  position: relative;
-  display: inline-flex;
-}
-
-.info-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  border: none;
-  background: transparent;
-  color: var(--cui-fg-mute);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background var(--cui-duration-fast) var(--cui-ease),
-              color var(--cui-duration-fast) var(--cui-ease);
-}
-
-.info-btn .fa-icon {
-  width: 15px;
-  height: 15px;
-}
-
-.info-btn:hover,
-.info-btn.active {
-  background: var(--cui-accent-mute);
-  color: var(--cui-fg);
-}
-
-.info-popover {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  min-width: 260px;
-  max-width: 320px;
-  padding: 12px 14px;
-  background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: var(--shadow-soft);
-  z-index: 50;
-}
-
-.info-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 4px 0;
-  font-size: 13px;
-}
-
-.info-label {
-  color: var(--fg-dim);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.info-value {
-  color: var(--fg);
-  font-weight: 600;
-  text-align: right;
-}
-
-.info-value.mono {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 12.5px;
-  font-variant-numeric: tabular-nums;
-}
-
-.info-divider {
-  height: 1px;
-  background: var(--border);
-  margin: 6px 0;
-}
-
-.info-help {
-  margin: 8px 0 0;
-  font-size: 11.5px;
-  line-height: 1.45;
-  color: var(--fg-dim);
-}
-.info-help.warn {
-  color: var(--tangerine);
 }
 
 .app-version {
   flex: 0 0 auto;
   text-align: center;
   font-style: italic;
-  font-size: 11px;
+  font-size: var(--t-xs);
   color: var(--fg-faint);
   padding: 4px 0 6px;
   background: color-mix(in srgb, var(--bg-0) 88%, transparent);
@@ -532,10 +457,9 @@ select {
 
 .card {
   background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  border: var(--hair);
+  border-radius: var(--r-2);
   padding: 22px;
-  box-shadow: var(--shadow-soft);
 }
 
 .btn {
@@ -549,19 +473,16 @@ select {
   padding: 11px 18px;
   /* Rounded-rect, not a full pill — the pill shape was the main "toy" tell.
      Matches the Conjure Health button radius. */
-  border-radius: var(--cui-radius);
+  border-radius: var(--r-1);
   cursor: pointer;
-  font-weight: 600;
-  font-size: 14px;
-  box-shadow: var(--cui-shadow-accent);
-  transition: transform var(--cui-duration-fast) var(--cui-ease), box-shadow var(--cui-duration) var(--cui-ease), filter var(--cui-duration) var(--cui-ease);
+  font-weight: var(--cui-weight-semibold);
+  font-size: var(--t-base);
+  transition: filter var(--cui-duration) var(--cui-ease);
 }
 
-/* Modern Whimsy hover: a gentle 1px lift with an accent-tinted shadow — no
-   scale. The lift is a wink, not a flash. */
+/* No lift, no glow. The primary action already carries the app's only
+   gradient; brightening it is all the hover it needs. */
 .btn:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--cui-shadow-accent);
   filter: brightness(1.06);
 }
 
@@ -575,21 +496,18 @@ select {
 }
 
 .btn:active {
-  transform: translateY(0) scale(0.98);
+  filter: brightness(0.94);
 }
 
 .btn:disabled {
   filter: grayscale(0.5) brightness(0.75);
-  box-shadow: none;
-  transform: none;
   cursor: not-allowed;
 }
 
 .btn.secondary {
   background: var(--bg-3);
-  border: 1px solid var(--border);
+  border: var(--hair);
   color: var(--fg);
-  box-shadow: var(--shadow-soft);
 }
 
 .btn.secondary:hover {
@@ -597,14 +515,12 @@ select {
 }
 
 .btn.danger {
-  /* The far stop was 70% error / 30% black. --cui-onstatus-d sits right next
-     to black (#0b0e14), so darkening the far end toward #000 in a dark
-     palette pushes it toward the label's own color instead of away from it -
-     8 of 9 dark palettes measured under 4.5:1, worst #0b0e14 on #ae4f4f at
-     3.70:1. 85% keeps a visible near-to-far shade step (14px/600 still needs
-     4.5:1) while the worst case (Conjure dark, #0b0e14 on #d36060) clears it
-     at 5.16:1. */
-  background: linear-gradient(135deg, var(--cui-error), color-mix(in srgb, var(--cui-error) 85%, #000));
+  /* Flat --cui-error, not a gradient. The old two-stop fill darkened the far
+     end toward #000, which in a dark palette moves it TOWARD the label
+     (--cui-onstatus-d is #0b0e14) rather than away: 8 of 9 dark palettes
+     measured under 4.5:1 at 70% black, worst 3.70:1. A solid fill has no far
+     stop to get wrong, and the gradient rationing wanted it gone anyway. */
+  background: var(--cui-error);
   /* --cui-onstatus, not --cui-on-accent: this fill is the error colour, and
      the two labels differ (on-accent is dark in six palettes, onstatus tracks
      the status hues instead). */
@@ -612,15 +528,14 @@ select {
 }
 
 .btn.ghost {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border);
+  background: var(--bg-2);
+  border: var(--hair);
   color: var(--fg-dim);
-  box-shadow: none;
 }
 
 .btn.ghost:hover {
   color: var(--fg);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-3);
 }
 
 .muted {
@@ -655,8 +570,8 @@ select {
   resize: vertical;
   min-height: 150px;
   background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  border: var(--hair);
+  border-radius: var(--r-2);
   padding: 14px 16px;
   color: var(--fg);
   font: inherit;
@@ -674,7 +589,7 @@ select {
    pen make it obvious each line is tappable; hover deepens the affordance. */
 .editable {
   cursor: text;
-  border-radius: 6px;
+  border-radius: var(--r-1);
   padding: 1px 5px;
   margin: -1px -5px;
   border-bottom: 1px dashed var(--grape);
@@ -684,7 +599,7 @@ select {
 
 .editable:hover,
 .editable:focus-visible {
-  background: rgba(179, 136, 255, 0.14);
+  background: var(--accent-wash);
   border-bottom-color: var(--bubblegum);
 }
 
@@ -707,7 +622,7 @@ select {
   box-sizing: border-box;
   background: var(--bg-1);
   border: 1px solid var(--grape);
-  border-radius: 8px;
+  border-radius: var(--r-1);
   padding: 6px 9px;
   color: var(--fg);
   font: inherit;
@@ -750,9 +665,9 @@ select {
   background: transparent;
   border: 1px dashed var(--border);
   color: var(--fg-dim);
-  border-radius: 10px;
+  border-radius: var(--r-1);
   padding: 6px 12px;
-  font-size: 13px;
+  font-size: var(--t-md);
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s;
 }
@@ -764,30 +679,29 @@ select {
 
 .capture-screen h2 {
   margin: 0;
-  font-size: 26px;
-  font-weight: 600;
+  font-size: var(--t-3xl);
+  font-weight: var(--cui-weight-semibold);
   letter-spacing: 0.01em;
 }
 
 .capture-area {
-  border: 2.5px dashed var(--border);
-  border-radius: 24px;
+  border: 1px dashed var(--cui-border-strong);
+  border-radius: var(--r-2);
   padding: 26px 18px;
   text-align: center;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent);
-  transition: border-color 0.25s, background 0.25s, transform 0.25s var(--bounce);
+  background: var(--bg-1);
+  transition: border-color 0.25s, background 0.25s;
 }
 
 .capture-area.dragover {
-  border-color: var(--bubblegum);
-  background: rgba(255, 143, 199, 0.08);
-  transform: scale(1.015);
+  border-color: var(--cui-accent);
+  background: var(--accent-wash);
 }
 
 .capture-area .icon {
   font-size: 40px;
   margin-bottom: 8px;
-  filter: drop-shadow(0 6px 14px color-mix(in srgb, var(--cui-accent) 40%, transparent));
+  color: var(--cui-accent);
   line-height: 0;
 }
 
@@ -796,11 +710,6 @@ select {
   height: 44px;
   display: block;
   margin: 0 auto;
-}
-
-@keyframes bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
 }
 
 .capture-buttons {
@@ -812,11 +721,10 @@ select {
 
 .photo-preview {
   position: relative;
-  border-radius: 20px;
+  border-radius: var(--r-2);
   overflow: hidden;
   background: var(--bg-1);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-soft);
+  border: var(--hair);
 }
 
 .photo-preview img {
@@ -838,16 +746,15 @@ select {
 .photo-tile {
   position: relative;
   aspect-ratio: 1;
-  border-radius: 16px;
+  border-radius: var(--r-2);
   overflow: hidden;
   background: var(--bg-1);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-soft);
-  transition: transform 0.2s var(--bounce);
+  border: var(--hair);
+  transition: border-color 0.18s var(--cui-ease);
 }
 
 .photo-tile:hover {
-  transform: translateY(-3px) rotate(-1deg);
+  border-color: var(--cui-border-strong);
 }
 
 .photo-tile img {
@@ -863,24 +770,23 @@ select {
   right: 7px;
   width: 26px;
   height: 26px;
-  border-radius: 50%;
-  background: rgba(22, 18, 43, 0.82);
-  border: 1px solid var(--border-soft);
+  border-radius: var(--r-1);
+  background: color-mix(in srgb, var(--cui-bg) 82%, transparent);
+  border: var(--hair);
   color: var(--fg);
-  font-size: 12px;
+  font-size: var(--t-sm);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
   backdrop-filter: blur(4px);
-  transition: background 0.18s, transform 0.18s var(--bounce);
+  transition: background 0.18s;
 }
 
 .photo-tile-remove:hover {
   background: var(--danger);
   border-color: var(--danger);
-  transform: scale(1.15);
 }
 
 .photo-tile-meta {
@@ -889,9 +795,9 @@ select {
   left: 0;
   right: 0;
   padding: 5px 9px;
-  font-size: 10px;
+  font-size: var(--t-micro);
   color: var(--fg-dim);
-  background: linear-gradient(180deg, transparent, rgba(16, 12, 32, 0.9));
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--cui-bg) 90%, transparent));
 }
 
 .capture-area.disabled {
@@ -910,10 +816,9 @@ select {
   flex: 0 0 auto;
   height: 100px;
   width: auto;
-  border-radius: 14px;
-  border: 1px solid var(--border-soft);
+  border-radius: var(--r-1);
+  border: var(--hair);
   object-fit: cover;
-  box-shadow: var(--shadow-soft);
 }
 
 /* ── Ingredients screen ────────────────────────────────────────────── */
@@ -930,9 +835,8 @@ select {
   width: 100%;
   max-height: 240px;
   object-fit: cover;
-  border-radius: 20px;
-  border: 1px solid var(--border-soft);
-  box-shadow: var(--shadow-soft);
+  border-radius: var(--r-2);
+  border: var(--hair);
 }
 
 .ing-group {
@@ -942,11 +846,11 @@ select {
 }
 
 .ing-group-label {
-  font-size: 11px;
+  font-size: var(--t-xs);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--accent-soft);
-  font-weight: 700;
+  font-weight: var(--cui-weight-bold);
 }
 
 .ing-row {
@@ -961,13 +865,13 @@ select {
   row-gap: 8px;
   padding: 11px 15px;
   background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  transition: border-color 0.18s, background 0.18s, transform 0.18s var(--bounce);
+  border: var(--hair);
+  border-radius: var(--r-1);
+  transition: border-color 0.18s, background 0.18s;
 }
 
 .ing-row:hover {
-  transform: translateX(3px);
+  border-color: var(--cui-border-strong);
 }
 
 /* Both were hardcoded literals off the retired palette (a fixed teal, a
@@ -991,40 +895,39 @@ select {
 .ing-row .name {
   flex: 1;
   min-width: 0;
-  font-weight: 600;
+  font-weight: var(--cui-weight-semibold);
 }
 
 .ing-row .notes {
   color: var(--fg-faint);
-  font-size: 12px;
+  font-size: var(--t-sm);
 }
 
 .ing-row .conf {
-  font-size: 11px;
+  font-size: var(--t-xs);
   padding: 2px 9px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--bg-3);
   color: var(--fg-dim);
-  font-weight: 700;
+  font-weight: var(--cui-weight-bold);
 }
 
 .ing-row .qty-pill {
   background: var(--bg-3);
-  border: 1px solid var(--border);
+  border: var(--hair);
   color: var(--accent-soft);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--t-sm);
+  font-weight: var(--cui-weight-semibold);
   padding: 4px 11px;
-  border-radius: 999px;
+  border-radius: var(--r-1);
   cursor: pointer;
   font-family: inherit;
-  transition: transform 0.15s var(--bounce), border-color 0.15s, color 0.15s;
+  transition: border-color 0.15s, color 0.15s;
 }
 
 .ing-row .qty-pill:hover {
   border-color: var(--grape);
   color: var(--fg);
-  transform: scale(1.05);
 }
 
 .qty-edit-form {
@@ -1038,8 +941,8 @@ select {
   border: 1px solid var(--grape);
   color: var(--fg);
   padding: 5px 9px;
-  border-radius: 8px;
-  font-size: 12px;
+  border-radius: var(--r-1);
+  font-size: var(--t-sm);
   outline: none;
   width: 110px;
 }
@@ -1054,16 +957,15 @@ select {
   border: none;
   color: var(--fg-dim);
   padding: 5px 9px;
-  border-radius: 8px;
+  border-radius: var(--r-1);
   cursor: pointer;
-  font-size: 13px;
-  transition: background 0.15s, color 0.15s, transform 0.15s var(--bounce);
+  font-size: var(--t-md);
+  transition: background 0.15s, color 0.15s;
 }
 
 .ing-row button.icon-btn:hover {
   background: var(--bg-3);
   color: var(--fg);
-  transform: scale(1.15);
 }
 
 .add-ing-form {
@@ -1074,10 +976,10 @@ select {
 
 .add-ing-form input {
   background: var(--bg-1);
-  border: 1px solid var(--border);
+  border: var(--hair);
   color: var(--fg);
   padding: 11px 15px;
-  border-radius: 14px;
+  border-radius: var(--r-1);
   outline: none;
   transition: border-color 0.18s, box-shadow 0.18s;
 }
@@ -1099,7 +1001,7 @@ select {
 
 .add-ing-form input:focus {
   border-color: var(--grape);
-  box-shadow: 0 0 0 3px rgba(179, 136, 255, 0.18);
+  box-shadow: 0 0 0 3px var(--accent-line);
 }
 
 /* ── Recipes screen ────────────────────────────────────────────────── */
@@ -1120,51 +1022,44 @@ select {
 
 .recipe-card {
   background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: var(--cui-radius-lg);
+  border: var(--hair);
+  border-radius: var(--r-2);
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: var(--shadow-soft);
   position: relative;
   overflow: hidden;
-  transition: transform var(--cui-duration) var(--cui-ease),
-              box-shadow var(--cui-duration) var(--cui-ease),
-              border-color var(--cui-duration) var(--cui-ease);
+  transition: border-color var(--cui-duration) var(--cui-ease);
 }
 
 .recipe-card:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-glow);
   border-color: var(--cui-border-strong);
 }
 
 /* The Create preview reuses .recipe-card for layout, but it's a static editing
-   surface (not a browsable result), so no hover lift. */
+   surface, not a browsable result — so it doesn't respond to hover at all. */
 .recipe-card--static:hover {
-  transform: none;
-  box-shadow: var(--shadow-soft);
   border-color: var(--border);
 }
 
 .recipe-card h3 {
   margin: 0;
-  font-size: 19px;
-  font-weight: 600;
+  font-size: var(--t-2xl);
+  font-weight: var(--cui-weight-semibold);
   letter-spacing: 0.01em;
 }
 
 .recipe-card .pill,
 .browse-item .pill {
   display: inline-block;
-  font-size: 11px;
+  font-size: var(--t-xs);
   padding: 3px 11px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--bg-3);
   color: var(--accent-soft);
   letter-spacing: 0.05em;
-  font-weight: 700;
+  font-weight: var(--cui-weight-bold);
   text-transform: uppercase;
   margin-right: 6px;
 }
@@ -1200,24 +1095,24 @@ select {
 
 .recipe-card .summary {
   color: var(--fg-dim);
-  font-size: 13px;
+  font-size: var(--t-md);
   line-height: 1.55;
 }
 
 .recipe-card section h4 {
   margin: 0 0 6px 0;
-  font-size: 11px;
+  font-size: var(--t-xs);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--accent-soft);
-  font-weight: 700;
+  font-weight: var(--cui-weight-bold);
 }
 
 .recipe-card ul,
 .recipe-card ol {
   margin: 0;
   padding-left: 18px;
-  font-size: 13px;
+  font-size: var(--t-md);
   line-height: 1.65;
   color: var(--fg-dim);
 }
@@ -1238,7 +1133,7 @@ select {
   position: absolute;
   left: 4px;
   color: var(--bubblegum);
-  font-weight: 700;
+  font-weight: var(--cui-weight-bold);
 }
 
 .recipe-card ol li {
@@ -1247,7 +1142,7 @@ select {
 
 .recipe-card ol li::marker {
   color: var(--grape);
-  font-weight: 700;
+  font-weight: var(--cui-weight-bold);
 }
 
 .recipe-card .row {
@@ -1268,8 +1163,8 @@ select {
   align-items: center;
   gap: 4px;
   background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-radius: 999px;
+  border: var(--hair);
+  border-radius: var(--r-1);
   padding: 3px 5px;
 }
 
@@ -1280,19 +1175,18 @@ select {
   background: transparent;
   color: var(--fg-dim);
   cursor: pointer;
-  border-radius: 50%;
-  font-size: 17px;
+  border-radius: var(--r-1);
+  font-size: var(--t-xl);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  transition: background 0.15s, color 0.15s, transform 0.15s var(--bounce);
+  transition: background 0.15s, color 0.15s;
 }
 
 .serving-stepper button:hover:not(:disabled) {
-  background: var(--grad-primary);
+  background: var(--cui-accent);
   color: var(--cui-on-accent);
-  transform: scale(1.12);
 }
 
 .serving-stepper button:disabled {
@@ -1301,8 +1195,8 @@ select {
 }
 
 .serving-count {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--t-md);
+  font-weight: var(--cui-weight-semibold);
   padding: 0 8px;
 }
 
@@ -1310,20 +1204,20 @@ select {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: rgba(255, 178, 77, 0.09);
-  border: 1px solid rgba(255, 178, 77, 0.4);
-  border-radius: 16px;
+  background: color-mix(in srgb, var(--cui-warning) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cui-warning) 40%, transparent);
+  border-radius: var(--r-2);
   padding: 12px 14px;
 }
 
 .shortage-banner-text {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--t-md);
   line-height: 1.4;
 }
 
 .ing-shortage {
-  font-size: 11px;
+  font-size: var(--t-xs);
   color: var(--accent-warm);
   margin-top: 2px;
   padding-left: 10px;
@@ -1349,21 +1243,8 @@ select {
 
 .browse-header h2 {
   margin: 0;
-  font-size: 26px;
-  font-weight: 600;
-}
-
-/* Primary source filter (All / My recipes / Favorites) — a pill segmented row
-   sharing the .nav-btn look. */
-.source-filter {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.source-filter .nav-btn {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--cui-border);
+  font-size: var(--t-3xl);
+  font-weight: var(--cui-weight-semibold);
 }
 
 .browse-filter {
@@ -1372,15 +1253,15 @@ select {
   gap: 8px;
   align-items: center;
   background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 999px;
+  border: var(--hair);
+  border-radius: var(--r-1);
   padding: 0 16px;
   transition: border-color 0.18s, box-shadow 0.18s;
 }
 
 .browse-filter:focus-within {
   border-color: var(--grape);
-  box-shadow: 0 0 0 3px rgba(179, 136, 255, 0.18);
+  box-shadow: 0 0 0 3px var(--accent-line);
 }
 
 .browse-filter input {
@@ -1399,7 +1280,7 @@ select {
 }
 
 /* Custom sort dropdown (replaces the native <select>, whose OS popup couldn't
-   be themed). Trigger + popover, both on Modern Whimsy surfaces. */
+   be themed). Trigger + popover, both on the app's own surfaces. */
 .dropdown {
   position: relative;
   display: inline-flex;
@@ -1409,12 +1290,12 @@ select {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--cui-border);
+  background: var(--bg-2);
+  border: var(--hair);
   color: var(--cui-fg-mute);
-  border-radius: var(--cui-radius-pill);
+  border-radius: var(--r-1);
   padding: 9px 16px;
-  font-size: 13px;
+  font-size: var(--t-md);
   font-weight: var(--cui-weight-medium);
   cursor: pointer;
   transition: background var(--cui-duration-fast) var(--cui-ease),
@@ -1449,9 +1330,9 @@ select {
   list-style: none;
   min-width: 180px;
   background: var(--cui-bg-3);
-  border: 1px solid var(--cui-border);
-  border-radius: var(--cui-radius);
-  box-shadow: var(--cui-shadow);
+  border: var(--hair);
+  border-radius: var(--r-1);
+  box-shadow: var(--shadow-float);
   animation: dropdown-rise var(--cui-duration) var(--cui-ease-out) both;
 }
 
@@ -1466,9 +1347,9 @@ select {
   justify-content: space-between;
   gap: 10px;
   padding: 9px 11px;
-  border-radius: var(--cui-radius-sm);
+  border-radius: var(--r-1);
   color: var(--cui-fg-mute);
-  font-size: 13px;
+  font-size: var(--t-md);
   cursor: pointer;
   transition: background var(--cui-duration-fast) var(--cui-ease),
               color var(--cui-duration-fast) var(--cui-ease);
@@ -1480,8 +1361,11 @@ select {
 }
 
 .dropdown-option.active {
-  background: var(--cui-accent-mute);
-  color: var(--cui-accent-soft);
+  background: var(--accent-wash);
+  /* --cui-fg, not --cui-accent-soft: this row sits on --cui-bg-3 (the menu's
+     own surface) where accent-soft measures ~3.6:1 in Spring light at any
+     wash strength. The wash is what marks it active. */
+  color: var(--cui-fg);
 }
 
 .dropdown-option .fa-icon {
@@ -1497,22 +1381,19 @@ select {
 
 .browse-item {
   background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 18px;
+  border: var(--hair);
+  border-radius: var(--r-2);
   padding: 15px 20px;
   display: flex;
   align-items: center;
   gap: 14px;
   cursor: pointer;
-  box-shadow: var(--shadow-soft);
-  transition: background 0.18s, border-color 0.18s, transform 0.18s var(--bounce), box-shadow 0.18s;
+  transition: background 0.18s, border-color 0.18s;
 }
 
 .browse-item:hover {
   background: var(--bg-2);
-  border-color: var(--grape);
-  transform: translateX(5px);
-  box-shadow: var(--shadow-glow);
+  border-color: var(--cui-border-strong);
 }
 
 .browse-item .title-block {
@@ -1520,30 +1401,30 @@ select {
 }
 
 .browse-item .title-block .title {
-  font-weight: 700;
-  font-size: 15px;
+  font-weight: var(--cui-weight-bold);
+  font-size: var(--t-lg);
 }
 
 .browse-item .title-block .meta {
-  font-size: 12px;
+  font-size: var(--t-sm);
   color: var(--fg-faint);
   margin-top: 4px;
 }
 
 .browse-item .made-pill {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--t-sm);
+  font-weight: var(--cui-weight-bold);
   color: var(--cui-on-accent);
-  background: var(--grad-warm);
+  background: var(--cui-accent);
   padding: 4px 11px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
 }
 
 .empty-state {
   text-align: center;
   padding: 64px 20px;
   color: var(--fg-faint);
-  font-size: 15px;
+  font-size: var(--t-lg);
 }
 
 .empty-icon {
@@ -1553,16 +1434,15 @@ select {
   margin: 0 auto 14px;
   color: var(--grape);
   opacity: 0.7;
-  animation: bob 3.5s ease-in-out infinite;
 }
 
 /* ── Status / spinner / error ──────────────────────────────────────── */
 
 .status-banner {
   padding: 13px 17px;
-  border-radius: 16px;
+  border-radius: var(--r-2);
   background: var(--bg-1);
-  border: 1px solid var(--border);
+  border: var(--hair);
   color: var(--fg-dim);
   display: flex;
   align-items: center;
@@ -1601,7 +1481,7 @@ select {
   border: 2px solid var(--border);
   border-top-color: var(--bubblegum);
   border-right-color: var(--grape);
-  border-radius: 50%;
+  border-radius: var(--r-circle);
   animation: spin 0.7s linear infinite;
 }
 
@@ -1631,42 +1511,6 @@ select {
 @media (max-width: 640px) {
   .app-body {
     padding: 18px 14px;
-  }
-
-  /* Stack the brand over a full-width tab strip so the six tabs never wrap
-     into a ragged second row. The strip scrolls horizontally when the labels
-     overflow the viewport — the standard mobile pattern, and far tidier than
-     the old two-row wrap. */
-  .app-header {
-    padding: 12px 14px;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-  }
-
-  /* The flex spacer only earns its keep in the desktop single-row header. */
-  .app-header .header-spacer {
-    display: none;
-  }
-
-  .app-nav {
-    width: 100%;
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-
-  .app-nav::-webkit-scrollbar {
-    display: none;
-  }
-
-  /* Keep each pill at its natural size and let the row scroll instead of
-     squishing the tabs. */
-  .app-nav .nav-btn {
-    flex: 0 0 auto;
   }
 
   .recipes-grid {
@@ -1758,7 +1602,7 @@ select {
     gap: 2px;
     padding: 14px 12px;
     border-top: none;
-    border-right: 1px solid var(--cui-border);
+    border-right: var(--hair);
     background: color-mix(in srgb, var(--bg-1) 55%, transparent);
     overflow-y: auto;
   }
@@ -1770,19 +1614,19 @@ select {
     justify-content: flex-start;
     gap: 12px;
     padding: 11px 14px;
-    border-radius: 12px;
-    font-size: 14px;
+    border-radius: var(--r-1);
+    font-size: var(--t-base);
     text-align: left;
     transition: color var(--cui-duration) var(--cui-ease),
                 background var(--cui-duration) var(--cui-ease);
   }
 
-  .tab:hover { background: var(--cui-accent-mute); }
+  .tab:hover { background: var(--accent-wash); }
 
   /* The active tab reads as a filled row, so the top-edge indicator the
      bottom bar used has nothing left to point at. */
   .tab.active {
-    background: var(--cui-accent-mute);
+    background: var(--accent-wash);
     color: var(--cui-fg);
   }
   .tab.active::before {
@@ -1790,7 +1634,7 @@ select {
     left: 0;
     width: 3px;
     height: 20px;
-    border-radius: 0 3px 3px 0;
+    border-radius: var(--r-0);
     transform: translateY(-50%);
   }
   .tab.active .tab-icon { transform: none; }
@@ -1858,16 +1702,16 @@ select {
 .miss-chip,
 .short-chip,
 .more-chip {
-  font-size: 11px;
+  font-size: var(--t-xs);
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   white-space: nowrap;
 }
 
 .cov-chip {
   background: var(--bg-3);
   color: var(--fg-dim);
-  font-weight: 700;
+  font-weight: var(--cui-weight-bold);
 }
 
 /* Was a hardcoded literal (the exact dark-mode --cui-success hex, so it
@@ -1890,7 +1734,7 @@ select {
 .miss-chip {
   background: color-mix(in srgb, var(--cui-error) 14%, transparent);
   color: var(--cui-error);
-  font-weight: 600;
+  font-weight: var(--cui-weight-semibold);
 }
 
 /* Was a hardcoded literal (the exact dark-mode --cui-warning hex). 15% stays
@@ -1899,13 +1743,13 @@ select {
 .short-chip {
   background: color-mix(in srgb, var(--cui-warning) 15%, transparent);
   color: var(--cui-warning);
-  font-weight: 600;
+  font-weight: var(--cui-weight-semibold);
 }
 
 .more-chip {
   background: transparent;
   color: var(--fg-faint);
-  font-weight: 600;
+  font-weight: var(--cui-weight-semibold);
 }
 
 .pill.cat {
@@ -1933,9 +1777,9 @@ select {
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 13px;
+  font-size: var(--t-md);
   padding: 11px 14px;
-  border-radius: 14px;
+  border-radius: var(--r-1);
   background: color-mix(in srgb, var(--cui-warning) 9%, transparent);
   border: 1px solid color-mix(in srgb, var(--cui-warning) 35%, transparent);
   color: var(--fg);
@@ -1958,7 +1802,7 @@ select {
 }
 
 .ing-missing {
-  font-size: 11px;
+  font-size: var(--t-xs);
   color: var(--cui-error);
   margin-top: 2px;
   padding-left: 10px;
@@ -2021,65 +1865,6 @@ select {
 
 /* ── Plan My Week ──────────────────────────────────────────────────────── */
 
-.plan-steps {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 4px;
-}
-
-.plan-step {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--fg-faint);
-}
-
-.plan-step.active {
-  color: var(--fg);
-}
-
-.plan-step.done {
-  color: var(--mint);
-}
-
-.plan-step-dot {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  background: var(--bg-3);
-  color: var(--fg-dim);
-  border: 1px solid var(--cui-border);
-}
-
-.plan-step.active .plan-step-dot {
-  background: var(--grad-primary);
-  color: var(--cui-on-accent);
-  border-color: transparent;
-}
-
-/* No current call site (superseded by the slim progress bar below), but same
-   defect if reintroduced: a hardcoded literal that never moved with theme.
-   11% matches the pill-wash fix above, same text-on-its-own-wash shape and
-   same reason 18% isn't safe here. */
-.plan-step.done .plan-step-dot {
-  background: color-mix(in srgb, var(--cui-success) 11%, transparent);
-  color: var(--cui-success);
-  border-color: transparent;
-}
-
-.plan-step.done .plan-step-dot .fa-icon {
-  width: 10px;
-  height: 10px;
-}
-
 /* ── Wizard progress (slim bar, replaces the numbered dot row) ────────── */
 .wiz-progress {
   display: flex;
@@ -2094,12 +1879,12 @@ select {
 .wiz-seg {
   flex: 1;
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--r-0);
   background: var(--bg-3);
   transition: background var(--cui-duration-fast, 0.15s) var(--cui-ease, ease);
 }
 .wiz-seg.on {
-  background: var(--grad-primary);
+  background: var(--cui-accent);
 }
 .wiz-cap {
   display: flex;
@@ -2108,12 +1893,12 @@ select {
   gap: 8px;
 }
 .wiz-step-name {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--t-md);
+  font-weight: var(--cui-weight-bold);
   color: var(--fg);
 }
 .wiz-cap .muted {
-  font-size: 12px;
+  font-size: var(--t-sm);
 }
 
 /* ── Meals review (slimmer cards, single "adds" line) ────────────────── */
@@ -2124,8 +1909,8 @@ select {
 }
 .meal-card {
   background: var(--bg-2, var(--cui-bg-2));
-  border: 1px solid var(--cui-border);
-  border-radius: var(--cui-radius, 14px);
+  border: var(--hair);
+  border-radius: var(--r-1);
   padding: 13px 14px;
   display: flex;
   flex-direction: column;
@@ -2139,8 +1924,8 @@ select {
 }
 .meal-card-head h3 {
   margin: 0;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--t-xl);
+  font-weight: var(--cui-weight-bold);
   line-height: 1.25;
 }
 /* Two distinct outs for a meal you don't want, side by side: regenerate just
@@ -2177,7 +1962,7 @@ select {
 .blocked-note .link-btn {
   margin-left: auto;
   flex: 0 0 auto;
-  font-weight: 700;
+  font-weight: var(--cui-weight-bold);
 }
 
 .meal-card-meta {
@@ -2187,7 +1972,7 @@ select {
   flex-wrap: wrap;
 }
 .meal-adds-count {
-  font-size: 12px;
+  font-size: var(--t-sm);
 }
 .meal-adds {
   margin-top: 1px;
@@ -2197,10 +1982,10 @@ select {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--t-sm);
+  font-weight: var(--cui-weight-semibold);
   padding: 4px 11px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--bg-3);
   color: var(--fg-dim);
 }
@@ -2238,7 +2023,7 @@ select {
 }
 
 .token-chip.want {
-  background: var(--cui-accent-mute);
+  background: var(--accent-wash);
   color: var(--accent-soft);
   cursor: pointer;
 }
@@ -2255,8 +2040,8 @@ select {
   gap: 6px;
   padding: 12px 16px;
   background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  border: var(--hair);
+  border-radius: var(--r-1);
 }
 
 .shopping-line-main {
@@ -2267,20 +2052,20 @@ select {
 }
 
 .shopping-name {
-  font-weight: 600;
+  font-weight: var(--cui-weight-semibold);
   text-transform: capitalize;
 }
 
 .shopping-qty {
-  font-size: 12px;
+  font-size: var(--t-sm);
   color: var(--accent-soft);
-  font-weight: 600;
+  font-weight: var(--cui-weight-semibold);
 }
 
 .serves {
-  font-size: 12px;
+  font-size: var(--t-sm);
   color: var(--tangerine);
-  font-weight: 600;
+  font-weight: var(--cui-weight-semibold);
 }
 
 .shopping-for {
@@ -2294,7 +2079,7 @@ select {
   color: var(--fg-dim);
   text-transform: none;
   letter-spacing: 0;
-  font-weight: 600;
+  font-weight: var(--cui-weight-semibold);
 }
 
 /* ── Home ──────────────────────────────────────────────────────────────── */
@@ -2309,29 +2094,27 @@ select {
 
 .home-greeting h2 {
   margin: 0;
-  font-size: 27px;
-  font-weight: 600;
+  font-size: var(--t-3xl);
+  font-weight: var(--cui-weight-semibold);
   letter-spacing: 0.01em;
 }
 
 .home-greeting .muted {
-  font-size: 14px;
+  font-size: var(--t-base);
   margin-top: 4px;
 }
 
-/* Tonight's pick: the one hero surface. Accent wash + glow so it reads as
-   the recommendation, not just another card. */
+/* Tonight's pick: the one hero surface. It says so with an accent hairline
+   and the app's largest radius, not with a wash and a glow. */
 .hero-card {
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 24px;
-  border-radius: 22px;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--cui-accent) 20%, transparent), color-mix(in srgb, var(--cui-accent-hover) 5%, transparent) 70%),
-    var(--bg-1);
-  border: 1px solid var(--cui-accent-tint);
-  box-shadow: var(--cui-shadow-accent);
+  border-radius: var(--r-2);
+  background: var(--bg-1);
+  border: var(--hair-accent);
   overflow: hidden;
 }
 
@@ -2339,8 +2122,8 @@ select {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--t-xs);
+  font-weight: var(--cui-weight-bold);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--bubblegum);
@@ -2353,8 +2136,8 @@ select {
 
 .hero-title {
   margin: 0;
-  font-size: 25px;
-  font-weight: 600;
+  font-size: var(--t-3xl);
+  font-weight: var(--cui-weight-semibold);
   line-height: 1.15;
   letter-spacing: 0.01em;
 }
@@ -2369,7 +2152,7 @@ select {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: var(--t-base);
   color: var(--fg-dim);
 }
 
@@ -2410,24 +2193,21 @@ select {
   align-items: flex-start;
   gap: 3px;
   padding: 15px 14px;
-  border-radius: 18px;
+  border-radius: var(--r-2);
   background: var(--bg-1);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-soft);
+  border: var(--hair);
   cursor: pointer;
   text-align: left;
-  transition: transform 0.18s var(--bounce), border-color 0.18s, box-shadow 0.18s;
+  transition: border-color 0.18s, background 0.18s;
 }
 
 .stat-tile:hover {
-  transform: translateY(-2px);
-  border-color: var(--grape);
-  box-shadow: var(--shadow-glow);
+  border-color: var(--cui-border-strong);
+  background: var(--bg-2);
 }
 
 .stat-tile.accent {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--cui-accent) 14%, transparent), transparent);
-  border-color: var(--cui-accent-tint);
+  border-color: var(--accent-line);
 }
 
 .stat-icon {
@@ -2437,13 +2217,13 @@ select {
 }
 
 .stat-value {
-  font-size: 26px;
-  font-weight: 700;
+  font-size: var(--t-4xl);
+  font-weight: var(--cui-weight-bold);
   line-height: 1.1;
 }
 
 .stat-label {
-  font-size: 12px;
+  font-size: var(--t-sm);
   color: var(--fg-dim);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -2464,16 +2244,16 @@ select {
 
 .home-section-head h3 {
   margin: 0;
-  font-size: 18px;
-  font-weight: 600;
+  font-size: var(--t-2xl);
+  font-weight: var(--cui-weight-semibold);
 }
 
 .link-btn {
   background: none;
   border: none;
   color: var(--accent-soft);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--t-md);
+  font-weight: var(--cui-weight-semibold);
   cursor: pointer;
   padding: 2px 4px;
 }
@@ -2487,10 +2267,10 @@ select {
   align-items: center;
   gap: 14px;
   padding: 18px 20px;
-  border-radius: 18px;
+  border-radius: var(--r-2);
   background: var(--bg-1);
   border: 1px dashed var(--border);
-  font-size: 14px;
+  font-size: var(--t-base);
   flex-wrap: wrap;
 }
 
@@ -2529,7 +2309,7 @@ select {
   height: 22px;
 }
 .action-title {
-  font-size: 14px;
+  font-size: var(--t-base);
   font-weight: var(--cui-weight-semibold);
   line-height: 1.2;
 }
@@ -2540,19 +2320,17 @@ select {
   align-items: flex-start;
   gap: 4px;
   padding: 14px 12px;
-  border-radius: 18px;
+  border-radius: var(--r-2);
   background: var(--bg-1);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-soft);
+  border: var(--hair);
   cursor: pointer;
   text-align: left;
-  transition: transform 0.18s var(--bounce), border-color 0.18s, box-shadow 0.18s;
+  transition: border-color 0.18s, background 0.18s;
 }
 
 .quick-action:hover {
-  transform: translateY(-2px);
-  border-color: var(--grape);
-  box-shadow: var(--shadow-glow);
+  border-color: var(--cui-border-strong);
+  background: var(--bg-2);
 }
 
 .quick-icon {
@@ -2563,12 +2341,12 @@ select {
 }
 
 .quick-title {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--t-lg);
+  font-weight: var(--cui-weight-semibold);
 }
 
 .quick-sub {
-  font-size: 12px;
+  font-size: var(--t-sm);
   color: var(--fg-dim);
 }
 
@@ -2593,51 +2371,48 @@ select {
   text-align: left;
   padding: 18px;
   background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  border: var(--hair);
+  border-radius: var(--r-2);
   cursor: pointer;
-  box-shadow: var(--shadow-soft);
-  transition: transform var(--cui-duration-fast) var(--cui-ease), border-color var(--cui-duration) var(--cui-ease), box-shadow var(--cui-duration) var(--cui-ease);
+  transition: border-color var(--cui-duration) var(--cui-ease), background var(--cui-duration) var(--cui-ease);
 }
 .launch-card:hover {
-  transform: translateY(-1px);
-  border-color: var(--cui-accent-tint);
-  box-shadow: var(--cui-shadow-accent);
+  border-color: var(--accent-line);
+  background: var(--bg-2);
 }
 .launch-icon {
   flex: 0 0 auto;
   width: 46px;
   height: 46px;
-  border-radius: 14px;
-  background: var(--grad-primary);
+  border-radius: var(--r-1);
+  background: var(--cui-accent);
   color: var(--cui-on-accent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--cui-shadow-accent);
 }
 .launch-icon .fa-icon { width: 20px; height: 20px; }
 .launch-text { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
-.launch-title { font-size: 16px; font-weight: 600; }
-.launch-sub { font-size: 12.5px; color: var(--fg-dim); line-height: 1.4; }
+.launch-title { font-size: var(--t-xl); font-weight: var(--cui-weight-semibold); }
+.launch-sub { font-size: var(--t-sm); color: var(--fg-dim); line-height: 1.4; }
 .launch-caret { width: 14px; height: 14px; color: var(--fg-faint); transform: rotate(-90deg); flex: 0 0 auto; }
 
 /* ── Describe a dish ────────────────────────────────────────────────── */
 .describe-pane { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
-.describe-pane h2 { margin: 0; font-size: 24px; font-weight: 600; }
+.describe-pane h2 { margin: 0; font-size: var(--t-3xl); font-weight: var(--cui-weight-semibold); }
 .describe-input {
   width: 100%;
   background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  border: var(--hair);
+  border-radius: var(--r-1);
   padding: 12px 14px;
   color: var(--fg);
   font: inherit;
   resize: vertical;
   outline: none;
 }
-.describe-input:focus { border-color: var(--grape); box-shadow: 0 0 0 3px rgba(179, 136, 255, 0.18); }
-.describe-toggle { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--fg); cursor: pointer; }
+.describe-input:focus { border-color: var(--grape); box-shadow: 0 0 0 3px var(--accent-line); }
+.describe-toggle { display: flex; align-items: center; gap: 8px; font-size: var(--t-base); color: var(--fg); cursor: pointer; }
 .describe-toggle input { width: 16px; height: 16px; }
 
 /* ── Library header (search + filter + add) ─────────────────────────── */
@@ -2646,9 +2421,9 @@ select {
   display: flex;
   gap: 4px;
   padding: 4px;
-  background: rgba(0, 0, 0, 0.22);
-  border: 1px solid var(--cui-border);
-  border-radius: var(--cui-radius-pill);
+  background: var(--cui-bg-2);
+  border: var(--hair);
+  border-radius: var(--r-1);
 }
 .seg-btn {
   flex: 1;
@@ -2656,8 +2431,8 @@ select {
   background: transparent;
   color: var(--cui-fg-mute);
   padding: 9px 10px;
-  border-radius: var(--cui-radius-pill);
-  font-size: 13px;
+  border-radius: var(--r-1);
+  font-size: var(--t-md);
   font-weight: var(--cui-weight-semibold);
   white-space: nowrap;
   cursor: pointer;
@@ -2667,17 +2442,17 @@ select {
 .seg-btn:hover {
   color: var(--cui-fg);
 }
-/* Opaque accent fill, not a wash: --cui-on-accent only has a contrast
-   guarantee against a solid --cui-accent/--cui-accent-hover surface. The
-   previous color-mix(..., transparent) pair here read on top of .seg's own
-   rgba(0,0,0,0.22) scrim, which is a translucent composite with no such
-   guarantee (measured as low as 1.88:1 in Fall dark). See DECISIONS.md
-   2026-09-10 - this is that mistake, twice - and don't put on-accent back on
-   anything less than the plain --grad-primary fill below. */
+/* OPAQUE accent fill, and that part is not stylistic: --cui-on-accent only
+   has a contrast guarantee against a solid --cui-accent / --cui-accent-hover
+   surface. An earlier version painted a color-mix(..., transparent) pair
+   here, which read on top of .seg's own scrim — a translucent composite with
+   no such guarantee — and measured as low as 1.88:1 in Fall dark. See
+   DECISIONS.md 2026-09-10. Flat rather than the gradient because the
+   gradient is rationed to the primary action; solid --cui-accent is inside
+   the same calibrated pair, so the label stays correct. */
 .seg-btn.active {
   color: var(--cui-on-accent);
-  background: var(--grad-primary);
-  box-shadow: 0 0 0 1px var(--cui-accent-tint), 0 4px 12px color-mix(in srgb, var(--cui-accent) 25%, transparent);
+  background: var(--cui-accent);
 }
 
 .lib-header { display: flex; align-items: center; gap: 8px; }
@@ -2687,41 +2462,41 @@ select {
   flex: 0 0 auto;
   width: 42px;
   height: 42px;
-  border-radius: 12px;
+  border-radius: var(--r-1);
   background: var(--bg-1);
-  border: 1px solid var(--border);
+  border: var(--hair);
 }
-.lib-icon.active { border-color: var(--cui-accent-tint); color: var(--fg); background: var(--cui-accent-mute); }
+.lib-icon.active { border-color: var(--accent-line); color: var(--fg); background: var(--accent-wash); }
 .lib-badge {
   position: absolute;
   top: -5px; right: -5px;
   min-width: 17px; height: 17px;
   padding: 0 4px;
-  border-radius: 999px;
-  background: var(--grad-primary);
+  border-radius: var(--r-pill);
+  background: var(--cui-accent);
   color: var(--cui-on-accent);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--t-micro);
+  font-weight: var(--cui-weight-bold);
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 .lib-panel {
   background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  border: var(--hair);
+  border-radius: var(--r-1);
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.lib-panel-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-dim); }
+.lib-panel-label { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-dim); }
 .add-panel { flex-direction: row; }
 .add-panel .btn { flex: 1; justify-content: center; }
 
 /* ── Kitchen (pantry) ───────────────────────────────────────────────── */
 .kitchen-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.kitchen-top h2 { margin: 0; font-size: 24px; font-weight: 600; }
+.kitchen-top h2 { margin: 0; font-size: var(--t-3xl); font-weight: var(--cui-weight-semibold); }
 .kitchen-make { width: 100%; justify-content: center; }
 .kitchen-matches { display: flex; flex-direction: column; gap: 10px; }
 .kitchen-invent { width: 100%; justify-content: center; }
@@ -2730,15 +2505,15 @@ select {
 /* ── Guided cook ────────────────────────────────────────────────────── */
 .guided { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; padding-bottom: 80px; }
 .guided-head { display: flex; align-items: center; gap: 12px; }
-.guided-progress { flex: 1; height: 6px; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden; }
-.guided-progress-bar { height: 100%; background: var(--grad-primary); border-radius: 999px; transition: width var(--cui-duration) var(--cui-ease); }
-.guided-title { margin: 0; font-size: 24px; font-weight: 600; }
+.guided-progress { flex: 1; height: 6px; background: var(--bg-3); border-radius: var(--r-0); overflow: hidden; }
+.guided-progress-bar { height: 100%; background: var(--cui-accent); border-radius: var(--r-0); transition: width var(--cui-duration) var(--cui-ease); }
+.guided-title { margin: 0; font-size: var(--t-3xl); font-weight: var(--cui-weight-semibold); }
 .guided-meta { display: flex; flex-wrap: wrap; gap: 6px; }
 .guided-section { display: flex; flex-direction: column; gap: 8px; }
 .guided-section-head {
   display: flex; align-items: center; justify-content: space-between;
   width: 100%; background: transparent; border: none; color: var(--fg);
-  font-size: 15px; font-weight: 600; padding: 4px 0; cursor: pointer;
+  font-size: var(--t-lg); font-weight: var(--cui-weight-semibold); padding: 4px 0; cursor: pointer;
 }
 .guided-section-head.static { cursor: default; }
 .guided-section-head .fa-icon { width: 13px; height: 13px; color: var(--fg-faint); transition: transform var(--cui-duration-fast) var(--cui-ease); }
@@ -2749,8 +2524,8 @@ select {
   display: flex; align-items: flex-start; gap: 11px;
   padding: 12px 14px;
   background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  border: var(--hair);
+  border-radius: var(--r-1);
   cursor: pointer;
   transition: opacity var(--cui-duration) var(--cui-ease), border-color var(--cui-duration) var(--cui-ease);
 }
@@ -2762,8 +2537,8 @@ select {
 .step-num { flex: 0 0 auto; width: 20px; height: 20px; color: var(--fg-faint); margin-top: 1px; }
 .step-num .fa-icon { width: 18px; height: 18px; }
 .step-row.checked .step-num { color: var(--mint); }
-.step-row.current { border-color: var(--cui-accent-tint); box-shadow: 0 0 0 1px var(--cui-accent-tint), 0 4px 14px color-mix(in srgb, var(--cui-accent) 18%, transparent); }
-.ing-tag { flex: 0 0 auto; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; display: inline-flex; align-items: center; gap: 4px; }
+.step-row.current { border-color: var(--cui-accent); }
+.ing-tag { flex: 0 0 auto; font-size: var(--t-xs); font-weight: var(--cui-weight-semibold); padding: 2px 7px; border-radius: var(--r-pill); display: inline-flex; align-items: center; gap: 4px; }
 /* 16% measured under 4.5:1 in three dark palettes (Spring/Summer/Christmas,
    ~4.37-4.45:1) for the same reason the pill wash needed nudging: error as
    text on its own wash, over --bg-1 via .step-row. 14% matches the value
@@ -2781,10 +2556,10 @@ select {
 .guided-done {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: 14px 16px;
-  background: var(--cui-accent-mute);
-  border: 1px solid var(--cui-accent-tint);
-  border-radius: 16px;
-  font-size: 15px; font-weight: 600;
+  background: var(--accent-wash);
+  border: var(--hair-accent);
+  border-radius: var(--r-2);
+  font-size: var(--t-lg); font-weight: var(--cui-weight-semibold);
 }
 .guided-done .btn { margin-left: auto; }
 
@@ -2793,13 +2568,13 @@ select {
 .adjust-pop {
   position: absolute; top: calc(100% + 8px); right: 0;
   min-width: 210px; padding: 12px 14px;
-  background: var(--bg-1); border: 1px solid var(--border);
-  border-radius: 14px; box-shadow: var(--shadow-soft); z-index: 50;
+  background: var(--bg-1); border: var(--hair);
+  border-radius: var(--r-1); box-shadow: var(--shadow-float); z-index: 50;
   display: flex; flex-direction: column; gap: 10px;
 }
-.adjust-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; }
+.adjust-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: var(--t-base); }
 .stepper { display: inline-flex; align-items: center; gap: 8px; }
-.stepper-val { min-width: 28px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
+.stepper-val { min-width: 28px; text-align: center; font-variant-numeric: tabular-nums; font-weight: var(--cui-weight-semibold); }
 
 /* ── Ask-the-chef chat ──────────────────────────────────────────────── */
 .chef-sheet {
@@ -2807,24 +2582,24 @@ select {
   max-width: 640px; margin: 0 auto;
   height: 58vh; max-height: 560px;
   background: var(--bg-1);
-  border: 1px solid var(--border);
+  border: var(--hair);
   border-bottom: none;
-  border-radius: 18px 18px 0 0;
-  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.4);
+  border-radius: var(--r-2) var(--r-2) 0 0;
+  box-shadow: var(--shadow-float);
   z-index: 60;
   display: flex; flex-direction: column;
 }
-.chef-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border); }
-.chef-title { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; }
+.chef-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: var(--hair); }
+.chef-title { display: inline-flex; align-items: center; gap: 8px; font-size: var(--t-lg); font-weight: var(--cui-weight-semibold); }
 .chef-title .fa-icon { width: 16px; height: 16px; color: var(--bubblegum); }
 .chef-thread { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
-.chef-hint { margin: 0; font-size: 13px; color: var(--fg-dim); line-height: 1.5; }
-.chef-msg { max-width: 85%; padding: 9px 12px; border-radius: 14px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
-.chef-msg.user { align-self: flex-end; background: var(--grad-primary); color: var(--cui-on-accent); border-bottom-right-radius: 4px; }
-.chef-msg.assistant { align-self: flex-start; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+.chef-hint { margin: 0; font-size: var(--t-md); color: var(--fg-dim); line-height: 1.5; }
+.chef-msg { max-width: 85%; padding: 9px 12px; border-radius: var(--r-1); font-size: var(--t-base); line-height: 1.45; white-space: pre-wrap; }
+.chef-msg.user { align-self: flex-end; background: var(--cui-accent); color: var(--cui-on-accent); border-bottom-right-radius: var(--r-0); }
+.chef-msg.assistant { align-self: flex-start; background: var(--bg-2); border: var(--hair); border-bottom-left-radius: var(--r-0); }
 .chef-typing { opacity: 0.7; font-style: italic; }
-.chef-input { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--border); }
-.chef-input input { flex: 1; background: var(--bg-0, var(--bg-1)); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; color: var(--fg); outline: none; }
+.chef-input { display: flex; gap: 8px; padding: 12px 14px; border-top: var(--hair); }
+.chef-input input { flex: 1; background: var(--bg-0, var(--bg-1)); border: var(--hair); border-radius: var(--r-1); padding: 10px 12px; color: var(--fg); outline: none; }
 .chef-input input:focus { border-color: var(--grape); }
 .chef-input .btn { flex: 0 0 auto; padding: 10px 14px; }
 
@@ -2839,13 +2614,13 @@ select {
   padding: 0;
   background: transparent;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--r-1);
   color: var(--fg-dim);
   cursor: pointer;
   transition: background var(--cui-duration-fast) var(--cui-ease), color var(--cui-duration-fast) var(--cui-ease);
 }
 .icon-btn:hover,
-.icon-btn.active { background: var(--cui-accent-mute); color: var(--fg); }
+.icon-btn.active { background: var(--accent-wash); color: var(--fg); }
 .icon-btn .fa-icon { width: 16px; height: 16px; }
 
 /* ── 0.9.1 review fixes: overflow menu, confirm row, kitchen section ──── */
@@ -2853,29 +2628,29 @@ select {
 .overflow-menu {
   position: absolute; top: calc(100% + 6px); right: 0;
   min-width: 192px; padding: 6px;
-  background: var(--bg-1); border: 1px solid var(--border);
-  border-radius: 12px; box-shadow: var(--shadow-soft); z-index: 50;
+  background: var(--bg-1); border: var(--hair);
+  border-radius: var(--r-1); box-shadow: var(--shadow-float); z-index: 50;
   display: flex; flex-direction: column; gap: 2px;
 }
 .overflow-item {
   display: flex; align-items: center; gap: 10px;
   width: 100%; text-align: left;
   padding: 9px 12px; background: transparent; border: none;
-  border-radius: 8px; color: var(--fg); cursor: pointer; font-size: 14px;
+  border-radius: var(--r-1); color: var(--fg); cursor: pointer; font-size: var(--t-base);
 }
-.overflow-item:hover { background: var(--cui-accent-mute); }
+.overflow-item:hover { background: var(--accent-wash); }
 .overflow-item:disabled { opacity: 0.5; cursor: default; }
-.overflow-item.danger { color: var(--cui-error, #ff7a7a); }
+.overflow-item.danger { color: var(--cui-error); }
 .overflow-item .fa-icon { width: 14px; height: 14px; flex: 0 0 auto; }
 
 .confirm-row {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: 10px 14px;
-  background: var(--cui-accent-mute);
-  border: 1px solid var(--border);
-  border-radius: 12px; font-size: 14px;
+  background: var(--accent-wash);
+  border: var(--hair);
+  border-radius: var(--r-1); font-size: var(--t-base);
 }
-.confirm-row .btn { padding: 6px 12px; font-size: 13px; }
+.confirm-row .btn { padding: 6px 12px; font-size: var(--t-md); }
 
 .kitchen-make-section { display: flex; flex-direction: column; gap: 10px; }
 .kitchen-make .fa-icon:last-child { width: 12px; height: 12px; opacity: 0.8; }
@@ -2889,9 +2664,9 @@ select {
   right: 14px;
   width: 36px;
   height: 36px;
-  border-radius: 999px;
-  border: 1px solid var(--cui-border);
-  background: rgba(0, 0, 0, 0.25);
+  border-radius: var(--r-1);
+  border: var(--hair);
+  background: color-mix(in srgb, var(--cui-bg) 70%, transparent);
   color: var(--cui-fg);
   cursor: pointer;
   display: inline-flex;
@@ -2899,8 +2674,7 @@ select {
   justify-content: center;
   transition: transform var(--cui-duration) var(--cui-ease), background var(--cui-duration-fast) var(--cui-ease);
 }
-.hero-refresh:hover { background: var(--cui-accent-mute); }
-.hero-refresh:active { transform: rotate(-90deg); }
+.hero-refresh:hover { background: var(--accent-wash); }
 .hero-refresh .fa-icon { width: 15px; height: 15px; }
 
 /* Favorite heart pinned to the recipe card's top-right corner. */
@@ -2910,9 +2684,9 @@ select {
   right: 12px;
   width: 38px;
   height: 38px;
-  border-radius: 999px;
+  border-radius: var(--r-1);
   border: none;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--bg-2);
   color: var(--fg-faint);
   cursor: pointer;
   display: inline-flex;
@@ -2920,7 +2694,7 @@ select {
   justify-content: center;
   transition: background var(--cui-duration-fast) var(--cui-ease), color var(--cui-duration-fast) var(--cui-ease), transform var(--cui-duration) var(--cui-ease);
 }
-.card-fav:hover { background: var(--cui-accent-mute); color: var(--fg); }
+.card-fav:hover { background: var(--accent-wash); color: var(--fg); }
 .card-fav.on { color: var(--bubblegum); }
 .card-fav.on:hover { color: var(--bubblegum); }
 .card-fav .fa-icon { width: 18px; height: 18px; }
@@ -2937,27 +2711,26 @@ select {
   width: 100%;
   text-align: left;
   padding: 18px 20px;
-  background: linear-gradient(135deg, var(--accent-soft), var(--bg-1));
+  background: var(--bg-1);
   border: 1px solid var(--accent-warm);
-  border-radius: 20px;
+  border-radius: var(--r-2);
   cursor: pointer;
-  box-shadow: var(--shadow-soft);
-  transition: transform var(--cui-duration-fast) var(--cui-ease), box-shadow var(--cui-duration) var(--cui-ease);
+  transition: background var(--cui-duration) var(--cui-ease);
 }
-.chef-promo:hover { transform: translateY(-2px); }
+.chef-promo:hover { background: var(--bg-2); }
 .chef-promo-eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--t-sm);
+  font-weight: var(--cui-weight-bold);
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--accent-warm);
 }
-.chef-promo-title { font-size: 19px; font-weight: 700; color: var(--fg); }
+.chef-promo-title { font-size: var(--t-2xl); font-weight: var(--cui-weight-bold); color: var(--fg); }
 .chef-promo-sub {
-  font-size: 13px;
+  font-size: var(--t-md);
   color: var(--fg-dim);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2968,19 +2741,19 @@ select {
 
 /* Detail: chef byline + blog story */
 .chef-byline {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--t-md);
+  font-weight: var(--cui-weight-semibold);
   color: var(--accent-warm);
   margin: 2px 0 6px;
 }
 .chef-blog {
-  border-top: 1px solid var(--border-soft);
-  border-bottom: 1px solid var(--border-soft);
+  border-top: var(--hair);
+  border-bottom: var(--hair);
   margin: 12px 0;
   padding: 12px 0;
 }
 .jump-to-recipe { margin-bottom: 8px; }
-.chef-blog-body { color: var(--fg-dim); line-height: 1.7; font-size: 15px; }
+.chef-blog-body { color: var(--fg-dim); line-height: 1.7; font-size: var(--t-lg); }
 .chef-blog-body h4 { color: var(--fg); margin: 16px 0 6px; }
 .chef-blog-body h5 { color: var(--fg); margin: 12px 0 4px; }
 .chef-blog-body p { margin: 0 0 12px; }
@@ -2989,8 +2762,8 @@ select {
 .chef-blog-input {
   width: 100%;
   background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: var(--hair);
+  border-radius: var(--r-1);
   padding: 12px 14px;
   color: var(--fg);
   font: inherit;
@@ -3007,7 +2780,7 @@ select {
   margin: -4px -20px 14px;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  border-radius: 16px 16px 0 0;
+  border-radius: var(--r-2) var(--r-2) 0 0;
   background: var(--bg-2);
 }
 .recipe-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -3017,7 +2790,7 @@ select {
   flex: 0 0 auto;
   width: 56px;
   height: 56px;
-  border-radius: 12px;
+  border-radius: var(--r-1);
   overflow: hidden;
   background: var(--bg-2);
 }
@@ -3047,17 +2820,17 @@ select {
 }
 .plan-view-tags:empty { display: none; }
 .plan-view-meta {
-  font-size: 13px;
+  font-size: var(--t-md);
 }
 .plan-latest {
-  font-size: 11px;
-  font-weight: 800;
+  font-size: var(--t-xs);
+  font-weight: var(--cui-weight-bold);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--cui-on-accent);
-  background: var(--grad-warm);
+  background: var(--cui-accent);
   padding: 2px 9px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
 }
 
 /* Calendar glyph standing in for a thumbnail on a previous-plan row. */
@@ -3072,7 +2845,7 @@ select {
 /* Shopping list as a checklist (saved plan). Each line is a button: a
    checkbox on the left, the item + its recipes stacked on the right. */
 .shopping-progress {
-  font-size: 12px;
+  font-size: var(--t-sm);
   color: var(--fg-faint);
   display: inline-flex;
   align-items: center;
@@ -3080,12 +2853,12 @@ select {
 }
 .shopping-progress .all-done {
   color: var(--cui-success);
-  font-weight: 700;
+  font-weight: var(--cui-weight-bold);
   display: inline-flex;
   align-items: center;
   gap: 5px;
 }
-.shopping-progress .link-btn { font-size: 12px; }
+.shopping-progress .link-btn { font-size: var(--t-sm); }
 
 .check-line {
   display: grid;
@@ -3107,7 +2880,7 @@ select {
   width: 24px;
   height: 24px;
   border: 2px solid var(--border-strong, var(--border));
-  border-radius: 8px;
+  border-radius: var(--r-1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3121,7 +2894,7 @@ select {
 
 .check-line.checked { opacity: 0.6; }
 .check-line.checked .shopping-check {
-  background: var(--grad-warm);
+  background: var(--cui-accent);
   border-color: transparent;
 }
 .check-line.checked .shopping-name {
@@ -3136,29 +2909,29 @@ select {
 .plan-actions .btn { white-space: nowrap; }
 .plan-share-select {
   background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: var(--hair);
+  border-radius: var(--r-1);
   color: var(--fg);
   font: inherit;
-  font-weight: 600;
+  font-weight: var(--cui-weight-semibold);
   padding: 8px 12px;
 }
 .plan-family-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
-  font-weight: 800;
+  font-size: var(--t-xs);
+  font-weight: var(--cui-weight-bold);
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--accent-soft);
   background: var(--bg-3);
-  border: 1px solid var(--cui-border);
+  border: var(--hair);
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   font-family: inherit;
 }
-.plan-family-chip.inline { margin-left: 8px; text-transform: none; font-weight: 700; letter-spacing: 0; border: none; padding: 0; background: none; cursor: default; }
+.plan-family-chip.inline { margin-left: 8px; text-transform: none; font-weight: var(--cui-weight-bold); letter-spacing: 0; border: none; padding: 0; background: none; cursor: default; }
 .plan-family-chip svg { width: 11px; height: 11px; }
 /* the trailing gear reads a touch dimmer than the name */
 .plan-family-chip svg:last-child { opacity: 0.7; }
@@ -3174,12 +2947,12 @@ select {
   align-items: center;
   gap: 6px;
   font: inherit;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--t-md);
+  font-weight: var(--cui-weight-semibold);
   color: var(--fg-dim, var(--cui-fg-mute));
   background: var(--bg-3);
-  border: 1px solid var(--cui-border);
-  border-radius: 999px;
+  border: var(--hair);
+  border-radius: var(--r-1);
   padding: 7px 14px;
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
@@ -3195,8 +2968,8 @@ select {
   padding: 8px 10px;
   margin-bottom: 10px;
   background: var(--bg-2);
-  border: 1px solid var(--cui-border);
-  border-radius: 12px;
+  border: var(--hair);
+  border-radius: var(--r-1);
 }
 .store-bar > svg { width: 15px; height: 15px; color: var(--accent-soft); flex: 0 0 auto; }
 .store-bar-select {
@@ -3204,19 +2977,19 @@ select {
   border: none;
   color: var(--fg);
   font: inherit;
-  font-weight: 700;
-  font-size: 14px;
+  font-weight: var(--cui-weight-bold);
+  font-size: var(--t-base);
   padding: 2px 4px;
   cursor: pointer;
   max-width: 55%;
 }
-.store-bar-name { font-weight: 700; font-size: 14px; }
-.store-bar .link-btn { font-size: 13px; }
+.store-bar-name { font-weight: var(--cui-weight-bold); font-size: var(--t-base); }
+.store-bar .link-btn { font-size: var(--t-md); }
 .store-ai-note {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 12px;
+  font-size: var(--t-sm);
   color: var(--accent-soft);
   margin: -2px 0 10px 2px;
 }
@@ -3227,12 +3000,12 @@ select {
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 13px;
+  font-size: var(--t-md);
   color: var(--fg-dim, var(--cui-fg-mute));
   margin: 0 0 14px;
   cursor: pointer;
 }
-.ai-toggle input { width: 17px; height: 17px; accent-color: var(--grape, #7c6af7); flex: 0 0 auto; }
+.ai-toggle input { width: 17px; height: 17px; accent-color: var(--cui-accent); flex: 0 0 auto; }
 .ai-toggle span { display: inline-flex; align-items: center; gap: 6px; }
 .ai-toggle svg { width: 13px; height: 13px; color: var(--accent-soft); }
 
@@ -3243,19 +3016,19 @@ select {
   align-items: center;
   gap: 6px;
   font: inherit;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--t-md);
+  font-weight: var(--cui-weight-semibold);
   color: var(--fg-dim, var(--cui-fg-mute));
   background: var(--bg-3);
-  border: 1px solid var(--cui-border);
-  border-radius: 999px;
+  border: var(--hair);
+  border-radius: var(--r-1);
   padding: 6px 12px;
   cursor: pointer;
 }
-.chip-tab.active { color: var(--cui-on-accent); background: var(--grad-primary); border-color: transparent; }
+.chip-tab.active { color: var(--cui-on-accent); background: var(--cui-accent); border-color: transparent; }
 .chip-default {
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--t-micro);
+  font-weight: var(--cui-weight-bold);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   opacity: 0.75;
@@ -3263,8 +3036,8 @@ select {
 
 .store-card {
   background: var(--bg-2);
-  border: 1px solid var(--cui-border);
-  border-radius: 14px;
+  border: var(--hair);
+  border-radius: var(--r-1);
   padding: 12px;
   margin-bottom: 14px;
   display: flex;
@@ -3275,8 +3048,8 @@ select {
 
 .aisle-card {
   background: var(--bg-2);
-  border: 1px solid var(--cui-border);
-  border-radius: 12px;
+  border: var(--hair);
+  border-radius: var(--r-1);
   padding: 10px;
   margin-bottom: 8px;
   display: flex;
@@ -3290,35 +3063,35 @@ select {
 .aisle-name {
   flex: 1;
   background: var(--bg-3);
-  border: 1px solid var(--cui-border);
-  border-radius: 10px;
+  border: var(--hair);
+  border-radius: var(--r-1);
   color: var(--fg);
   font: inherit;
-  font-weight: 700;
+  font-weight: var(--cui-weight-bold);
   padding: 9px 11px;
   min-width: 0;
 }
 .aisle-cats { display: flex; flex-wrap: wrap; gap: 6px; }
 .cat-chip {
   font: inherit;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--t-sm);
+  font-weight: var(--cui-weight-semibold);
   color: var(--fg-dim, var(--cui-fg-mute));
   background: var(--bg-3);
-  border: 1px solid var(--cui-border);
-  border-radius: 999px;
+  border: var(--hair);
+  border-radius: var(--r-1);
   padding: 5px 11px;
   cursor: pointer;
   transition: all 0.12s;
 }
-.cat-chip.on { color: var(--cui-on-accent); background: var(--grad-primary); border-color: transparent; }
+.cat-chip.on { color: var(--cui-on-accent); background: var(--cui-accent); border-color: transparent; }
 
 .exception-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .exception-kw {
   flex: 1;
   background: var(--bg-3);
-  border: 1px solid var(--cui-border);
-  border-radius: 10px;
+  border: var(--hair);
+  border-radius: var(--r-1);
   color: var(--fg);
   font: inherit;
   padding: 9px 11px;
@@ -3326,8 +3099,8 @@ select {
 }
 .exception-aisle {
   background: var(--bg-3);
-  border: 1px solid var(--cui-border);
-  border-radius: 10px;
+  border: var(--hair);
+  border-radius: var(--r-1);
   color: var(--fg);
   font: inherit;
   padding: 9px 8px;
@@ -3338,8 +3111,8 @@ select {
 .fam-list { display: flex; flex-direction: column; gap: 10px; }
 .fam-card {
   background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  border: var(--hair);
+  border-radius: var(--r-2);
   padding: 14px 16px;
   margin-bottom: 10px;
 }
@@ -3355,55 +3128,55 @@ select {
   cursor: pointer;
   padding: 0;
 }
-.fam-name { font-weight: 700; font-size: 15px; }
+.fam-name { font-weight: var(--cui-weight-bold); font-size: var(--t-lg); }
 .fam-card-body { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
 .fam-invite { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .fam-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-weight: 800;
+  font-weight: var(--cui-weight-bold);
   letter-spacing: 0.12em;
-  font-size: 16px;
+  font-size: var(--t-xl);
   color: var(--fg);
   background: var(--bg-3);
   padding: 4px 12px;
-  border-radius: 8px;
+  border-radius: var(--r-1);
 }
 .fam-link {
   flex: 1 1 100%;
   min-width: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
+  font-size: var(--t-sm);
   color: var(--accent-soft);
   background: var(--bg-3);
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--r-1);
   overflow-x: auto;
   white-space: nowrap;
 }
 .fam-members { display: flex; flex-direction: column; gap: 6px; }
-.fam-member { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.fam-member { display: flex; align-items: center; gap: 8px; font-size: var(--t-base); }
 .fam-member svg { width: 13px; height: 13px; color: var(--fg-faint); }
 .fam-owner-tag {
-  font-size: 10px;
-  font-weight: 800;
+  font-size: var(--t-micro);
+  font-weight: var(--cui-weight-bold);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--accent-soft);
   background: var(--bg-3);
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
 }
 /* An invited-but-not-yet-accepted member, so an empty-looking family reads as
    "waiting on them" rather than "the invite failed". */
 .fam-pending-tag {
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--t-micro);
+  font-weight: var(--cui-weight-bold);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--fg-faint);
-  border: 1px solid var(--border);
+  border: var(--hair);
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
 }
 
 /* Leaving a family: a quiet link that expands into a two-step confirm, since
@@ -3411,16 +3184,16 @@ select {
 .fam-leave-row {
   margin-top: 14px;
   padding-top: 10px;
-  border-top: 1px solid var(--border);
+  border-top: var(--hair);
 }
 .link-btn.danger { color: var(--danger); }
 .fam-leave-confirm {
   margin-top: 14px;
   padding-top: 12px;
-  border-top: 1px solid var(--border);
+  border-top: var(--hair);
 }
 .fam-leave-warn {
-  font-size: 13px;
+  font-size: var(--t-md);
   line-height: 1.45;
   color: var(--fg-dim);
   text-align: center;
@@ -3431,27 +3204,27 @@ select {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 14px;
+  font-size: var(--t-base);
   color: var(--fg-dim);
   background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: var(--hair);
+  border-radius: var(--r-1);
   padding: 10px 14px;
   margin-bottom: 8px;
 }
 .username-claimed svg { width: 14px; height: 14px; color: var(--cui-success); }
-.fam-error { color: var(--cui-error); font-size: 13px; margin-top: 6px; }
-.fam-note { color: var(--fg-dim); font-size: 13px; margin-top: 4px; }
+.fam-error { color: var(--cui-error); font-size: var(--t-md); margin-top: 6px; }
+.fam-note { color: var(--fg-dim); font-size: var(--t-md); margin-top: 4px; }
 
 .fam-pending-tag {
-  font-size: 10px;
-  font-weight: 800;
+  font-size: var(--t-micro);
+  font-weight: var(--cui-weight-bold);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--butter);
-  background: rgba(255, 178, 77, 0.18);
+  background: color-mix(in srgb, var(--cui-warning) 18%, transparent);
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
 }
 .invite-card {
   display: flex;
@@ -3478,23 +3251,23 @@ select {
 .join-card {
   background: var(--bg-1);
   border: 1px solid var(--grape);
-  border-radius: 20px;
+  border-radius: var(--r-2);
   padding: 24px 22px;
   max-width: 340px;
   width: 100%;
   text-align: center;
-  box-shadow: var(--shadow-glow);
+  box-shadow: var(--shadow-float);
 }
 .join-card h3 { margin: 12px 0 6px; }
-.join-card .muted { font-size: 14px; }
+.join-card .muted { font-size: var(--t-base); }
 .join-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 48px;
   height: 48px;
-  border-radius: 14px;
-  background: var(--grad-warm);
+  border-radius: var(--r-1);
+  background: var(--cui-accent);
   color: var(--cui-on-accent);
 }
 .join-badge svg { width: 22px; height: 22px; }
@@ -3508,18 +3281,17 @@ select {
   gap: 12px;
   width: 100%;
   text-align: left;
-  background: linear-gradient(135deg, rgba(124, 108, 255, 0.16), rgba(255, 178, 77, 0.12));
-  border: 1px solid var(--grape);
-  border-radius: 16px;
+  background: var(--accent-wash);
+  border: var(--hair-accent);
+  border-radius: var(--r-2);
   padding: 14px 16px;
   margin-bottom: 14px;
   color: var(--fg);
   font: inherit;
   cursor: pointer;
-  box-shadow: var(--shadow-soft);
-  transition: transform 0.18s var(--bounce), box-shadow 0.18s;
+  transition: border-color 0.18s;
 }
-.invite-banner:hover { transform: translateY(-1px); box-shadow: var(--shadow-glow); }
+.invite-banner:hover { border-color: var(--cui-accent); }
 .invite-banner-icon {
   flex: 0 0 auto;
   width: 36px;
@@ -3527,14 +3299,14 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  background: var(--grad-warm);
+  border-radius: var(--r-1);
+  background: var(--cui-accent);
   color: var(--cui-on-accent);
 }
 .invite-banner-icon svg { width: 16px; height: 16px; }
 .invite-banner-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.invite-banner-text strong { font-size: 15px; }
-.invite-banner-sub { font-size: 12px; color: var(--fg-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.invite-banner-text strong { font-size: var(--t-lg); }
+.invite-banner-sub { font-size: var(--t-sm); color: var(--fg-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .invite-banner-caret { width: 16px; height: 16px; color: var(--fg-faint); transform: rotate(-90deg); flex: 0 0 auto; }
 
 /* ── Image picker (recipe editor / chef Studio) ───────────────────────── */
@@ -3550,12 +3322,12 @@ select {
   width: 100%;
   aspect-ratio: 16 / 9;
   max-height: 220px;
-  border: 2px dashed var(--border);
-  border-radius: 14px;
+  border: 1px dashed var(--cui-border-strong);
+  border-radius: var(--r-1);
   background: var(--bg-2);
   color: var(--fg-dim);
   font: inherit;
-  font-weight: 600;
+  font-weight: var(--cui-weight-semibold);
   cursor: pointer;
   transition: border-color 0.18s, background 0.18s, color 0.18s;
 }
@@ -3573,7 +3345,7 @@ select {
   aspect-ratio: 16 / 9;
   max-height: 260px;
   object-fit: cover;
-  border-radius: 14px;
+  border-radius: var(--r-1);
   display: block;
   background: var(--bg-2);
 }
@@ -3584,7 +3356,7 @@ select {
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.4);
-  border-radius: 14px;
+  border-radius: var(--r-1);
 }
 .image-picker-actions {
   display: flex;
@@ -3603,7 +3375,7 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 14px;
+  border-radius: var(--r-1);
   background: var(--accent-soft);
   color: var(--accent-warm);
 }
@@ -3628,8 +3400,8 @@ select {
   gap: 12px;
   padding: 12px 16px;
   background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  border: var(--hair);
+  border-radius: var(--r-1);
   transition: opacity var(--cui-duration) var(--cui-ease);
 }
 .admin-row.busy { opacity: 0.5; pointer-events: none; }
@@ -3644,30 +3416,30 @@ select {
   gap: 8px;
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid var(--border);
-  font-size: 13px;
+  border-top: var(--hair);
+  font-size: var(--t-md);
   color: var(--text-1);
 }
 .admin-confirm > span { flex: 1 1 220px; min-width: 0; }
 .admin-id { min-width: 0; }
 .admin-name {
-  font-weight: 600;
+  font-weight: var(--cui-weight-semibold);
   display: flex;
   align-items: center;
   gap: 8px;
 }
 .admin-you {
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--t-micro);
+  font-weight: var(--cui-weight-bold);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--cui-accent-soft);
-  background: var(--cui-accent-mute);
+  background: var(--accent-wash);
   padding: 2px 7px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
 }
-.admin-email { font-size: 12px; color: var(--fg-dim); margin-top: 2px; }
-.admin-seen { font-size: 11px; color: var(--fg-faint); margin-top: 2px; }
+.admin-email { font-size: var(--t-sm); color: var(--fg-dim); margin-top: 2px; }
+.admin-seen { font-size: var(--t-xs); color: var(--fg-faint); margin-top: 2px; }
 .admin-role { flex: 0 0 auto; }
 
 
@@ -3702,21 +3474,21 @@ select {
   }
   .print-only { display: block; }
   .print-title {
-    font-size: 20px;
-    font-weight: 700;
+    font-size: var(--t-2xl);
+    font-weight: var(--cui-weight-bold);
     margin: 0 0 12px;
     padding-bottom: 6px;
     border-bottom: 1.5px solid #000;
   }
   .home-section-head h3 {
-    font-size: 14px;
+    font-size: var(--t-base);
     margin: 14px 0 6px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
   .ing-group-label {
-    font-size: 12px;
-    font-weight: 700;
+    font-size: var(--t-sm);
+    font-weight: var(--cui-weight-bold);
     color: #000 !important;
     margin-top: 10px;
     border-bottom: 1px solid #bbb;
@@ -3733,16 +3505,16 @@ select {
     background: #fff !important;
     width: 14px;
     height: 14px;
-    border-radius: 3px;
+    border-radius: var(--r-1);
   }
   /* Already-in-the-cart items still print, just struck through. */
   .check-line.checked { opacity: 1; }
   .check-line.checked .shopping-name { text-decoration: line-through; }
-  .shopping-name { font-size: 13px; }
-  .shopping-qty, .serves { font-size: 11px; color: #444 !important; }
+  .shopping-name { font-size: var(--t-md); }
+  .shopping-qty, .serves { font-size: var(--t-xs); color: #444 !important; }
   /* Keep the meals list — handy reference while shopping. */
   .browse-item { border: none !important; padding: 2px 0 !important; }
-  .browse-item .meta { font-size: 11px; color: #444 !important; }
+  .browse-item .meta { font-size: var(--t-xs); color: #444 !important; }
   @page { margin: 14mm; }
 }
 
@@ -3759,7 +3531,7 @@ select {
   padding: 4px 8px 4px 4px;
   background: var(--bg-1);
   border: 1px solid var(--accent-warm);
-  border-radius: 18px;
+  border-radius: var(--r-2);
 }
 .resume-cook-main {
   flex: 1;
@@ -3770,7 +3542,7 @@ select {
   padding: 12px 14px;
   background: none;
   border: 0;
-  border-radius: 14px;
+  border-radius: var(--r-1);
   text-align: left;
   color: inherit;
   cursor: pointer;
@@ -3783,12 +3555,12 @@ select {
   flex-direction: column;
   gap: 1px;
   min-width: 0;
-  font-size: 13px;
+  font-size: var(--t-md);
 }
-.resume-cook-text > strong { font-size: 12px; letter-spacing: 0.02em; text-transform: uppercase; opacity: 0.75; }
+.resume-cook-text > strong { font-size: var(--t-sm); letter-spacing: 0.02em; text-transform: uppercase; opacity: 0.75; }
 .resume-cook-title {
-  font-weight: 600;
-  font-size: 15px;
+  font-weight: var(--cui-weight-semibold);
+  font-size: var(--t-lg);
   /* One line — a long title must not push the summary out of view. */
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3824,9 +3596,9 @@ button.step-row { display: flex; }
    `:focus-visible` rather than `:focus` so a mouse click doesn't leave a ring
    behind — the keyboard user gets it, the pointer user doesn't. */
 :where(button, a, [role="button"], [role="checkbox"], input, select, textarea):focus-visible {
-  outline: 2px solid var(--cui-accent, #7c6af7);
+  outline: 2px solid var(--cui-accent);
   outline-offset: 2px;
-  border-radius: 10px;
+  border-radius: var(--r-1);
 }
 
 /* 44px hit areas without a 44px box.
@@ -3853,5 +3625,5 @@ button.step-row { display: flex; }
    hybrids on the small one. */
 
 /* The paste counter under the free-form recipe box. Quiet until it matters. */
-.create-count { font-size: 11px; margin-top: 6px; text-align: right; }
-.create-count.at-cap { color: var(--tangerine); font-weight: 600; text-align: left; }
+.create-count { font-size: var(--t-xs); margin-top: 6px; text-align: right; }
+.create-count.at-cap { color: var(--tangerine); font-weight: var(--cui-weight-semibold); text-align: left; }
