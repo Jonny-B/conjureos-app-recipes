@@ -5,6 +5,13 @@
  * after they land in saved markdown frontmatter is not.
  */
 
+/**
+ * Where something is kept. Drives the Pantry screen's grouping and, with the
+ * shelf-life table, how fast it is assumed to go off — a chicken breast in the
+ * freezer is not a chicken breast in the fridge.
+ */
+export type PantryLocation = "pantry" | "fridge" | "freezer";
+
 export interface Ingredient {
   /** Lowercase canonical name, e.g. "eggs", "red onion". */
   name: string;
@@ -22,6 +29,18 @@ export interface Ingredient {
   quantity?: string;
   /** Optional free-form note ("looks past date", "fresh, opened"). */
   notes?: string;
+  /**
+   * Which storage area this was seen in, when the vision pass could tell
+   * (a fridge shelf looks nothing like a cupboard). Absent = unknown, and the
+   * shelf-life table's own guess is used instead.
+   */
+  location?: PantryLocation;
+  /**
+   * A best-before / use-by date READ OFF THE PACKAGING, as `YYYY-MM-DD`.
+   * Present only when the model could actually read one — never inferred.
+   * A real printed date always beats the shelf-life estimate.
+   */
+  expiresAt?: string;
   /** True when the user has explicitly confirmed (or added) this item. */
   confirmed: boolean;
 }
@@ -145,8 +164,20 @@ export interface PantryItem {
   quantity?: string;
   /** Optional free-form note ("opened", "use soon"). */
   notes?: string;
-  /** ISO timestamp first added. */
+  /** ISO timestamp first added. Also the clock the shelf-life estimate runs on. */
   addedAt: string;
+  /**
+   * Where it is kept. Absent = let features/shelfLife.ts guess from the name.
+   * Set by the scan when it could tell, or by the user moving a row.
+   */
+  location?: PantryLocation;
+  /**
+   * A known use-by date, `YYYY-MM-DD`. Either read off the packaging by the
+   * scan or typed by the user. When present it REPLACES the shelf-life
+   * estimate rather than adjusting it — a printed date is a fact and the
+   * table is a guess, and mixing the two would make both less trustworthy.
+   */
+  expiresAt?: string;
 }
 
 /**

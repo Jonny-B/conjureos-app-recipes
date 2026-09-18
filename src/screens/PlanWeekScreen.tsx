@@ -43,6 +43,7 @@ function uniq(a: string[]): string[] {
 
 export function PlanWeekScreen({
   pantry,
+  initialInclude = null,
   catalogVersion = 0,
   families = [],
   defaultFamilyId = null,
@@ -50,6 +51,13 @@ export function PlanWeekScreen({
   onPersist,
 }: {
   pantry: PantryItem[] | null;
+  /**
+   * Ingredient chips the wizard opens with, from the Pantry's "use these up"
+   * block. They land in the SAME state a hand-typed chip does, which is the
+   * point: the seed is a starting position, not a locked constraint, and the
+   * first thing you can do with it is take one out.
+   */
+  initialInclude?: string[] | null;
   /** Bumped by App when the catalog reloads from the DB, so the memo re-runs. */
   catalogVersion?: number;
   /**
@@ -70,7 +78,9 @@ export function PlanWeekScreen({
 }) {
   const [step, setStep] = useState<Step>("mood");
   const [moodMode, setMoodMode] = useState<MoodMode>("ingredients");
-  const [includeChips, setIncludeChips] = useState<string[]>([]);
+  const [includeChips, setIncludeChips] = useState<string[]>(() =>
+    uniq((initialInclude ?? []).map(sanitizeName).filter(Boolean)).slice(0, 8),
+  );
   const [chipInput, setChipInput] = useState("");
   const [freeText, setFreeText] = useState("");
   const [mealCount, setMealCount] = useState(5);

@@ -2502,6 +2502,190 @@ select {
 .kitchen-invent { width: 100%; justify-content: center; }
 .kitchen-list-head { display: flex; align-items: center; justify-content: space-between; }
 
+/* ── Pantry: scan hero, use-these-up, stock rows ──────────────────────
+ * The home screen. Everything here is square rows and hairline dividers —
+ * no cards, no lift, no glow. A stock list is data, and data reads better
+ * as a table than as a wall of little boxes. */
+
+.scan-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 18px 20px;
+  border: var(--hair-accent);
+  border-radius: var(--r-2);
+  background: var(--bg-1);
+}
+.scan-hero-title {
+  margin: 0;
+  font-size: var(--t-3xl);
+  font-weight: var(--cui-weight-semibold);
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+}
+.scan-hero-sub { margin: 0; font-size: var(--t-base); line-height: 1.45; }
+.scan-hero-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+/* Both buttons matter, so neither is allowed to be the crumb: they share the
+   row equally and only the fill separates primary from secondary. */
+.scan-hero-btn { flex: 1 1 140px; justify-content: center; min-height: 48px; }
+
+/* ── Use these up ─────────────────────────────────────────────────────── */
+.useup { display: flex; flex-direction: column; gap: 8px; }
+.useup .home-section-head h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.useup .home-section-head h3 .fa-icon {
+  width: 15px;
+  height: 15px;
+  color: var(--cui-warning);
+}
+.useup-note { margin: 0; font-size: var(--t-md); line-height: 1.4; }
+.useup-rows {
+  display: flex;
+  flex-direction: column;
+  border: var(--hair);
+  border-radius: var(--r-1);
+  overflow: hidden;
+}
+.useup-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  /* `border: none` FIRST and not just `border-top` — these rows are <button>s,
+     and a button that only overrides its top border keeps the UA's default on
+     the other three, which paints a hard dark outline around every row. */
+  border: none;
+  /* The divider IS the structure — one hairline between rows, none at the
+     ends, so the block reads as a single object rather than five. */
+  border-top: var(--hair);
+  background: var(--bg-1);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  /* 44px minimum: this is tapped in a kitchen. */
+  min-height: 44px;
+  transition: background var(--cui-duration-fast) var(--cui-ease);
+}
+.useup-row:first-child { border-top: none; }
+button.useup-row:hover { background: var(--bg-2); }
+.useup-name { font-weight: var(--cui-weight-semibold); text-transform: capitalize; }
+.useup-qty { font-size: var(--t-sm); }
+.useup-basis { font-size: var(--t-micro); text-transform: uppercase; letter-spacing: 0.06em; }
+.useup-go {
+  margin-left: auto;
+  width: 13px;
+  height: 13px;
+  transform: rotate(-90deg);
+  color: var(--fg-faint);
+  flex: 0 0 auto;
+}
+.risk-chip { white-space: nowrap; margin-left: auto; }
+.useup-row .risk-chip { margin-left: auto; }
+.useup-row .useup-basis + .risk-chip,
+.useup-row .risk-chip + .useup-basis { margin-left: 0; }
+
+/* ── The stock list ───────────────────────────────────────────────────── */
+.stock-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.stock-list {
+  display: flex;
+  flex-direction: column;
+  border: var(--hair);
+  border-radius: var(--r-1);
+  overflow: hidden;
+}
+.stock-row { border-top: var(--hair); background: var(--bg-1); }
+.stock-row:first-child { border-top: none; }
+.stock-row.open { background: var(--bg-2); }
+.stock-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  min-height: 44px;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.stock-name { font-weight: var(--cui-weight-semibold); text-transform: capitalize; min-width: 0; }
+.stock-qty { font-size: var(--t-sm); }
+.stock-head .risk-chip { margin-left: auto; }
+.stock-caret {
+  width: 12px;
+  height: 12px;
+  color: var(--fg-faint);
+  flex: 0 0 auto;
+  transition: transform var(--cui-duration-fast) var(--cui-ease);
+}
+/* With a chip present the caret must not inherit the chip's auto margin. */
+.stock-head .risk-chip + .stock-caret { margin-left: 0; }
+.stock-head > .stock-caret:first-of-type { margin-left: auto; }
+
+.stock-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 14px 14px;
+}
+.stock-field { display: flex; flex-direction: column; gap: 5px; }
+.stock-field-label {
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-dim);
+  font-weight: var(--cui-weight-semibold);
+}
+.stock-field input {
+  background: var(--bg-0);
+  border: var(--hair);
+  border-radius: var(--r-1);
+  color: var(--fg);
+  font: inherit;
+  padding: 10px 12px;
+  outline: none;
+  min-height: 44px;
+}
+.stock-field input:focus { border-color: var(--cui-accent); }
+/* The date control paints its own glyph, which the UA colours for a LIGHT
+   page; in the dark flavour it disappears. Invert only there. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-flavor="light"]) .stock-field input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: 0.7;
+  }
+}
+:root[data-flavor="dark"] .stock-field input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.7;
+}
+.loc-seg { width: 100%; }
+.stock-basis { margin: 0; font-size: var(--t-sm); line-height: 1.4; }
+.stock-actions { display: flex; }
+.link-btn.danger { color: var(--cui-error); display: inline-flex; align-items: center; gap: 7px; }
+.link-btn.danger .fa-icon { width: 12px; height: 12px; }
+
+/* Screen-reader-only text: used where a colour alone would be carrying the
+   meaning (an expired chip is red, and red is not a word). */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ── Guided cook ────────────────────────────────────────────────────── */
 .guided { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; padding-bottom: 80px; }
 .guided-head { display: flex; align-items: center; gap: 12px; }

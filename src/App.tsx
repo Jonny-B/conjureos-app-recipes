@@ -93,14 +93,21 @@ export function App() {
   // plan actions the Plans screen contributes for the plan in view.
   const [cogOpen, setCogOpen] = useState(false);
   const [plansIntent, setPlansIntent] = useState<PlansIntent | null>(null);
+  /**
+   * Ingredient names the planner should open pre-seeded with — set when the
+   * Pantry's "use these up" block is the thing that sent you here. Cleared
+   * with the intent, so a later plain "New plan" does not inherit them.
+   */
+  const [planSeed, setPlanSeed] = useState<string[] | null>(null);
   const [cogExtras, setCogExtras] = useState<CogItem[]>([]);
   // Appearance lives behind the cog rather than on a tab: it is set once and
   // then almost never, so it should not cost a slot in a four-tab bar.
   const [appearanceOpen, setAppearanceOpen] = useState(false);
-  const goPlans = (intent: PlansIntent) => {
+  const goPlans = (intent: PlansIntent, seed?: string[]) => {
     setCookTarget(null);
     setTab("plan");
     setPlansIntent(intent);
+    setPlanSeed(seed?.length ? seed : null);
     setCogOpen(false);
   };
 
@@ -181,7 +188,7 @@ export function App() {
               pantry={pantry}
               onChange={setPantry}
               onCook={startCook}
-              onPlanWeek={() => goPlans("new")}
+              onPlanWeek={(seed) => goPlans("new", seed)}
               onBrowse={() => {
                 setRecipeSource("all");
                 setTab("recipes");
@@ -199,7 +206,11 @@ export function App() {
               pantry={pantry}
               catalogVersion={catalogVersion}
               intent={plansIntent}
-              onIntentConsumed={() => setPlansIntent(null)}
+              planSeed={planSeed}
+              onIntentConsumed={() => {
+                setPlansIntent(null);
+                setPlanSeed(null);
+              }}
               onCogItems={setCogExtras}
               familyEpoch={familyEpoch}
             />

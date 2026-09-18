@@ -10,7 +10,7 @@
 import { vfs } from "../bridge/vfs";
 import { readJsonDoc, requireJsonDoc } from "./jsonDoc";
 import { sanitizeName } from "./vision";
-import type { Ingredient, PantryItem } from "../types";
+import type { Ingredient, PantryItem, PantryLocation } from "../types";
 
 const RECIPES_DIR = "/home/Documents/Recipes";
 const PANTRY_PATH = `${RECIPES_DIR}/.pantry.json`;
@@ -70,6 +70,8 @@ export async function addPantryItem(input: {
   name: string;
   quantity?: string;
   notes?: string;
+  location?: PantryLocation;
+  expiresAt?: string;
 }): Promise<PantryItem[]> {
   const name = sanitizeName(input.name);
   if (!name) throw new Error("Enter an ingredient name.");
@@ -78,13 +80,21 @@ export async function addPantryItem(input: {
     name,
     quantity: clean(input.quantity),
     notes: clean(input.notes),
+    location: input.location,
+    expiresAt: input.expiresAt,
     addedAt: new Date().toISOString(),
   });
 }
 
 /** Merge a batch of scanned/AI ingredients into the pantry. */
 export async function addPantryItems(
-  incoming: Array<{ name: string; quantity?: string; notes?: string }>,
+  incoming: Array<{
+    name: string;
+    quantity?: string;
+    notes?: string;
+    location?: PantryLocation;
+    expiresAt?: string;
+  }>,
 ): Promise<PantryItem[]> {
   let items = await loadPantryForWrite();
   const now = new Date().toISOString();
@@ -95,6 +105,8 @@ export async function addPantryItems(
       name,
       quantity: clean(raw.quantity),
       notes: clean(raw.notes),
+      location: raw.location,
+      expiresAt: raw.expiresAt,
       addedAt: now,
     });
   }
@@ -102,9 +114,17 @@ export async function addPantryItems(
   return items;
 }
 
+/**
+ * Patch one item in place.
+ *
+ * Every field is optional and only touched when the caller names it, so
+ * "set the expiry" cannot silently clear the quantity. Passing an explicit
+ * `undefined` for a key that IS present clears that field — which is how the
+ * user removes a date or drops back to the shelf-life guess for a location.
+ */
 export async function updatePantryItem(
   name: string,
-  patch: Partial<Pick<PantryItem, "quantity" | "notes">>,
+  patch: Partial<Pick<PantryItem, "quantity" | "notes" | "location" | "expiresAt">>,
 ): Promise<PantryItem[]> {
   const items = await loadPantryForWrite();
   const key = dedupeKey(name);
@@ -114,6 +134,8 @@ export async function updatePantryItem(
           ...i,
           quantity: "quantity" in patch ? clean(patch.quantity) : i.quantity,
           notes: "notes" in patch ? clean(patch.notes) : i.notes,
+          location: "location" in patch ? patch.location : i.location,
+          expiresAt: "expiresAt" in patch ? cleanDate(patch.expiresAt) : i.expiresAt,
         }
       : i,
   );
@@ -137,6 +159,8 @@ export function ingredientsFromPantry(items: PantryItem[]): Ingredient[] {
     confirmed: true,
     ...(i.quantity ? { quantity: i.quantity } : {}),
     ...(i.notes ? { notes: i.notes } : {}),
+    ...(i.location ? { location: i.location } : {}),
+    ...(i.expiresAt ? { expiresAt: i.expiresAt } : {}),
   }));
 }
 
@@ -153,10 +177,20 @@ function mergeIntoList(items: PantryItem[], entry: PantryItem): PantryItem[] {
   const idx = items.findIndex((i) => dedupeKey(i.name) === key);
   if (idx === -1) return [entry, ...items];
   const existing = items[idx]!;
+  /**
+   * `addedAt` is KEPT, and that is not an oversight — it is the clock the
+   * shelf-life estimate runs on, and re-scanning a shelf must not make
+   * three-week-old spinach look like it arrived today. A genuinely NEW
+   * carton of milk gets its freshness back by the user clearing the row and
+   * re-adding it, or by the scan reading a printed date, which outranks the
+   * estimate entirely.
+   */
   const merged: PantryItem = {
     name: existing.name,
     quantity: entry.quantity ?? existing.quantity,
     notes: entry.notes ?? existing.notes,
+    location: entry.location ?? existing.location,
+    expiresAt: cleanDate(entry.expiresAt) ?? existing.expiresAt,
     addedAt: existing.addedAt,
   };
   const copy = items.slice();
@@ -171,6 +205,12 @@ function dedupeKey(name: string): string {
 function clean(s: string | undefined): string | undefined {
   const t = s?.trim();
   return t ? t.slice(0, 60) : undefined;
+}
+
+/** A bare `YYYY-MM-DD`, or nothing. Anything else is dropped, not stored. */
+function cleanDate(s: string | undefined): string | undefined {
+  const t = s?.trim();
+  return t && /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : undefined;
 }
 
 function isValidItem(x: unknown): x is PantryItem {

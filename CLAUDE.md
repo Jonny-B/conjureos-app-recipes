@@ -1,6 +1,19 @@
-# Recipes app: instructions for Claude
+# Conjure Pantry: instructions for Claude
 
 A ConjureOS anchor app (separate repo from ConjureOS). Pure React + TypeScript, no Vite.
+
+**It is a pantry app that happens to know recipes**, not a recipe app with a
+pantry feature. The promise is *use up what you already have*, and the two
+mechanics that carry it are the camera (a shelf becomes a stocked list) and the
+planner (a week of different dinners that between them finish what's in the
+pantry). Everything else is supporting cast. Read `CONJURE_PANTRY_DESIGN.md`
+before changing what the app IS.
+
+**The store slug is still `recipes`, deliberately.** It is the dedupe key for
+every installed copy, so changing it puts a second app on every device instead
+of updating the one that's there. Same for the repo name, the npm package name
+and the VFS path `/home/Documents/Recipes/` — that last one would orphan every
+saved recipe, plan and pantry file on every device.
 
 ## Before publishing: build the REAL store bundle and smoke-test it
 
@@ -31,11 +44,13 @@ hands it back (clearing site data is the only way to resume following
 ConjureOS). The palette itself is never a setting: `data-theme` is always
 written as `"spr"`, and `theme.ts` ignores the theme field of every
 appearance message ConjureOS sends — other apps on the same channel (Conjure
-Health, for one) still read it, Recipes just doesn't.
+Health, for one) still read it, Conjure Pantry just doesn't.
 
 `npm test` runs `scripts/theme.test.ts` against it: 19 cases, plain tsx, no
 framework — 18 exercise `theme.ts`'s own logic, and one instead reads
-`src/conjureos-ui.css` off disk to guard the re-sync below.
+`src/conjureos-ui.css` off disk to guard the re-sync below. It then runs
+`scripts/shelfLife.test.ts` (see **Waste risk** below). Same shape, no
+framework; both must pass.
 
 `src/conjureos-ui.css` is a VENDORED copy of `@conjureos/ui` `dist/ui.css` and
 must stay at a 1.x version — 0.x had one dark palette and no light/dark axis,
@@ -51,6 +66,33 @@ cp node_modules/@conjureos/ui/dist/ui.css src/conjureos-ui.css
 That also wipes the header comment at the top of the file, which is not part
 of the upstream package — put it back from git history before committing the
 re-sync (the comment itself has the exact command).
+
+## Waste risk (the "use these up" block)
+
+`src/features/shelfLife.ts` decides what is closest to being thrown out. Two
+sources, deliberately never blended:
+
+1. **A real date** — `PantryItem.expiresAt`, either read off the packaging by
+   the vision pass or typed by the user. A fact; it wins outright.
+2. **An estimate** — a keyword→days table applied to `addedAt`. A guess, and
+   the UI always says so ("about 3 days left", never "expires Tuesday").
+
+Two rules keep the table honest, and `scripts/shelfLife.test.ts` pins both:
+
+- **Longest matching keyword wins.** That is what makes "ground beef" 2 days
+  and not "beef" 4, "black pepper" a spice and not "pepper" a vegetable,
+  "coconut milk" a cupboard item and not a fridge one. Adding a SHORT keyword
+  that shadows a long one is how this table rots, and it rots silently.
+- **A keyword must start at a word boundary.** Without it, "boiled eggs"
+  matches `oil` — b-**oil**-ed — and gets a year in the cupboard.
+
+The numbers are ordinary home-storage rules of thumb, and deliberately
+generous: telling someone their rice is about to go off teaches them to ignore
+the block, which costs more than saying nothing.
+
+`merge` keeps the ORIGINAL `addedAt` when re-scanning a shelf. That is not an
+oversight — it is the clock the estimate runs on, and a re-scan must not make
+three-week-old spinach look like it arrived today.
 
 Never hardcode a colour in `src/styles.css`. Spring's own `--cui-on-accent` is
 DARK (`#0d1108`) in the dark flavour and white (`#fff`) in light, so
@@ -79,6 +121,27 @@ that came with it. Reasoning in ConjureOS `DECISIONS.md` (2026-09-17).
 
 No licensing review is needed before a prod publish any more. That gate existed
 solely for the scraped corpus.
+
+## Visual language
+
+Squared-off angles, hairline borders, and nothing else carrying structure. The
+rules live at the top of `src/styles.css`; the short version:
+
+- **Every radius comes from the scale** (`--r-0/1/2/pill/circle`). No component
+  picks its own curve. `--r-pill` is RATIONED to status chips and count badges:
+  a pill says "this is data", structure goes square.
+- **Every type size comes from the scale** (`--t-micro` … `--t-4xl`). With the
+  ornament gone, hierarchy has nowhere else to come from.
+- **One shadow** (`--shadow-float`), and only genuinely floating layers get it:
+  bottom sheets, dropdowns, popovers. Cards and rows get `--hair`.
+- **One gradient** (`--grad-primary`), on one element per screen: the primary
+  action. Everything else that reads as "accent" is a flat `--cui-accent`.
+- **`--cui-accent-mute` / `--cui-accent-tint` are NOT the accent tokens.** They
+  are deprecated aliases for the SUPPORT hue, which in Spring is pink. Use
+  `--accent-line` / `--accent-wash` / `--hair-accent`, defined in this repo and
+  derived from `--cui-accent`.
+- The canvas is flat. A tinted background is the one thing that makes a
+  10%-opacity hairline disappear.
 
 ## Publishing
 

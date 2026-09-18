@@ -111,6 +111,7 @@ export function PlansScreen({
   pantry,
   catalogVersion = 0,
   intent = null,
+  planSeed = null,
   onIntentConsumed,
   onCogItems,
   familyEpoch = 0,
@@ -129,6 +130,12 @@ export function PlansScreen({
   familyEpoch?: number;
   /** A sub-screen to open, requested from the app-header cog. */
   intent?: PlansIntent | null;
+  /**
+   * Ingredient names to open the wizard pre-seeded with. Set when the Pantry's
+   * "use these up" block routed here, so the week is planned around exactly
+   * the things closest to being thrown out.
+   */
+  planSeed?: string[] | null;
   onIntentConsumed?: () => void;
   /** Contribute plan actions (share / delete) to the header settings sheet. */
   onCogItems?: (items: CogItem[]) => void;
@@ -424,9 +431,20 @@ export function PlansScreen({
     await loadPlans();
   };
 
+  /**
+   * The seed the wizard opens with, captured at the moment the intent arrives.
+   *
+   * It cannot be read from the prop at render time: `onIntentConsumed` clears
+   * it on the host one render later, which would pull the chips back out of a
+   * wizard the user is looking at. Held in a ref and cleared when the wizard
+   * closes, so opening "New" by hand afterwards starts empty.
+   */
+  const seededRef = useRef<string[] | null>(null);
+
   // A header-cog intent (Family / Stores / New) opens that sub-screen.
   useEffect(() => {
     if (!intent) return;
+    if (intent === "new") seededRef.current = planSeed?.length ? planSeed : null;
     setMode(intent);
     onIntentConsumed?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -513,11 +531,13 @@ export function PlansScreen({
     return (
       <PlanWeekScreen
         pantry={pantry}
+        initialInclude={seededRef.current}
         catalogVersion={catalogVersion}
         families={families}
         defaultFamilyId={defaultFamilyId()}
         onPersist={persistNewPlan}
         onDone={() => {
+          seededRef.current = null;
           setMode("landing");
           void loadPlans();
         }}
@@ -566,7 +586,14 @@ export function PlansScreen({
             Family{familyPlans.length ? ` (${familyPlans.length})` : ""}
           </button>
         </div>
-        <button className="btn plans-new" onClick={() => setMode("new")} aria-label="New plan">
+        <button
+          className="btn plans-new"
+          onClick={() => {
+            seededRef.current = null;
+            setMode("new");
+          }}
+          aria-label="New plan"
+        >
           <Icon name="plus" /> New
         </button>
       </div>
