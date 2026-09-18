@@ -3086,6 +3086,142 @@ button.useup-row:hover { background: var(--bg-2); }
   text-decoration-thickness: 1.5px;
 }
 
+/* ── The List tab ─────────────────────────────────────────────────────
+ * Designed for one hand, in a shop, in bad light. Every decision here comes
+ * from that: 56px rows, a 26px box, the WHOLE row as the target, and no
+ * colour carrying meaning except the fill of a ticked box. */
+
+.list-progress {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+}
+.list-progress .link-btn { display: inline-flex; align-items: center; gap: 6px; }
+.list-progress .link-btn .fa-icon { width: 12px; height: 12px; }
+
+.aisle-block { margin-bottom: 18px; }
+.aisle-title {
+  margin: 0 0 6px;
+  font-size: var(--t-xs);
+  font-weight: var(--cui-weight-bold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-soft);
+}
+.aisle-items {
+  display: flex;
+  flex-direction: column;
+  border: var(--hair);
+  border-radius: var(--r-1);
+  overflow: hidden;
+}
+.buy-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  border-top: var(--hair);
+  background: var(--bg-1);
+}
+.buy-row:first-child { border-top: none; }
+.buy-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  /* 56px, not 44: this is tapped while walking, holding a basket. */
+  min-height: 56px;
+  padding: 10px 14px;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+.buy-main:hover { background: var(--bg-2); }
+.buy-box {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  /* 2px, deliberately heavier than the app's hairlines: an empty checkbox has
+     to be findable at arm's length under a supermarket strip light. */
+  border: 2px solid var(--cui-border-strong);
+  border-radius: var(--r-1);
+  color: var(--cui-on-accent);
+  transition: background var(--cui-duration-fast) var(--cui-ease),
+              border-color var(--cui-duration-fast) var(--cui-ease);
+}
+.buy-box .fa-icon { width: 15px; height: 15px; }
+.buy-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.buy-name {
+  font-size: var(--t-xl);
+  font-weight: var(--cui-weight-semibold);
+  text-transform: capitalize;
+  line-height: 1.2;
+}
+.buy-sub { font-size: var(--t-md); color: var(--fg-dim); }
+
+.buy-row.checked .buy-box { background: var(--cui-accent); border-color: var(--cui-accent); }
+/* Ticked items stay legible rather than fading out: the list is a record of
+   the trip, and "did I already get the milk?" is asked at the till. */
+.buy-row.checked .buy-name { text-decoration: line-through; text-decoration-thickness: 2px; }
+.buy-row.checked .buy-text { opacity: 0.55; }
+
+.buy-move {
+  flex: 0 0 auto;
+  align-self: stretch;
+  padding: 0 14px;
+  border: none;
+  border-left: var(--hair);
+  background: none;
+  color: var(--fg-faint);
+  font: inherit;
+  font-size: var(--t-sm);
+  font-weight: var(--cui-weight-semibold);
+  cursor: pointer;
+  min-width: 56px;
+}
+.buy-move:hover, .buy-move.active { background: var(--accent-wash); color: var(--fg); }
+
+.buy-aisles {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px 14px;
+  border-top: var(--hair);
+  background: var(--bg-2);
+}
+.buy-aisles-label {
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: var(--cui-weight-semibold);
+  color: var(--fg-dim);
+}
+.buy-aisles .cat-chip { min-height: 40px; }
+
+/* Print: the aisle blocks take over from the old .shopping-group markup. */
+@media print {
+  .aisle-items { border: none !important; }
+  .buy-row { border-top: none !important; break-inside: avoid; page-break-inside: avoid; }
+  .buy-main { min-height: 0 !important; padding: 3px 0 !important; }
+  .buy-box {
+    border: 1.5px solid #000 !important;
+    background: #fff !important;
+    width: 14px;
+    height: 14px;
+  }
+  .buy-row.checked .buy-text { opacity: 1; }
+  .buy-name { font-size: 13px; }
+  .buy-sub { font-size: 11px; color: #444 !important; }
+}
+
 /* ── Plans: scope switch, share, family chip ──────────────────────────── */
 .plans-header-actions { display: flex; align-items: center; gap: 8px; }
 

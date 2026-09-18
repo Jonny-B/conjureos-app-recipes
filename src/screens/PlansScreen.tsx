@@ -14,19 +14,7 @@ import { subscribeFamilyChannels, type RealtimeHandle } from "../bridge/realtime
 import { PlanWeekScreen } from "./PlanWeekScreen";
 import { FamilyScreen } from "./FamilyScreen";
 import { StoreEditor } from "./StoreEditor";
-import {
-  loadStoresState,
-  saveStores,
-  groupByStore,
-  readLastStoreId,
-  writeLastStoreId,
-  aiSortEnabled,
-  withLearned,
-  UNSORTED,
-  type StoreLayout,
-} from "../features/storeLayout";
-import { inferAislePlacements } from "../features/aiStoreSort";
-import { printShoppingList } from "../features/printList";
+import { ListScreen } from "./ListScreen";
 import type { PlansIntent, CogItem } from "../App";
 import { Icon } from "../icons";
 
@@ -630,15 +618,23 @@ export function PlansScreen({
       ) : (
         current && (
           <>
-            <PlanView
-              focus={focus}
-              rec={current}
-              isLatest={viewing === 0}
-              familyName={current.familyId ? familyName(current.familyId) : null}
-              onToggle={(c) => toggleChecked(current, c)}
-              onUncheckAll={() => uncheckAll(current)}
-              onManageStores={() => setMode("stores")}
-            />
+            {focus === "list" ? (
+              <ListScreen
+                rec={current}
+                familyName={current.familyId ? familyName(current.familyId) : null}
+                dateLabel={formatDate(current.data.createdAt)}
+                onToggle={(c) => toggleChecked(current, c)}
+                onUncheckAll={() => uncheckAll(current)}
+                onManageStores={() => setMode("stores")}
+              />
+            ) : (
+              <PlanView
+                rec={current}
+                isLatest={viewing === 0}
+                familyName={current.familyId ? familyName(current.familyId) : null}
+                dateLabel={formatDate(current.data.createdAt)}
+              />
+            )}
             {active.length > 1 && (
               <section className="home-section">
                 <div className="home-section-head">
@@ -723,174 +719,30 @@ function LoadError({
 
 // ── one saved plan, read-only + check-off ────────────────────────────────
 
+/**
+ * One saved plan's MEALS. The shopping list that the same plan adds up to is a
+ * separate screen (ListScreen) on its own tab, because the two get used in
+ * completely different places — this one at a kitchen table, that one standing
+ * in a shop. They share this record, and one PlanWriter, so a tick made while
+ * shopping shows up here without a refetch.
+ */
 function PlanView({
-  focus,
   rec,
   isLatest,
   familyName,
-  onToggle,
-  onUncheckAll,
-  onManageStores,
+  dateLabel,
 }: {
-  focus: PlanFocus;
   rec: PlanRecord;
   isLatest: boolean;
   familyName: string | null;
-  onToggle: (canonical: string) => void;
-  onUncheckAll: () => void;
-  onManageStores: () => void;
+  dateLabel: string;
 }) {
   const plan = rec.data;
-
-  // Group the shopping list by the user's selected store layout (personal, VFS).
-  const [stores, setStores] = useState<StoreLayout[]>([]);
-  const [storeId, setStoreId] = useState<string>("");
-  const [defaultId, setDefaultId] = useState<string>("");
-  const [aiNote, setAiNote] = useState<string | null>(null);
-  const askedRef = useRef<Set<string>>(new Set());
-  // Deliberately the strict loader. This component WRITES stores back (the
-  // AI-placement effect below), and loadStores fabricates a default layout when
-  // the file is unreadable — so the lenient loader here would let that synthetic
-  // default overwrite the user's real aisle orders, the exact clobber the
-  // jsonDoc split exists to prevent. Unreachable today only because the default
-  // store happens to cover every category, so nothing lands in Unsorted; one
-  // renamed aisle re-opens it.
-  const [storesUnreadable, setStoresUnreadable] = useState(false);
-  useEffect(() => {
-    loadStoresState().then((r) => {
-      if (!r.ok) {
-        setStoresUnreadable(true);
-        return;
-      }
-      const { stores: st, defaultId: d } = r.value;
-      setStores(st);
-      setDefaultId(d);
-      const last = readLastStoreId();
-      setStoreId(st.some((s) => s.id === last) ? last! : d);
-    });
-  }, []);
-  // Latest stores, for the async AI-placement effect below (which resolves long
-  // after the render that started it).
-  const storesRef = useRef<StoreLayout[]>(stores);
-  storesRef.current = stores;
-  const store = stores.find((s) => s.id === storeId) ?? stores[0] ?? null;
-  const pickStore = (id: string) => {
-    setStoreId(id);
-    writeLastStoreId(id);
-  };
-  /**
-   * Grouped by aisle when we have a store layout; a single flat group when we
-   * don't.
-   *
-   * With no store this returned `[]` while `total` still counted the items, so
-   * the render took the "we have items" branch and mapped an empty array: the
-   * header said "12 to buy", the store bar said "My store", and there was
-   * nothing underneath it. That state is reachable whenever the store file is
-   * unreadable — and briefly on every load, before the layout resolves.
-   * `doPrint` already handles exactly this with an ungrouped fallback and a
-   * comment explaining why; the on-screen list never got the same treatment.
-   */
-  const groups = useMemo(() => {
-    const list = plan.shoppingList ?? [];
-    if (store) return groupByStore(list, store);
-    return list.length > 0
-      ? [{ aisleId: UNSORTED, aisleName: "Shopping list", items: list }]
-      : [];
-  }, [plan, store]);
-  const unsorted = useMemo(() => groups.find((g) => g.aisleId === UNSORTED)?.items ?? [], [groups]);
-
-  // Whenever a list has items the store layout doesn't cover, hand the layout to
-  // the model and let it place them by analogy to what's already in each aisle.
-  // Placements are learned onto the store, so the same items are instant + free
-  // next time. Each (store, item) is asked at most once.
-  useEffect(() => {
-    // storesUnreadable: skip entirely rather than pay for an AI call whose
-    // result we must not persist.
-    if (!store || storesUnreadable || !aiSortEnabled() || unsorted.length === 0) return;
-    const toAsk = unsorted.filter((i) => !askedRef.current.has(`${store.id}:${i.canonical}`));
-    if (toAsk.length === 0) return;
-    const keys = toAsk.map((i) => `${store.id}:${i.canonical}`);
-    keys.forEach((k) => askedRef.current.add(k));
-    let cancelled = false;
-    void (async () => {
-      // "Asked" has to mean ANSWERED. Marking before the call and never
-      // unmarking meant one network blip stranded those items in Unsorted for
-      // the rest of the session, with no note and no way to retry — the effect
-      // simply never looked at them again. On a failure (or an empty answer)
-      // the marks come off, so the next render asks once more.
-      let placements: Record<string, string> = {};
-      try {
-        placements = await inferAislePlacements(
-          toAsk.map((i) => ({ name: i.name, canonical: i.canonical })),
-          store,
-        );
-      } catch {
-        placements = {};
-      }
-      if (cancelled) return;
-      if (Object.keys(placements).length === 0) {
-        keys.forEach((k) => askedRef.current.delete(k));
-        return;
-      }
-      // Items the model DID look at but declined to place stay marked: it
-      // answered, it just had no aisle for them, and re-asking buys nothing.
-      // The write lives outside the state updater: React may invoke an updater
-      // more than once for the same change (StrictMode does it deliberately),
-      // and each extra invocation would be another VFS write + sync push.
-      const next = (storesRef.current ?? []).map((s) =>
-        s.id === store.id ? withLearned(s, placements) : s,
-      );
-      void saveStores({ stores: next, defaultId });
-      setStores(next);
-      const n = Object.keys(placements).length;
-      setAiNote(`Placed ${n} item${n === 1 ? "" : "s"} using your store layout`);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [store, unsorted, defaultId, storesUnreadable]);
-
-  const checked = useMemo(() => new Set(plan.checked ?? []), [plan]);
   const total = (plan.shoppingList ?? []).length;
-
-  // Print a purpose-built sheet rather than the app's own DOM — see printList.ts.
-  // Items already in the cart still print (struck through): the paper copy is a
-  // record of the whole trip, and someone else may be holding it.
-  const doPrint = () => {
-    // The store layout is read from the VFS, so for the first moments after a
-    // plan opens `groups` is empty while `total` isn't. Printing that would
-    // hand over a sheet saying "nothing to buy" for a list full of items —
-    // fall back to one ungrouped list rather than lie on paper.
-    const printGroups =
-      groups.length > 0
-        ? groups
-        : [{ aisleId: "all", aisleName: "Shopping list", items: plan.shoppingList ?? [] }];
-    printShoppingList({
-      groups: printGroups.map((g) => ({
-        aisleName: g.aisleName,
-        items: g.items.map((i) => ({
-          name: i.name,
-          quantity: i.quantity,
-          quantityNote: i.quantityNote,
-          checked: checked.has(i.canonical),
-        })),
-      })),
-      meals: (plan.picks ?? []).map((p) => p.title),
-      dateLabel: formatDate(plan.createdAt),
-      familyName: rec.familyId ? familyName : null,
-      storeName: store?.name ?? null,
-    });
-  };
-
-  const doneCount = (plan.shoppingList ?? []).filter((i) => checked.has(i.canonical)).length;
-  const allDone = total > 0 && doneCount === total;
   const shared = !!rec.familyId;
 
   return (
-    <div className="plan-view print-area">
-      <div className="print-only print-title">
-        Shopping list — {formatDate(plan.createdAt)}
-      </div>
+    <div className="plan-view">
       <div className="plan-view-head">
         <div className="plan-view-tags">
           {isLatest && <span className="plan-latest">Latest</span>}
@@ -901,128 +753,29 @@ function PlanView({
           )}
         </div>
         <div className="plan-view-meta muted">
-          Planned {formatDate(plan.createdAt)} · {(plan.picks ?? []).length} meal
+          Planned {dateLabel} · {(plan.picks ?? []).length} meal
           {(plan.picks ?? []).length === 1 ? "" : "s"} · {total} to buy
         </div>
       </div>
 
-      {focus === "plan" && (
-        <section className="home-section">
-          <div className="home-section-head">
-            <h3>This week's meals</h3>
-          </div>
-          <div className="browse-list">
-            {(plan.picks ?? []).map((pick) => (
-              <div key={pick.id} className="browse-item" style={{ cursor: "default" }}>
-                <div className="title-block">
-                  <div className="title">{pick.title}</div>
-                  <div className="meta">
-                    {pick.haveCount}/{pick.totalCount} on hand
-                    {pick.marginalNew.length > 0 && ` · ${pick.marginalNew.length} to buy`}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Conditional, NOT `hidden` — `.home-section` sets `display: flex`, which
-          beats the UA's low-specificity `[hidden] { display: none }` and would
-          leave the whole shopping list on screen under the meals. */}
-      {focus === "list" && (
       <section className="home-section">
         <div className="home-section-head">
-          <h3>Shopping list</h3>
-          {total > 0 && (
-            <button className="link-btn no-print" onClick={doPrint} title="Print this list">
-              <Icon name="print" /> Print
-            </button>
-          )}
-          {total > 0 && (
-            <span className="shopping-progress">
-              {doneCount === 0 ? (
-                `${total} to buy`
-              ) : allDone ? (
-                <span className="all-done"><Icon name="check" /> All {total} in the cart</span>
-              ) : (
-                <>
-                  {doneCount}/{total} in the cart ·{" "}
-                  <button className="link-btn" onClick={onUncheckAll}>Uncheck all</button>
-                </>
-              )}
-            </span>
-          )}
+          <h3>This week's meals</h3>
         </div>
-
-        {total > 0 && (
-          <div className="store-bar">
-            <Icon name="store" />
-            {stores.length > 1 ? (
-              <select className="store-bar-select" value={store?.id ?? ""} onChange={(e) => pickStore(e.target.value)}>
-                {stores.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-            ) : (
-              <span className="store-bar-name">{store?.name ?? "My store"}</span>
-            )}
-            <div style={{ flex: 1 }} />
-            <button className="link-btn" onClick={onManageStores}>Edit store</button>
-          </div>
-        )}
-
-        {aiNote && (
-          <div className="store-ai-note">
-            <Icon name="wand" /> {aiNote}
-          </div>
-        )}
-
-        {storesUnreadable && total > 0 && (
-          <div className="status-banner error">
-            <Icon name="triangle-exclamation" />
-            <span>
-              Couldn't read your store layouts, so this list isn't sorted by aisle.
-              Everything you need is still here.
-            </span>
-          </div>
-        )}
-
-        {total === 0 ? (
-          <div className="empty-state">
-            <Icon name="check" className="empty-icon" />
-            <div>Nothing to buy — this week is fully covered by what you have.</div>
-          </div>
-        ) : (
-          groups.map((g) => (
-            <div key={g.aisleId} className="shopping-group">
-              <div className="ing-group-label">{g.aisleName}</div>
-              {g.items.map((item) => {
-                const isChecked = checked.has(item.canonical);
-                return (
-                  <button
-                    key={item.canonical}
-                    type="button"
-                    className={`shopping-line check-line${isChecked ? " checked" : ""}`}
-                    onClick={() => onToggle(item.canonical)}
-                    aria-pressed={isChecked}
-                  >
-                    <span className="shopping-check" aria-hidden="true">
-                      {isChecked && <Icon name="check" />}
-                    </span>
-                    <div className="shopping-line-main">
-                      <span className="shopping-name">{item.name}</span>
-                      {item.quantity && <span className="shopping-qty">{item.quantity}</span>}
-                      {item.quantityNote && <span className="serves">{item.quantityNote}</span>}
-                    </div>
-                  </button>
-                );
-              })}
+        <div className="browse-list">
+          {(plan.picks ?? []).map((pick) => (
+            <div key={pick.id} className="browse-item" style={{ cursor: "default" }}>
+              <div className="title-block">
+                <div className="title">{pick.title}</div>
+                <div className="meta">
+                  {pick.haveCount}/{pick.totalCount} on hand
+                  {pick.marginalNew.length > 0 && ` · ${pick.marginalNew.length} to buy`}
+                </div>
+              </div>
             </div>
-          ))
-        )}
+          ))}
+        </div>
       </section>
-      )}
     </div>
   );
 }
