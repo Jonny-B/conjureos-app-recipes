@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { CatalogRecipe, FeedRecipe, PantryItem, Recipe, RecipeSource, SavedRecipe } from "../types";
+import type { CatalogRecipe, FeedRecipe, Recipe, RecipeSource, SavedRecipe } from "../types";
 import { getCatalog, categories, toRecipe, loadRecipeBody, withRecipeBody } from "../features/catalog";
 import {
   listSavedRecipesResult,
@@ -17,17 +17,16 @@ import { SnapRecipeScreen } from "./SnapRecipeScreen";
 import { DescribeScreen } from "./DescribeScreen";
 import { CHEF_NAME } from "./StudioScreen";
 import { fetchChefLatest } from "../bridge/recipesApi";
-import { ingredientsFromPantry } from "../features/pantry";
-import { computeCoverage, prettyIngredient } from "../features/scaling";
-import { buildCoverage, buildScored, daySeed, type Scored } from "../features/recommend";
+import { buildScored, daySeed, type Scored } from "../features/recommend";
 import { Icon } from "../icons";
 import { ErrorBanner, useActionError } from "../components/ErrorBanner";
+import { ResumeCook } from "../components/ResumeCook";
+import { loadCookSession, type CookSession } from "../features/cookSession";
 
 interface Props {
   /** Which slice to show: all recipes, just the user's saved ones, or favorites. */
   source: RecipeSource;
   onSourceChange: (s: RecipeSource) => void;
-  pantry: PantryItem[] | null;
   /** Enter the guided cook for a recipe (savedRecipe set when it's in the library). */
   onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
   /** Bumped by App when the catalog reloads from the DB, so the memos re-run. */
@@ -54,8 +53,17 @@ function keyOf(fi: FeedRecipe): string {
   return fi.kind === "catalog" ? `c:${fi.id}` : `s:${fi.recipe.path}`;
 }
 
-export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, catalogVersion = 0 }: Props) {
+export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVersion = 0 }: Props) {
   const [saved, setSaved] = useState<SavedRecipe[]>([]);
+  /**
+   * A cook left running, if there is one.
+   *
+   * The guided cook is an OVERLAY, not a tab, so a persisted session has no
+   * door of its own — without this banner it would survive its 12h TTL and be
+   * unreachable. It used to sit on the Pantry screen because that was home;
+   * this is home now.
+   */
+  const [resumable, setResumable] = useState<CookSession | null>(null);
   const [favs, setFavs] = useState<Set<string>>(new Set());
   const [loaded, setLoaded] = useState(false);
   const [query, setQuery] = useState("");
@@ -90,6 +98,9 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
   useEffect(() => {
     refresh();
   }, [refresh]);
+  useEffect(() => {
+    setResumable(loadCookSession());
+  }, []);
   // Chef Payson's newest promoted recipe (best-effort; absent if none/offline).
   useEffect(() => {
     fetchChefLatest(1)
@@ -130,32 +141,19 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
 
   const visible = ranked.slice(0, page * PAGE_SIZE);
 
-  // Pantry coverage for the rows on screen. Home and Pantry already show these
-  // chips; the browse list didn't, so applying a category filter looked like it
-  // "lost" the have/short/missing counts. Slim catalog rows carry `tokens`,
-  // which is what computeCoverage matches on, so this works pre-body-fetch.
-  const pantryIng = useMemo(() => (pantry ? ingredientsFromPantry(pantry) : []), [pantry]);
-  const covFor = (fi: FeedRecipe) =>
-    pantryIng.length > 0 ? computeCoverage(fi.recipe, pantryIng) ?? undefined : undefined;
-
   /**
-   * "Tonight's pick" — the library's one recommendation, scored against the
-   * pantry (see features/recommend.ts). It came off the old Home screen when
-   * Home did; here it heads the library, which is where a recipe suggestion
-   * belongs in a pantry-first app.
+   * "Tonight's pick" — the library's one recommendation (see
+   * features/recommend.ts). It no longer scores against a pantry; what is left
+   * is favourites, quick recipes and what you have not cooked lately.
    *
    * Deliberately hidden the moment someone is searching or filtering: a
    * suggestion is help when you are browsing and an obstacle when you already
    * know what you are looking for.
    */
   const browsing = source === "all" && !query.trim() && category === "all";
-  const covByKey = useMemo(
-    () => (browsing ? buildCoverage(catalog, saved, pantryIng, pantryIng.length > 0) : new Map()),
-    [browsing, catalog, saved, pantryIng],
-  );
   const scored = useMemo(
-    () => (browsing ? buildScored(catalog, saved, favs, covByKey, daySeed()) : []),
-    [browsing, catalog, saved, favs, covByKey],
+    () => (browsing ? buildScored(catalog, saved, favs, daySeed()) : []),
+    [browsing, catalog, saved, favs],
   );
   // Rotate through the top of the ranking rather than re-sorting: the ordering
   // is already the answer, the shuffle just walks it.
@@ -224,7 +222,7 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
       refresh();
     };
     if (mode === "describe") {
-      return <DescribeScreen pantry={pantry} onBack={back} onCook={onCook} />;
+      return <DescribeScreen onBack={back} onCook={onCook} />;
     }
     return (
       <div className="browse-screen">
@@ -247,7 +245,6 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
         <ErrorBanner error={actionError} onDismiss={clearActionError} />
         <RecipeDetail
           feed={resolvedSelected}
-          pantry={pantry}
           inLibrary={inLibrary}
           onCook={onCook}
           onBack={() => setSelected(null)}
@@ -263,6 +260,14 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
   return (
     <div className="browse-screen">
       <ErrorBanner error={actionError} onDismiss={clearActionError} />
+      {resumable && (
+        <ResumeCook
+          session={resumable}
+          saved={saved}
+          onResume={(r, sv) => onCook(r, sv)}
+          onForget={() => setResumable(null)}
+        />
+      )}
       {/* Ours vs. yours: the primary switch for the whole tab. */}
       <div className="seg" role="tablist" aria-label="Which recipes">
         {SOURCE_TABS.map((t) => (
@@ -388,7 +393,6 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
       {loaded && ranked.length > 0 && (
         <p className="lib-count">
           {ranked.length.toLocaleString()} recipe{ranked.length === 1 ? "" : "s"}
-          {pantryIng.length > 0 && " · every row shows how much of it your pantry covers"}
         </p>
       )}
 
@@ -403,7 +407,6 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
               <RecipeRow
                 key={keyOf(fi)}
                 fi={fi}
-                cov={covFor(fi)}
                 onOpen={() => run(async () => setSelected(await withRecipeBody(fi)))}
               />
             ))}
@@ -438,7 +441,6 @@ function HeroPick({
   canShuffle: boolean;
 }) {
   const r = scored.fi.recipe;
-  const cov = scored.cov;
   return (
     <article className="hero-card">
       {canShuffle && (
@@ -458,19 +460,10 @@ function HeroPick({
         {r.cookTime > 0 && <span className="pill">{r.cookTime} min</span>}
         {r.nutrition && <span className="pill">~{r.nutrition.calories} cal</span>}
       </div>
-      <div className={`hero-why${cov && cov.missing === 0 ? " have" : ""}`}>
-        <Icon name={cov && cov.missing === 0 ? "check" : "circle-info"} />
+      <div className="hero-why">
+        <Icon name="circle-info" />
         {scored.reason}
       </div>
-      {cov && cov.missing > 0 && (cov.missingNames.length > 0 || cov.shortNames.length > 0) && (
-        <div className="cov-strip">
-          {cov.missingNames.slice(0, 4).map((n) => (
-            <span key={n} className="miss-chip">
-              {prettyIngredient(n)}
-            </span>
-          ))}
-        </div>
-      )}
       <div className="hero-actions">
         <button className="btn" onClick={onView}>
           View recipe

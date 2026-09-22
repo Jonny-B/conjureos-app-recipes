@@ -6,45 +6,40 @@
  * other ways of adding a recipe (write it, snap it) — because that is what it
  * is: a third way in, not a destination.
  *
- * "Use what's in my pantry" is the pantry-first version of the same call: the
- * pantry seeds the prompt so the model writes around what you already own.
+ * It used to offer "build it around what's in my pantry", seeding the prompt
+ * from the pantry this app kept. That went with the pantry, to Conjure Pantry,
+ * and the seed parameter went with it rather than being left as an optional
+ * argument nothing fills.
  */
 import { useState } from "react";
-import type { PantryItem, Recipe, SavedRecipe } from "../types";
+import type { Recipe, SavedRecipe } from "../types";
 import { generateFromDescription } from "../features/recipes";
-import { ingredientsFromPantry } from "../features/pantry";
 import { RecipesScreen } from "./RecipesScreen";
 import { Icon } from "../icons";
 
 export function DescribeScreen({
-  pantry,
   onBack,
   onCook,
 }: {
-  pantry: PantryItem[] | null;
   onBack: () => void;
   onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
 }) {
   const [text, setText] = useState("");
-  const [useHave, setUseHave] = useState(false);
   const [state, setState] = useState<
     { kind: "input" } | { kind: "generating" } | { kind: "recipes"; recipes: Recipe[] }
   >({ kind: "input" });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const hasPantry = !!(pantry && pantry.length);
-  const seed = () => (useHave && hasPantry ? ingredientsFromPantry(pantry ?? []) : undefined);
-
   const go = async () => {
     // A state flip is not a guard: two taps inside one frame both get through
-    // and both bill a request. Same defect the pantry scan had.
+    // and both bill a request.
     if (!text.trim() || busy) return;
     setBusy(true);
     setError(null);
     setState({ kind: "generating" });
     try {
-      const recipes = await generateFromDescription(text, seed());
+      const recipes = await generateFromDescription(text);
       setState({ kind: "recipes", recipes });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -69,8 +64,6 @@ export function DescribeScreen({
         <BackBar label="Describe again" onBack={() => setState({ kind: "input" })} />
         <RecipesScreen
           recipes={state.recipes}
-          ingredients={seed() ?? []}
-          onEditIngredients={() => setState({ kind: "input" })}
           onRestart={() => setState({ kind: "input" })}
           onCook={(r) => onCook(r, null)}
         />
@@ -92,16 +85,6 @@ export function DescribeScreen({
         maxLength={400}
         rows={3}
       />
-      <label className={`describe-toggle${hasPantry ? "" : " disabled"}`}>
-        <input
-          type="checkbox"
-          checked={useHave && hasPantry}
-          disabled={!hasPantry}
-          onChange={(e) => setUseHave(e.target.checked)}
-        />
-        Build it around what's in my pantry
-        {!hasPantry && <span className="faint"> — scan or add items first</span>}
-      </label>
       {error && (
         <div className="status-banner error">
           <Icon name="triangle-exclamation" />

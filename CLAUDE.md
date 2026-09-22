@@ -1,125 +1,116 @@
-# Conjure Pantry: instructions for Claude
+# Recipes: instructions for Claude
 
 A ConjureOS anchor app (separate repo from ConjureOS). Pure React + TypeScript, no Vite.
 
-**It is a pantry app that happens to know recipes**, not a recipe app with a
-pantry feature. The promise is *use up what you already have*, and the two
-mechanics that carry it are the camera (a shelf becomes a stocked list) and the
-planner (a week of different dinners that between them finish what's in the
-pantry). Everything else is supporting cast. Read `CONJURE_PANTRY_DESIGN.md`
-before changing what the app IS.
+**It is a recipe library, full stop.** You add recipes to it — by writing them,
+photographing them, or describing a dish — you browse them, and you cook them
+step by step. That is the whole app.
 
-**The store slug is still `recipes`, deliberately.** It is the dedupe key for
-every installed copy, so changing it puts a second app on every device instead
-of updating the one that's there. Same for the repo name, the npm package name
-and the VFS path `/home/Documents/Recipes/` — that last one would orphan every
-saved recipe, plan and pantry file on every device.
+## What used to be here and is not
+
+This app briefly carried a pantry, a week planner, a shopping list,
+grocery-store aisle layouts and shared families, and was going to be renamed
+**Conjure Pantry**. That is reversed. Of 42 designed screens only six were ever
+about recipes, so all of it moved to
+[`conjureos-pantry`](https://github.com/Jonny-B/conjureos-pantry) — its own repo,
+its own store slug (`pantry`), its own VFS path.
+
+**The two apps share NOTHING.** Not a table, not an edge function, not a VFS
+path. Do not add a pantry, a week planner or a shopping list back here. If a
+recipe screen wants to know what the user has in, the answer is to ask Conjure
+Pantry through the action bridge, never to grow a second copy of it.
+
+| Thing | Value | Changeable? |
+|---|---|---|
+| Store slug | `recipes` | **No.** It is the dedupe key for every installed copy. |
+| VFS path | `/home/Documents/Recipes/` | **No.** It holds saved files on every device. |
+| Display name | `Recipes` | It was briefly "Conjure Pantry". Two apps with that name is the worst outcome of the split. |
+| Backend | `recipes-db` (in the ConjureOS repo) | Pantry must never read it, and this app must never read Pantry's. |
+
+## Conjure Pantry discovers this app, and a schema change can break it silently
+
+`listRecipes` and `getRecipe` are a published contract, not just a convenience
+API. Pantry declares the SHAPE it wants (`manifest.needs`) and the ConjureOS
+kernel matches it **structurally** against the `returns` schemas in this app's
+`package.json` — no app names, no allow-list, nothing coordinated between the
+two authors. Today `listRecipes` satisfies Pantry's `recipeSearch` need and
+`getRecipe` satisfies `recipe`.
+
+`schemaSatisfies` **fails closed**. So dropping a field from `listRecipes`'
+`required` array, or narrowing a type, disconnects Pantry with **no error
+anywhere** — it just reports that nothing can suggest meals, and plans nothing.
+Nothing in this repo's tests will fail. Before touching either schema, run
+`conjureos-pantry/scripts/needs.test.ts`, which checks this app's real shapes
+against Pantry's declared needs using the kernel's own matcher.
 
 ## Before publishing: build the REAL store bundle and smoke-test it
 
-`npm run dev` (conj-pack dev) is a fast esbuild dev server with mocked bridges. It is NOT the pipeline the App Store uses, so code can pass in dev and still crash on import. The store build is `@conjureos/pack`'s `bundle()` (esbuild-wasm + jspm importmap), run by ConjureOS `@bundle` in CI.
+`npm run dev` (conj-pack dev) is a fast esbuild dev server with mocked bridges.
+It is NOT the pipeline the App Store uses, so code can pass in dev and still
+crash on import. The store build is `@conjureos/pack`'s `bundle()` (esbuild-wasm
++ jspm importmap), run by ConjureOS `@bundle` in CI.
 
-Hard rule: never publish (dev or prod) without building the store bundle locally and loading it.
+Hard rule: never publish (dev or prod) without building the store bundle locally
+and loading it.
 
 1. `npm run build` produces `dist/recipes.html` via the same `bundle()` CI uses.
-2. Serve `dist/` and open `dist/recipes.html` in a browser. It runs standalone with the same mocked bridges, so confirm it renders with a clean console. A crash here is a real store-build bug.
+2. Open `dist/recipes.html` in a browser. It runs standalone with the same mocked
+   bridges, so confirm it renders with a clean console. A crash here is a real
+   store-build bug.
 
 Treat "`dist/recipes.html` loads clean" as the gate for any publish.
 
-## Known dev-vs-store differences (do not get bitten again)
+### Known dev-vs-store differences (do not get bitten again)
 
-- The store bundler's loader map covers tsx/ts/jsx/js/css + image/font types, but NOT `.json`. Do not `import x from "*.json"`; a JSON import returns `undefined` in the store build (works in dev). Ship bundled data as a `.ts` module (`export const ...`). See `src/data/catalog.ts`, generated by `scripts/build-catalog.ts`.
-- Keep `@conjureos/pack` aligned with the version CI uses (ConjureOS `scripts/package.json` pins it; currently `^0.1.1`). A version skew makes local and CI diverge.
+- The store bundler's loader map covers tsx/ts/jsx/js/css + image/font types, but
+  NOT `.json`. Do not `import x from "*.json"`; a JSON import returns `undefined`
+  in the store build and works fine in dev.
+- The bundler cannot resolve a `.js` extension on a TypeScript import. Relative
+  imports in this repo are extensionless; keep them that way.
+- Keep `@conjureos/pack` aligned with the version CI uses (ConjureOS
+  `scripts/package.json` pins it).
 
 ## Appearance
 
-Recipes is locked to the Spring palette (`spr`); the only appearance choice a
-user makes inside the app is light or dark. `src/theme.ts` holds that one
-axis — this app's own stored flavor choice if there is one, else whatever
-flavor ConjureOS is wearing, live, else nothing (the browser's own
-preference decides) — and `src/components/AppearanceSheet.tsx` is the
-two-button UI behind the cog. Picking Light or Dark there is a one-way door:
-from then on this app's own choice wins and the sheet has no control that
-hands it back (clearing site data is the only way to resume following
-ConjureOS). The palette itself is never a setting: `data-theme` is always
-written as `"spr"`, and `theme.ts` ignores the theme field of every
-appearance message ConjureOS sends — other apps on the same channel (Conjure
-Health, for one) still read it, Conjure Pantry just doesn't.
+Locked to the Spring palette (`spr`); the only appearance choice a user makes is
+light or dark. `src/theme.ts` holds that one axis — this app's own stored flavor
+choice if there is one, else whatever flavor ConjureOS is wearing, live, else
+nothing (the browser's own preference decides) — and
+`src/components/AppearanceSheet.tsx` is the two-button UI behind the cog. Picking
+Light or Dark is a one-way door: from then on this app's own choice wins, and
+clearing site data is the only way to resume following ConjureOS. The palette
+itself is never a setting: `data-theme` is always written as `"spr"`, and
+`theme.ts` ignores the theme field of every appearance message ConjureOS sends.
 
-`npm test` runs `scripts/theme.test.ts` against it: 19 cases, plain tsx, no
-framework — 18 exercise `theme.ts`'s own logic, and one instead reads
-`src/conjureos-ui.css` off disk to guard the re-sync below. It then runs three
-more files in the same shape, and all four must pass:
+(Conjure Pantry locks BOTH axes — Spring and light — so do not copy its
+`theme.ts` here, or this app loses its dark mode.)
 
-| File | Guards |
-|---|---|
-| `scripts/theme.test.ts` | the one appearance lever, and the vendored stylesheet |
-| `scripts/shelfLife.test.ts` | the waste-risk table (see **Waste risk** below) |
-| `scripts/weekScore.test.ts` | the Plan tab's score strip |
-| `scripts/realtimePresence.test.ts` | the Phoenix presence reducer |
-
-There is still no test runner and no framework. Four plain files did not justify
-adding vitest; if a fifth needs a mock or a DOM, that is the moment to revisit.
+`npm test` runs `scripts/theme.test.ts`: 19 plain-tsx cases, no framework. 18
+exercise `theme.ts`; the last reads `src/conjureos-ui.css` off disk to guard the
+re-sync below.
 
 `src/conjureos-ui.css` is a VENDORED copy of `@conjureos/ui` `dist/ui.css` and
-must stay at a 1.x version — 0.x had one dark palette and no light/dark axis,
-so an accidental re-sync from an older build would silently break the one
-appearance lever this app has left (`npm test` catches this: the guard case
-above fails if the `spr` palette block or either `[data-flavor="…"]`
-resolution selector goes missing). Re-sync with:
+must stay at a 1.x version — 0.x had one dark palette and no light/dark axis, so
+an accidental re-sync from an older build would silently break the one appearance
+lever this app has. Re-sync with:
 
 ```
 cp node_modules/@conjureos/ui/dist/ui.css src/conjureos-ui.css
 ```
 
-That also wipes the header comment at the top of the file, which is not part
-of the upstream package — put it back from git history before committing the
-re-sync (the comment itself has the exact command).
-
-## Waste risk (the "use these up" block)
-
-`src/features/shelfLife.ts` decides what is closest to being thrown out. Two
-sources, deliberately never blended:
-
-1. **A real date** — `PantryItem.expiresAt`, either read off the packaging by
-   the vision pass or typed by the user. A fact; it wins outright.
-2. **An estimate** — a keyword→days table applied to `addedAt`. A guess, and
-   the UI always says so ("about 3 days left", never "expires Tuesday").
-
-Two rules keep the table honest, and `scripts/shelfLife.test.ts` pins both:
-
-- **Longest matching keyword wins.** That is what makes "ground beef" 2 days
-  and not "beef" 4, "black pepper" a spice and not "pepper" a vegetable,
-  "coconut milk" a cupboard item and not a fridge one. Adding a SHORT keyword
-  that shadows a long one is how this table rots, and it rots silently.
-- **A keyword must start at a word boundary.** Without it, "boiled eggs"
-  matches `oil` — b-**oil**-ed — and gets a year in the cupboard.
-
-The numbers are ordinary home-storage rules of thumb, and deliberately
-generous: telling someone their rice is about to go off teaches them to ignore
-the block, which costs more than saying nothing.
-
-`merge` keeps the ORIGINAL `addedAt` when re-scanning a shelf. That is not an
-oversight — it is the clock the estimate runs on, and a re-scan must not make
-three-week-old spinach look like it arrived today.
-
-Never hardcode a colour in `src/styles.css`. Spring's own `--cui-on-accent` is
-DARK (`#0d1108`) in the dark flavour and white (`#fff`) in light, so
-`color: #fff` on a filled button is a bug in Spring dark specifically, not a
-shortcut — use the token, and check both flavours, which is now the whole
-axis there is to check.
+That also wipes the header comment at the top of the file, which is not part of
+the upstream package — put it back from git history before committing.
 
 ## Versioning
 
-Bump `version` in BOTH `package.json` and `src/version.ts` together. CI fails the publish if they differ; the in-app footer reads `src/version.ts`.
+Bump `version` in BOTH `package.json` and `src/version.ts` together. CI fails the
+publish if they differ; the in-app footer reads `src/version.ts`.
 
 ## Catalog
 
 The catalog is **USDA MyPlate** — 1,120 recipes, US federal government content,
 public domain. It lives in the `recipes` table (`provenance='usda-myplate'`) and
-is fetched from `recipes-db` at runtime; it is NOT bundled and NOT in
-`src/data/catalog.ts`, which no longer exists (0.30.0 stopped shipping it on
-devices).
+is fetched from `recipes-db` at runtime; it is NOT bundled.
 
 **The scraped AllRecipes corpus is gone** (2026-09-17): 3,170 rows deleted from
 prod, 3,169 from dev. Do not regenerate it. `scripts/build-catalog.ts` and
@@ -139,8 +130,7 @@ rules live at the top of `src/styles.css`; the short version:
 - **Every radius comes from the scale** (`--r-0/1/2/pill/circle`). No component
   picks its own curve. `--r-pill` is RATIONED to status chips and count badges:
   a pill says "this is data", structure goes square.
-- **Every type size comes from the scale** (`--t-micro` … `--t-4xl`). With the
-  ornament gone, hierarchy has nowhere else to come from.
+- **Every type size comes from the scale** (`--t-micro` … `--t-4xl`).
 - **One shadow** (`--shadow-float`), and only genuinely floating layers get it:
   bottom sheets, dropdowns, popovers. Cards and rows get `--hair`.
 - **One gradient** (`--grad-primary`), on one element per screen: the primary
@@ -151,7 +141,12 @@ rules live at the top of `src/styles.css`; the short version:
   derived from `--cui-accent`.
 - The canvas is flat. A tinted background is the one thing that makes a
   10%-opacity hairline disappear.
+- **Never hardcode a colour.** Spring's `--cui-on-accent` is DARK (`#0d1108`) in
+  the dark flavour and white in light, so `color: #fff` on a filled button is a
+  real bug in Spring dark. Use the token and check both flavours.
 
 ## Publishing
 
-Dev: Actions, "Publish to ConjureOS App Store", Run workflow (workflow_dispatch). Prod: publish a GitHub Release. See `README.md` and ConjureOS `ANCHOR_APP_CI_SETUP.md`.
+Dev: Actions, "Publish to ConjureOS App Store", Run workflow (workflow_dispatch).
+Prod: publish a GitHub Release. See `README.md` and ConjureOS
+`ANCHOR_APP_CI_SETUP.md`.

@@ -1,7 +1,7 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.51.0",
-  "description": "A pantry app that happens to know recipes. Scan your shelves and fridge so it knows what you own, plan a week that uses it up without cooking the same thing twice, and shop from a list ordered by your own store's aisles.",
+  "version": "0.52.0",
+  "description": "Recipes for ConjureOS: a library you add to, browse and cook from. Write a recipe, photograph one, or describe a dish and have one written; then cook it step by step.",
   "type": "module",
   "license": "MIT",
   "author": "Jonny-B",
@@ -10,8 +10,8 @@
     "url": "https://github.com/Jonny-B/conjureos-app-recipes.git"
   },
   "conjureos": {
-    "displayName": "Conjure Pantry",
-    "icon": "fa:basket-shopping",
+    "displayName": "Recipes",
+    "icon": "fa:utensils",
     "permissions": [
       "ai.complete",
       "vfs.read",
@@ -470,105 +470,6 @@
           }
         }
       },
-      "getPantry": {
-        "permission": "actions.read",
-        "description": "What the user currently has in their kitchen. Useful before suggesting a recipe or building a shopping list.",
-        "params": {
-          "type": "object",
-          "properties": {}
-        },
-        "returns": {
-          "type": "object",
-          "properties": {
-            "items": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "quantity": {
-                    "type": "string"
-                  },
-                  "notes": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "addToPantry": {
-        "permission": "actions.write",
-        "description": "Add items to the user's pantry. Reversible with removeFromPantry.",
-        "params": {
-          "type": "object",
-          "properties": {
-            "items": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "maxLength": 80
-                  },
-                  "quantity": {
-                    "type": "string",
-                    "maxLength": 40
-                  },
-                  "notes": {
-                    "type": "string",
-                    "maxLength": 120
-                  }
-                },
-                "required": [
-                  "name"
-                ]
-              },
-              "minItems": 1,
-              "maxItems": 50
-            }
-          },
-          "required": [
-            "items"
-          ]
-        },
-        "returns": {
-          "type": "object",
-          "properties": {
-            "count": {
-              "type": "integer"
-            }
-          }
-        }
-      },
-      "removeFromPantry": {
-        "permission": "actions.write",
-        "description": "Remove one item from the user's pantry by name.",
-        "params": {
-          "type": "object",
-          "properties": {
-            "name": {
-              "type": "string",
-              "maxLength": 80
-            }
-          },
-          "required": [
-            "name"
-          ]
-        },
-        "returns": {
-          "type": "object",
-          "properties": {
-            "count": {
-              "type": "integer"
-            }
-          }
-        }
-      },
       "setFavorite": {
         "permission": "actions.write",
         "description": "Mark or unmark one of the user's saved recipes as a favourite. Reversible.",
@@ -652,215 +553,6 @@
           }
         }
       },
-      "listPlans": {
-        "permission": "actions.read",
-        "description": "The user's saved week plans, newest first.",
-        "params": {
-          "type": "object",
-          "properties": {}
-        },
-        "returns": {
-          "type": "object",
-          "properties": {
-            "plans": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "title": {
-                    "type": "string"
-                  },
-                  "shared": {
-                    "type": "boolean"
-                  },
-                  "updatedAt": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "getPlan": {
-        "permission": "actions.read",
-        "description": "One saved week plan in full: its meals and its consolidated shopping list, grouped by grocery aisle.",
-        "params": {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "id"
-          ]
-        },
-        "returns": {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string"
-            },
-            "title": {
-              "type": "string"
-            },
-            "shared": {
-              "type": "boolean"
-            },
-            "picks": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "title": {
-                    "type": "string"
-                  }
-                }
-              }
-            },
-            "shoppingList": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "aisle": {
-                    "type": "string"
-                  },
-                  "quantity": {
-                    "type": "string"
-                  },
-                  "recipes": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            },
-            "checked": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          }
-        }
-      },
-      "planWeek": {
-        "permission": "actions.read",
-        "description": "Build a week of meals around the user's pantry and return it as a PROPOSAL. The week is chosen as a SET: it maximises the distinct pantry items used up across all the meals \u2014 weighted toward what is closest to going off \u2014 while keeping the meals varied in cuisine, protein and method, so it is not the same dinner five times. Does not save anything: the user commits a plan in the app. Honours their blocked list automatically.",
-        "params": {
-          "type": "object",
-          "properties": {
-            "mealCount": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 7,
-              "default": 5
-            },
-            "includeIngredients": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "maxLength": 60
-              },
-              "maxItems": 20
-            },
-            "cuisines": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "maxLength": 40
-              },
-              "maxItems": 10
-            },
-            "avoid": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "maxLength": 60
-              },
-              "maxItems": 20
-            },
-            "dietary": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "maxLength": 40
-              },
-              "maxItems": 10
-            },
-            "effort": {
-              "type": "string",
-              "enum": [
-                "quick",
-                "any"
-              ],
-              "description": "\"quick\" biases the week toward weeknight recipes. Use it when the user says they are busy or short on time, not merely because they asked for simple food."
-            }
-          }
-        },
-        "returns": {
-          "type": "object",
-          "properties": {
-            "picks": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "title": {
-                    "type": "string"
-                  }
-                }
-              }
-            },
-            "shoppingList": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "aisle": {
-                    "type": "string"
-                  },
-                  "quantity": {
-                    "type": "string"
-                  }
-                }
-              }
-            },
-            "shortfall": {
-              "type": "integer"
-            },
-            "warnings": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "saved": {
-              "type": "boolean",
-              "description": "Always false \u2014 this action never persists."
-            }
-          }
-        }
-      },
       "scaleSavedRecipe": {
         "permission": "actions.read",
         "description": "Rescale one of the user's saved recipes to a different serving count and return the result. Does not modify the stored copy.",
@@ -905,106 +597,6 @@
             }
           }
         }
-      },
-      "getFamily": {
-        "permission": "actions.read",
-        "description": "The households the user belongs to, with their role in each. Does not return the member list or the invite code.",
-        "params": {
-          "type": "object",
-          "properties": {}
-        },
-        "returns": {
-          "type": "object",
-          "properties": {
-            "inFamily": {
-              "type": "boolean"
-            },
-            "families": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "role": {
-                    "type": "string",
-                    "enum": [
-                      "owner",
-                      "member"
-                    ]
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "listStores": {
-        "permission": "actions.read",
-        "description": "The user's saved grocery-store layouts, used to order a shopping list by the aisles they actually walk.",
-        "params": {
-          "type": "object",
-          "properties": {}
-        },
-        "returns": {
-          "type": "object",
-          "properties": {
-            "stores": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "aisles": {
-                    "type": "integer"
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "renameFamily": {
-        "permission": "actions.write",
-        "description": "Rename a household the user OWNS. Owner-only (the server rejects a non-owner) and reversible. Does not change who is in the family or what they can see \u2014 use the app for that.",
-        "params": {
-          "type": "object",
-          "properties": {
-            "familyId": {
-              "type": "string",
-              "maxLength": 64,
-              "description": "From getFamily."
-            },
-            "name": {
-              "type": "string",
-              "maxLength": 60
-            }
-          },
-          "required": [
-            "familyId",
-            "name"
-          ]
-        },
-        "returns": {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string"
-            },
-            "name": {
-              "type": "string"
-            }
-          }
-        }
       }
     },
     "remoteActions": {
@@ -1014,9 +606,9 @@
       }
     },
     "promptSuggestions": [
-      "What's in my pantry that I should use up first?",
-      "Plan a week of dinners from what I already have",
-      "What's on my shopping list this week?"
+      "What can I cook with chicken and rice?",
+      "Save this recipe to my library",
+      "What did I cook this week?"
     ]
   },
   "//": "No Vite. `npm run dev` is the esbuild dev server from @conjureos/pack; the published build goes through ConjureOS @bundle in CI (same as a user-published app). Bump `version` here AND in src/version.ts together.",
@@ -1024,7 +616,7 @@
     "dev": "conj-pack dev",
     "build": "npx -y tsx scripts/build-bundle.mjs",
     "typecheck": "tsc -b --noEmit",
-    "test": "npx -y tsx scripts/theme.test.ts && npx -y tsx scripts/shelfLife.test.ts && npx -y tsx scripts/weekScore.test.ts && npx -y tsx scripts/realtimePresence.test.ts"
+    "test": "npx -y tsx scripts/theme.test.ts"
   },
   "dependencies": {
     "react": "^18.3.1",

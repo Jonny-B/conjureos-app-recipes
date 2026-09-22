@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { Ingredient, NutritionStrip, Recipe, SavedRecipe } from "../types";
+import { useEffect, useRef, useState } from "react";
+import type { NutritionStrip, Recipe, SavedRecipe } from "../types";
 import { saveRecipe, updateSavedRecipe } from "../features/storage";
 import {
   computeNutrition,
@@ -7,13 +7,11 @@ import {
   isUsingDemoKey,
   type NutritionResult,
 } from "../features/nutrition";
-import { computeAvailability, scaleRecipe, type AvailabilityResult } from "../features/scaling";
+import { scaleRecipe } from "../features/scaling";
 import { Icon } from "../icons";
 
 interface Props {
   recipes: Recipe[];
-  ingredients: Ingredient[];
-  onEditIngredients: () => void;
   onRestart: () => void;
   /** When set, each card offers "Cook this" → guided cook (with the scaled recipe). */
   onCook?: (recipe: Recipe) => void;
@@ -43,26 +41,18 @@ function toCard(result: NutritionResult): CardNutrition {
   return { kind: "empty" };
 }
 
-export function RecipesScreen({ recipes, ingredients, onEditIngredients, onRestart, onCook }: Props) {
+export function RecipesScreen({ recipes, onRestart, onCook }: Props) {
   const [savedIdx, setSavedIdx] = useState<Set<number>>(new Set());
   const [savingIdx, setSavingIdx] = useState<number | null>(null);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [nutrition, setNutrition] = useState<CardNutrition[]>(
     () => recipes.map(() => ({ kind: "pending" as const })),
   );
-  // Per-card scaling factor. Default 1; the stepper and the "scale to my
-  // ingredients" button drive it.
+  // Per-card scaling factor. Default 1; the servings stepper drives it. There
+  // used to be a "scale to my ingredients" button beside it, fed by the pantry
+  // this app kept — that went to Conjure Pantry with the pantry itself.
   const [scaleFactors, setScaleFactors] = useState<number[]>(() => recipes.map(() => 1));
   const [bannerDismissed, setBannerDismissed] = useState(false);
-
-  // Pre-compute availability per recipe based on what the user has — the
-  // "Scale to my ingredients" button uses it, the warning rendered next to
-  // a recipe's constraining ingredient uses it too. Memoized so the
-  // expensive parse doesn't re-fire on every keystroke.
-  const availability = useMemo<AvailabilityResult[]>(
-    () => recipes.map((r) => computeAvailability(r, ingredients)),
-    [recipes, ingredients],
-  );
 
   // Cards whose macros landed after they were saved and are being written to
   // the already-saved row. Purely for the "adding macros…" line.
@@ -182,12 +172,6 @@ export function RecipesScreen({ recipes, ingredients, onEditIngredients, onResta
     setScaleFactors((prev) => prev.map((f, i) => (i === idx ? factor : f)));
   };
 
-  const scaleToAvailable = (idx: number) => {
-    const a = availability[idx];
-    if (!a) return;
-    setScaleFactors((prev) => prev.map((f, i) => (i === idx ? a.factor : f)));
-  };
-
   const resetScale = (idx: number) => {
     setScaleFactors((prev) => prev.map((f, i) => (i === idx ? 1 : f)));
   };
@@ -198,13 +182,10 @@ export function RecipesScreen({ recipes, ingredients, onEditIngredients, onResta
         <div>
           <h2 style={{ margin: 0 }}>Three options</h2>
           <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-            From {ingredients.length} confirmed ingredient{ingredients.length === 1 ? "" : "s"}. Adjust servings or scale to what you have.
+            Adjust the servings on any of them, then save the one you want.
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="btn secondary" onClick={onEditIngredients}>
-            Edit ingredients
-          </button>
           <button className="btn ghost" onClick={onRestart}>
             Start over
           </button>
@@ -226,21 +207,18 @@ export function RecipesScreen({ recipes, ingredients, onEditIngredients, onResta
         {recipes.map((r, i) => {
           const factor = scaleFactors[i] ?? 1;
           const scaled = scaleRecipe(r, factor);
-          const avail = availability[i]!;
           return (
             <RecipeCard
               key={i}
               original={r}
               scaled={scaled}
               factor={factor}
-              availability={avail}
               nutritionState={nutrition[i] ?? { kind: "empty" }}
               saved={savedIdx.has(i)}
               saving={savingIdx === i}
               backfilling={backfilling.has(i)}
               anySaving={savingIdx !== null}
               onServingsChange={(delta) => adjustServings(i, delta)}
-              onScaleToAvailable={() => scaleToAvailable(i)}
               onResetScale={() => resetScale(i)}
               onSave={() => onSave(i)}
               onCook={onCook ? () => onCook(scaled) : undefined}
@@ -258,7 +236,6 @@ interface RecipeCardProps {
   original: Recipe;
   scaled: Recipe;
   factor: number;
-  availability: AvailabilityResult;
   nutritionState: CardNutrition;
   saved: boolean;
   saving: boolean;
@@ -266,7 +243,6 @@ interface RecipeCardProps {
   backfilling: boolean;
   anySaving: boolean;
   onServingsChange: (delta: number) => void;
-  onScaleToAvailable: () => void;
   onResetScale: () => void;
   onSave: () => void;
   onCook?: () => void;
@@ -276,37 +252,16 @@ function RecipeCard({
   original,
   scaled,
   factor,
-  availability,
   nutritionState,
   saved,
   saving,
   backfilling,
   anySaving,
   onServingsChange,
-  onScaleToAvailable,
   onResetScale,
   onSave,
   onCook,
 }: RecipeCardProps) {
-  // Constraining ingredient and a precomputed shortage map so we can show
-  // a "not enough X" annotation next to the offending recipe line.
-  const lineShortages = useMemo(() => {
-    const m = new Map<string, { ratio: number; constraining: boolean; available: number; needed: number; userIngredient: string }>();
-    for (const match of availability.matches) {
-      if (match.ratio < 0.999) {
-        m.set(match.recipeLine, {
-          ratio: match.ratio,
-          constraining: match.constraining,
-          available: match.available,
-          needed: match.needed,
-          userIngredient: match.userIngredient,
-        });
-      }
-    }
-    return m;
-  }, [availability]);
-
-  const scaleNeeded = availability.factor < 0.999;
   const isScaled = factor !== 1;
 
   return (
@@ -350,47 +305,14 @@ function RecipeCard({
         )}
       </div>
 
-      {/* "Scale to my ingredients" — only when shortage detected */}
-      {scaleNeeded && !isScaled && (
-        <div className="shortage-banner">
-          <div className="shortage-banner-text">
-            <strong>You don't have enough of everything.</strong>
-            <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-              Recipe scales to {(availability.factor * 100).toFixed(0)}% of original to fit what's on hand.
-            </div>
-          </div>
-          <button className="btn secondary" onClick={onScaleToAvailable} style={{ padding: "6px 12px", fontSize: 12 }}>
-            Scale to my ingredients
-          </button>
-        </div>
-      )}
-      {scaleNeeded && isScaled && (
-        <div className="muted" style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-          <Icon name="check" /> Scaled to fit your ingredients ({(factor * 100).toFixed(0)}%).
-        </div>
-      )}
-
       <NutritionLine state={nutritionState} />
 
       <section>
         <h4>Ingredients{factor !== 1 && <span className="faint" style={{ fontWeight: 400, marginLeft: 6 }}>(scaled)</span>}</h4>
         <ul>
-          {scaled.ingredients.map((ing, j) => {
-            const original_line = original.ingredients[j];
-            const shortage = original_line ? lineShortages.get(original_line) : undefined;
-            return (
-              <li key={j}>
-                {ing}
-                {shortage && (
-                  <div className="ing-shortage">
-                    {shortage.constraining ? <Icon name="triangle-exclamation" /> : "· "}{" "}
-                    Need {Math.round(shortage.needed)}g, you have ~{Math.round(shortage.available)}g{" "}
-                    <span className="faint">({shortage.userIngredient})</span>
-                  </div>
-                )}
-              </li>
-            );
-          })}
+          {scaled.ingredients.map((ing, j) => (
+            <li key={j}>{ing}</li>
+          ))}
         </ul>
       </section>
 

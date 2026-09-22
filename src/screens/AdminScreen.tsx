@@ -78,7 +78,7 @@ export function AdminScreen({ myEmail }: { myEmail: string | null }) {
       <div className="home-greeting">
         <h2 style={{ margin: 0 }}>Admin</h2>
         <div className="muted" style={{ marginTop: 4 }}>
-          {total} {total === 1 ? "person has" : "people have"} used Conjure Pantry. Search and set roles.
+          {total} {total === 1 ? "person has" : "people have"} used Recipes. Search and set roles.
         </div>
       </div>
 

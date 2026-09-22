@@ -1,31 +1,27 @@
 /**
  * The recommendation engine: which recipe to put in front of someone, and why.
  *
- * This lived inside HomeScreen until the Pantry-first IA landed and the Home
- * tab went away. It is genuinely useful logic (pantry coverage dominates the
- * score, favourites nudge it, quick recipes nudge it, a daily seed keeps the
- * ties from freezing) and it has more than one caller now, so it lives here
- * rather than inside whichever screen happens to render it today.
+ * PANTRY COVERAGE USED TO DOMINATE THIS SCORE, and it is gone. When this app
+ * kept a pantry, "you have everything for this" was the strongest signal there
+ * was and everything else was a nudge. The pantry is Conjure Pantry's now, so
+ * what is left is what a recipe library actually knows about you: what you
+ * marked a favourite, what is quick, and what you have not cooked lately.
  *
- * Nothing in this module touches React or the DOM. Coverage is deliberately
- * computed SEPARATELY from scoring: the two have different inputs, and folding
- * them together meant one tapped heart re-ran computeCoverage across the whole
- * ~1,200-recipe catalog.
+ * THE LAST ONE MATTERS MORE THAN IT LOOKS. Without coverage, the raw score is
+ * nearly flat, and a flat score means the suggestion never changes. So the
+ * daily seed is not decoration: it is the thing that stops "tonight's pick"
+ * being the same recipe every night forever.
+ *
+ * Nothing here touches React or the DOM.
  */
 import type { CatalogRecipe, FeedRecipe, SavedRecipe } from "../types";
-import type { CoverageResult } from "./scaling";
-import { computeCoverage } from "./scaling";
-import type { ingredientsFromPantry } from "./pantry";
 
 export interface Scored {
   fi: FeedRecipe;
-  cov: CoverageResult | null;
   score: number;
   /** A plain-language sentence for why this is being suggested. */
   reason: string;
 }
-
-type PantryIngredients = ReturnType<typeof ingredientsFromPantry>;
 
 /** Stable identity for a feed row, across catalog and saved recipes. */
 export function keyOf(fi: FeedRecipe): string {
@@ -44,46 +40,41 @@ export function feedItems(
   return items;
 }
 
-/** Coverage per row key. Depends on the catalog and the pantry — never on favourites. */
-export function buildCoverage(
-  catalog: CatalogRecipe[],
-  saved: SavedRecipe[],
-  pantryIng: PantryIngredients,
-  hasPantry: boolean,
-): Map<string, CoverageResult | null> {
-  const out = new Map<string, CoverageResult | null>();
-  if (!hasPantry) return out;
-  // `favs` is irrelevant to coverage, so an empty set is fine for keying here.
-  for (const fi of feedItems(catalog, saved, new Set())) {
-    out.set(keyOf(fi), computeCoverage(fi.recipe, pantryIng));
-  }
-  return out;
+/** How long ago a saved recipe was last cooked, in days, or null. */
+function daysSinceCooked(fi: FeedRecipe): number | null {
+  if (fi.kind !== "saved") return null;
+  const at = fi.recipe.lastMadeAt;
+  if (!at) return null;
+  const t = Date.parse(at);
+  if (!Number.isFinite(t)) return null;
+  return Math.floor((Date.now() - t) / 86_400_000);
 }
 
 export function buildScored(
   catalog: CatalogRecipe[],
   saved: SavedRecipe[],
   favs: Set<string>,
-  covByKey: Map<string, CoverageResult | null>,
   seed: number,
 ): Scored[] {
   const items = feedItems(catalog, saved, favs);
 
   const scored = items.map<Scored>((fi) => {
     const recipe = fi.recipe;
-    const cov = covByKey.get(keyOf(fi)) ?? null;
     let score = 0;
-    if (cov) score += cov.score; // -1..1, dominant signal when a pantry exists
     if (fi.favorite) score += 0.4;
     if (recipe.cookTime > 0 && recipe.cookTime <= 30) score += 0.1;
-    if (cov && cov.total > 0 && cov.missing === 0) score += 0.3;
-    return { fi, cov, score, reason: reasonFor(fi, cov) };
+    // Something you liked enough to cook, long enough ago to fancy again. A
+    // recipe cooked in the last fortnight is pushed DOWN rather than up: the
+    // one thing a library knows for certain is what you just ate.
+    const since = daysSinceCooked(fi);
+    if (since !== null) score += since < 14 ? -0.5 : 0.25;
+    return { fi, score, reason: reasonFor(fi) };
   });
   // Tiebreak on a per-recipe seeded hash, NOT the title. A title tiebreak makes
-  // equal-scored recipes sort alphabetically, so when scores are flat (no
-  // pantry) the whole top of the list is "A" recipes and the hero rotation
-  // loops through them. The hash scatters equal-scored items across the
-  // catalog, and folding in the daily seed reshuffles them once a day.
+  // equal-scored recipes sort alphabetically, and with coverage gone the scores
+  // ARE mostly flat — so without this the whole top of the list would be "A"
+  // recipes and the hero would loop through them. The hash scatters equal-scored
+  // items across the catalog, and the daily seed reshuffles them once a day.
   return scored.sort((a, b) => b.score - a.score || shuffleKey(a.fi, seed) - shuffleKey(b.fi, seed));
 }
 
@@ -98,14 +89,17 @@ export function shuffleKey(fi: FeedRecipe, seed: number): number {
   return h >>> 0;
 }
 
-export function reasonFor(fi: FeedRecipe, cov: CoverageResult | null): string {
-  if (cov && cov.total > 0 && cov.missing === 0) return "You have everything for this.";
-  if (cov && cov.have > 0) {
-    const need = cov.missing === 1 ? "1 thing" : `${cov.missing} things`;
-    return `You have ${cov.have} of ${cov.total} ingredients. Just ${need} to grab.`;
+export function reasonFor(fi: FeedRecipe): string {
+  const since = daysSinceCooked(fi);
+  if (since !== null && since >= 14) {
+    const months = Math.floor(since / 30);
+    return months >= 1
+      ? `You made this ${months === 1 ? "a month" : `${months} months`} ago. Worth another go.`
+      : "You made this a couple of weeks back. Worth another go.";
   }
   if (fi.favorite) return "One of your favorites, worth revisiting.";
-  if (fi.recipe.cookTime > 0 && fi.recipe.cookTime <= 20) return `Quick: on the table in ${fi.recipe.cookTime} minutes.`;
+  if (fi.recipe.cookTime > 0 && fi.recipe.cookTime <= 20)
+    return `Quick: on the table in ${fi.recipe.cookTime} minutes.`;
   if (fi.kind === "catalog") return `A ${fi.recipe.category.toLowerCase()} idea worth a try.`;
   return "Worth a try tonight.";
 }

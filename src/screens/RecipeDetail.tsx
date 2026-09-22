@@ -1,8 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { FeedRecipe, PantryItem, Recipe, SavedRecipe } from "../types";
-import { ingredientsFromPantry } from "../features/pantry";
-import { computeAvailability, computeCoverage } from "../features/scaling";
-import { parseIngredient, formatStrip } from "../features/nutrition";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { FeedRecipe, Recipe, SavedRecipe } from "../types";
+import { formatStrip } from "../features/nutrition";
 import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
 import { safeHref, hrefHost } from "../features/safeUrl";
 import { CHEF_NAME } from "./StudioScreen";
@@ -31,7 +29,6 @@ function renderBlog(text: string): ReactNode[] {
 
 interface Props {
   feed: FeedRecipe;
-  pantry: PantryItem[] | null;
   /** True when this catalog recipe is already in the user's saved library. */
   inLibrary?: boolean;
   /** Enter the guided cook for this recipe (savedRecipe set when it's in the library). */
@@ -51,7 +48,6 @@ interface Props {
  */
 export function RecipeDetail({
   feed,
-  pantry,
   inLibrary,
   onCook,
   onBack,
@@ -86,25 +82,6 @@ export function RecipeDetail({
       document.removeEventListener("keydown", onKey);
     };
   }, [menuOpen]);
-  const pantryIng = useMemo(() => (pantry ? ingredientsFromPantry(pantry) : []), [pantry]);
-  const hasPantry = pantryIng.length > 0;
-
-  const avail = useMemo(
-    () => (hasPantry ? computeAvailability(recipe, pantryIng) : null),
-    [recipe, pantryIng, hasPantry],
-  );
-  const cov = useMemo(
-    () => (hasPantry ? computeCoverage(recipe, pantryIng) : null),
-    [recipe, pantryIng, hasPantry],
-  );
-
-  const matchByLine = useMemo(() => {
-    const m = new Map<string, { needed: number; available: number }>();
-    if (avail) for (const x of avail.matches) m.set(x.recipeLine, { needed: x.needed, available: x.available });
-    return m;
-  }, [avail]);
-  const missingSet = useMemo(() => new Set(cov?.missingNames ?? []), [cov]);
-  const shortSet = useMemo(() => new Set(cov?.shortNames ?? []), [cov]);
 
   const isCatalog = feed.kind === "catalog";
 
@@ -207,46 +184,14 @@ export function RecipeDetail({
           </section>
         )}
 
-        {/* total === 0 means the ingredient list hasn't loaded (or is empty),
-            NOT that the pantry covers it — claiming "you have everything" off a
-            0-of-0 coverage is how an unloaded recipe read as fully stocked. */}
-        {cov && cov.total > 0 && (
-          <div className={`cov-banner${cov.missing === 0 ? " complete" : ""}`}>
-            <Icon name={cov.missing === 0 ? "check" : "basket-shopping"} />
-            {cov.missing === 0
-              ? "You have everything for this."
-              : `You have ${cov.have} of ${cov.total} ingredients` +
-                (cov.short ? ` (${cov.short} running low)` : "") +
-                `. ${cov.missing} to buy.`}
-          </div>
-        )}
 
         <div ref={recipeRef} />
         <section>
           <h4>Ingredients</h4>
           <ul>
-            {recipe.ingredients.map((ing, i) => {
-              const name = parseIngredient(ing)?.name;
-              const missing = hasPantry && !!name && missingSet.has(name);
-              const short = hasPantry && !!name && shortSet.has(name);
-              const m = matchByLine.get(ing);
-              return (
-                <li key={i}>
-                  {ing}
-                  {missing && (
-                    <span className="ing-missing">
-                      <Icon name="basket-shopping" /> not in pantry
-                    </span>
-                  )}
-                  {short && m && (
-                    <span className="ing-shortage">
-                      <Icon name="triangle-exclamation" /> running low: need ~{Math.round(m.needed)}g, have ~
-                      {Math.round(m.available)}g
-                    </span>
-                  )}
-                </li>
-              );
-            })}
+            {recipe.ingredients.map((ing, i) => (
+              <li key={i}>{ing}</li>
+            ))}
           </ul>
         </section>
 

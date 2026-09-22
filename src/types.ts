@@ -5,13 +5,6 @@
  * after they land in saved markdown frontmatter is not.
  */
 
-/**
- * Where something is kept. Drives the Pantry screen's grouping and, with the
- * shelf-life table, how fast it is assumed to go off — a chicken breast in the
- * freezer is not a chicken breast in the fridge.
- */
-export type PantryLocation = "pantry" | "fridge" | "freezer";
-
 export interface Ingredient {
   /** Lowercase canonical name, e.g. "eggs", "red onion". */
   name: string;
@@ -29,12 +22,6 @@ export interface Ingredient {
   quantity?: string;
   /** Optional free-form note ("looks past date", "fresh, opened"). */
   notes?: string;
-  /**
-   * Which storage area this was seen in, when the vision pass could tell
-   * (a fridge shelf looks nothing like a cupboard). Absent = unknown, and the
-   * shelf-life table's own guess is used instead.
-   */
-  location?: PantryLocation;
   /**
    * A best-before / use-by date READ OFF THE PACKAGING, as `YYYY-MM-DD`.
    * Present only when the model could actually read one — never inferred.
@@ -153,116 +140,6 @@ export interface CatalogRecipe extends Recipe {
 }
 
 /**
- * One persistent pantry/fridge item the user keeps on hand. Stored as JSON at
- * /home/Documents/Recipes/.pantry.json (see features/pantry.ts). Feeds the
- * match-ranking + Plan My Week features via ingredientsFromPantry().
- */
-export interface PantryItem {
-  /** Sanitized lowercase name, e.g. "sour cream". */
-  name: string;
-  /** Optional free-form amount on hand ("1 pint", "200g", "half a carton"). */
-  quantity?: string;
-  /** Optional free-form note ("opened", "use soon"). */
-  notes?: string;
-  /** ISO timestamp first added. Also the clock the shelf-life estimate runs on. */
-  addedAt: string;
-  /**
-   * Where it is kept. Absent = let features/shelfLife.ts guess from the name.
-   * Set by the scan when it could tell, or by the user moving a row.
-   */
-  location?: PantryLocation;
-  /**
-   * A known use-by date, `YYYY-MM-DD`. Either read off the packaging by the
-   * scan or typed by the user. When present it REPLACES the shelf-life
-   * estimate rather than adjusting it — a printed date is a fact and the
-   * table is a guess, and mixing the two would make both less trustworthy.
-   */
-  expiresAt?: string;
-}
-
-/**
- * Plan My Week: the structured constraints derived from the user's "mood"
- * (picked ingredients, a seed recipe, or free text interpreted by the AI).
- */
-export interface MoodConstraints {
-  /** Ingredients the week should lean on (soft preference). */
-  includeIngredients: string[];
-  /** Cuisines/categories to favor (e.g. "italian", "dinner"). */
-  cuisines: string[];
-  /** Dietary rules, e.g. "vegetarian", "gluten-free". */
-  dietary: string[];
-  /** Ingredients to exclude entirely. */
-  avoid: string[];
-  /** How many meals to plan (1-7). */
-  mealCount: number;
-  /**
-   * How much time they have. "quick" biases the planner toward weeknight
-   * recipes; absent or "any" leaves it alone.
-   *
-   * This is what makes "busy week" in the nudge box mean something. It is a
-   * TAG-based signal rather than a cookTime one on purpose: the USDA corpus
-   * carries no times at all, so a minutes-based effort term could never fire.
-   */
-  effort?: "quick" | "any";
-}
-
-/** One recipe chosen for the week, with its overlap/coverage breakdown. */
-export interface PlannedRecipe {
-  id: string;
-  title: string;
-  recipe: Recipe;
-  /**
-   * The recipe's catalog category, kept so the week score can count distinct
-   * cuisines without re-looking-up every pick in a catalog the device no
-   * longer holds. Optional because plans saved before the week-score strip
-   * existed don't have it — the strip says "variety unknown" rather than
-   * claiming a number it can't compute.
-   */
-  category?: string;
-  /** Derived flags ("quick", "vegetarian", …), same reason as `category`. */
-  tags?: string[];
-  /** Canonical ingredient names already covered by the pantry. */
-  pantryCovered: string[];
-  /** Canonical names this pick first added to the shared shopping set. */
-  marginalNew: string[];
-  haveCount: number;
-  totalCount: number;
-}
-
-/** One consolidated, deduped shopping-list line covering 1+ recipes. */
-export interface ShoppingListItem {
-  /** Human-friendly display name. */
-  name: string;
-  /** Normalized key the merge grouped on. */
-  canonical: string;
-  /** Original amount when only one recipe needs it. */
-  quantity?: string;
-  /** "enough for N recipes" when many recipes share it. */
-  quantityNote?: string;
-  /** Which chosen recipes need this item. */
-  recipes: { id: string; title: string }[];
-  /** Coarse grocery aisle for grouping. */
-  aisle: string;
-}
-
-/** A saved week plan: the chosen recipes + the consolidated shopping list. */
-export interface WeekPlan {
-  picks: PlannedRecipe[];
-  shoppingList: ShoppingListItem[];
-  constraints: MoodConstraints;
-  /** mealCount minus picks found (0 when fully satisfied). */
-  shortfall: number;
-  warnings: string[];
-  createdAt: string;
-  /**
-   * Canonical keys (`ShoppingListItem.canonical`) the user has checked off
-   * while shopping. Persisted with the plan so the checklist survives closing
-   * the app. Absent/empty = nothing checked yet.
-   */
-  checked?: string[];
-}
-
-/**
  * A recipe as shown in the browse/favorites feed: either a bundled catalog
  * recipe or one the user saved. `favorite` is resolved at render time (catalog
  * favorites from the index, saved favorites from frontmatter).
@@ -274,9 +151,3 @@ export type FeedRecipe =
 /** Which slice the Recipes tab shows. Favorites is a filter here, not a tab. */
 export type RecipeSource = "all" | "mine" | "favorites";
 
-export type Screen =
-  | { kind: "capture" }
-  | { kind: "identifying"; photos: CapturedPhoto[] }
-  | { kind: "ingredients"; photos: CapturedPhoto[]; ingredients: Ingredient[] }
-  | { kind: "generating"; photos: CapturedPhoto[]; ingredients: Ingredient[] }
-  | { kind: "recipes"; photos: CapturedPhoto[]; ingredients: Ingredient[]; recipes: Recipe[] };
