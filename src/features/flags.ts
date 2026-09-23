@@ -9,27 +9,27 @@
 /**
  * Recipe photography in the UI.
  *
- * OFF by owner decision (2026-09-04), taken over the scraped AllRecipes
- * corpus: 0 of its 3,190 rows carried an image_url, a photo-led grid over it
- * would have been 3,190 grey rectangles, and every photo would have added to
- * its unresolved provenance question (issue #48).
+ * ON since 0.56.0, for the USDA-credited photos only (owner decision,
+ * 2026-09-23: "just use the USDA images").
  *
- * Where that stands now (2026-09-23): the corpus is USDA MyPlate (1,120
- * rows) and still 0 rows carry an image_url. The Internet Archive's captures
- * of the retired myplate.gov recipe pages DO carry a photo per recipe, so
- * importing them is possible — but it is an owner decision, not a flag flip,
- * because the photos' terms are looser than the text's: USDA asks that its
- * photos be used "only for promotion, informational and educational purposes
- * of a non-profit nature", and recipes credited to partner programmes may
- * carry partner photos that are not federal works at all.
+ * History: it was OFF by owner decision (2026-09-04) over the scraped
+ * AllRecipes corpus, where 0 of 3,190 rows carried an image_url and every
+ * photo would have added to its provenance question (issue #48). The corpus
+ * is USDA MyPlate now, and the Internet Archive's captures of the retired
+ * myplate.gov pages carry a photo per recipe — but most recipes credit a
+ * partner (a state university, a nonprofit, a company), and a partner may
+ * still own its photo. So only recipes whose page credits a FEDERAL source
+ * get one: `scripts/usda-photo-census.py` decides which and writes
+ * `scripts/usda-photos.json`, and `scripts/import-usda-photos.mjs` uploads
+ * exactly those and sets their image_url. Everything else keeps its plate.
+ * Do not import a partner-credited photo without that partner's permission.
  *
- * Since 0.54.0 the UI no longer needs photos to look finished: every recipe
- * surface has a picture slot (components/RecipePlate.tsx) that shows a
- * category plate — hue + glyph — when there is no photo. Flipping this to
- * `true` puts photos in that same slot (the feed tile, Tonight's pick, and
- * the picture behind an open recipe) wherever a row has an image_url, keeps
- * the plate where it doesn't, and restores the recipe-photo picker in the
- * editor. The layout around the slot does not change.
+ * What it switches: every recipe surface has one picture slot
+ * (components/RecipePlate.tsx) — the feed tile, Tonight's pick, and the
+ * picture behind an open recipe. With this on, a row with an image_url shows
+ * its photo there; a row without one (or a photo that fails to load) shows
+ * the category plate. It also turns on the recipe-photo picker in the editor,
+ * so people can photograph their own recipes. The layout does not change.
  *
  * What this flag does NOT do:
  *   - It does not remove backend support. `recipes.image_url`, the
@@ -41,4 +41,4 @@
  *     `.ing-screen .thumb` and the ImagePicker's own preview belong to that
  *     flow and are unaffected.
  */
-export const RECIPE_PHOTOS_ENABLED = false;
+export const RECIPE_PHOTOS_ENABLED = true;

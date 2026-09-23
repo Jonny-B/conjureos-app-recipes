@@ -129,6 +129,42 @@ that came with it. Reasoning in ConjureOS `DECISIONS.md` (2026-09-17).
 No licensing review is needed before a prod publish any more. That gate existed
 solely for the scraped corpus.
 
+**Photos: USDA-credited recipes only** (owner decision, 2026-09-23). Each
+MyPlate page credits a source, and most credit a partner (a state university,
+a state SNAP-Ed programme, a nonprofit, a company) who may still own the photo.
+Only recipes crediting a federal source (USDA, HHS and its NIH/NCI/NHLBI/CDC/
+FDA) get their photo. `scripts/usda-photo-census.py` decides and writes
+`scripts/usda-photos.json`; `scripts/import-usda-photos.mjs` uploads exactly
+that list to the `recipe-images` bucket and sets `image_url` (needs the
+project's service-role key, run once per project). Never widen that list to
+partner-credited photos without the partner's permission.
+
+## Moderation, bans, terms and AI photos (0.56.0)
+
+Backend half lives in ConjureOS `recipes-db` + migration `153_recipes_moderation`.
+
+- **Admins** (role `admin`; the bootstrap emails in recipes-db are admins
+  automatically) get Admin → Users (search, paged; set role; ban / unban; delete
+  a user's recipes and/or images) and Admin → Recipes (every user-added recipe,
+  private included; delete, remove photo, generate an AI photo). Every admin
+  action is re-checked server-side.
+- **A ban is Recipes-only.** It never touches the ConjureOS account. While
+  banned, recipes-db refuses everything but `myRole`, and the app shows a
+  notice instead of itself. Admins can't be banned (demote first).
+- **Terms** (`src/features/terms.ts`): users keep ownership and grant ConjureOS
+  LLC a broad licence (owner decision; the text is an unreviewed DRAFT). The app
+  asks before the first save/upload/AI photo; recipes-db refuses `add`,
+  `update`, `chefUpsert` and `uploadImage` until accepted. Bump `TERMS_VERSION`
+  when the text changes and everyone is asked again.
+- **AI photos** (`src/features/aiPhoto.ts`): ConjureOS `ai.image.generate`
+  (desktop only; billed to the requesting user's credits, an admin's own for
+  admin actions). "AI-generated" is **burned into the pixels** in the app before
+  upload — not a CSS overlay — and uploaded with `ai: true`, which keys it
+  `ai-<uuid>` so the server derives `recipes.image_ai`. The open recipe also
+  shows an "AI image" pill, because the photo fade can cover the stamp there.
+  Terms are checked BEFORE generating, so nobody pays for an image they can't
+  save.
+
 ## Visual language
 
 Squared-off angles, hairline borders, and nothing else carrying structure. The
@@ -161,10 +197,9 @@ hairlines alone read as a 2001 directory listing:
   `src/features/recipeLook.ts`). Each is a `--cui-*` ROLE, never a value. A hue
   marks what kind of dish something is (plate, category word, rail chip, macro
   key) and is never decoration on anything else.
-- **Every recipe surface has a picture slot**, `components/RecipePlate.tsx`: a
-  flat hue-and-glyph plate today, the photo in the same box if
-  `RECIPE_PHOTOS_ENABLED` is ever flipped (see `src/features/flags.ts` for why
-  it isn't, yet). Don't add a second, photo-only layout.
+- **Every recipe surface has a picture slot**, `components/RecipePlate.tsx`: the
+  recipe's photo when it has one, otherwise a flat hue-and-glyph plate in the
+  same box. Don't add a second, photo-only layout.
 - **The open recipe is laid out to the owner's mockup** (2026-09-23, the
   "Pumpkin Cookies" image): the recipe's picture behind the whole card, serif
   title, the app's own pills, the one-line nutrition strip, ingredients down the

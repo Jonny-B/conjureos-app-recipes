@@ -199,6 +199,7 @@ function EditablePreview({
         <ImagePicker
           value={image}
           onChange={onImageChange}
+          aiSource={() => ({ recipe })}
           label={chefMode ? "Blog header image" : "Recipe photo"}
           hint={
             chefMode

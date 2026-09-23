@@ -1,6 +1,8 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { Recipe } from "../types";
 import { preparePhoto } from "../features/capture";
 import { uploadRecipeImage } from "../bridge/recipesApi";
+import { aiPhotoCost, generateRecipePhoto, isAiPhotoAvailable } from "../features/aiPhoto";
 import { Icon } from "../icons";
 
 /**
@@ -14,15 +16,56 @@ export function ImagePicker({
   onChange,
   label,
   hint,
+  aiSource,
 }: {
   value: string | undefined;
   onChange: (url: string | undefined) => void;
   label: string;
   hint?: string;
+  /**
+   * When set, offers "Generate with AI": the recipe to picture, read at click
+   * time so it reflects the latest edits. The result is stamped
+   * "AI-generated" and billed to the user's credits (features/aiPhoto.ts).
+   */
+  aiSource?: () => { recipe: Pick<Recipe, "title" | "ingredients">; category?: string | null };
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const canAi = !!aiSource && isAiPhotoAvailable();
+  const [cost, setCost] = useState<number | null>(null);
+  useEffect(() => {
+    if (canAi) void aiPhotoCost().then(setCost);
+  }, [canAi]);
+
+  const generate = async () => {
+    if (!aiSource) return;
+    const { recipe, category } = aiSource();
+    if (!recipe.title.trim()) {
+      setError("Give the recipe a title first, so the image has something to show.");
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    setGenerating(true);
+    try {
+      const { url } = await generateRecipePhoto(recipe, category);
+      onChange(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+      setGenerating(false);
+    }
+  };
+
+  const aiButton = canAi && (
+    <button className="btn secondary" onClick={() => void generate()} disabled={busy} type="button">
+      <Icon name="wand" /> {generating ? "Generating… (up to a minute)" : value ? "Regenerate with AI" : "Generate with AI"}
+      {!generating && cost !== null && <span className="ai-cost"> · {cost} credits</span>}
+    </button>
+  );
 
   const pick = () => inputRef.current?.click();
 
@@ -67,19 +110,23 @@ export function ImagePicker({
             <button className="btn secondary" onClick={pick} disabled={busy} type="button">
               <Icon name="camera" /> Change
             </button>
+            {aiButton}
             <button className="btn ghost" onClick={() => onChange(undefined)} disabled={busy} type="button">
               <Icon name="trash-can" /> Remove
             </button>
           </div>
         </div>
       ) : (
-        <button className="image-picker-drop" onClick={pick} disabled={busy} type="button">
-          {busy ? (
-            <><div className="spinner" /> <span>Uploading…</span></>
-          ) : (
-            <><Icon name="camera" /> <span>Add a photo</span></>
-          )}
-        </button>
+        <>
+          <button className="image-picker-drop" onClick={pick} disabled={busy} type="button">
+            {busy ? (
+              <><div className="spinner" /> <span>{generating ? "Generating an image…" : "Uploading…"}</span></>
+            ) : (
+              <><Icon name="camera" /> <span>Add a photo</span></>
+            )}
+          </button>
+          {aiButton && <div className="image-picker-ai">{aiButton}<span className="muted">Marked “AI-generated” on the image.</span></div>}
+        </>
       )}
 
       {error && (

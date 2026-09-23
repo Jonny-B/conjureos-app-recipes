@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CatalogRecipe, FeedRecipe, Recipe, RecipeSource, SavedRecipe } from "../types";
-import { getCatalog, categories, toRecipe, loadRecipeBody, withRecipeBody } from "../features/catalog";
+import { getCatalog, categories, toRecipe, loadRecipeBody, withRecipeBody, patchCatalogRecipe } from "../features/catalog";
 import {
   listSavedRecipesResult,
   saveRecipe,
@@ -33,6 +33,8 @@ interface Props {
   onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
   /** Bumped by App when the catalog reloads from the DB, so the memos re-run. */
   catalogVersion?: number;
+  /** Admin: may give any recipe an AI photo or remove its photo. */
+  isAdmin?: boolean;
 }
 
 const SOURCE_TABS: { id: RecipeSource; label: string }[] = [
@@ -55,7 +57,7 @@ function keyOf(fi: FeedRecipe): string {
   return fi.kind === "catalog" ? `c:${fi.id}` : `s:${fi.recipe.path}`;
 }
 
-export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVersion = 0 }: Props) {
+export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVersion = 0, isAdmin = false }: Props) {
   const [saved, setSaved] = useState<SavedRecipe[]>([]);
   /**
    * A cook left running, if there is one.
@@ -248,6 +250,15 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
           onSaveToLibrary={() => onSaveToLibrary(resolvedSelected)}
           onMade={() => onMade(resolvedSelected)}
           onDelete={() => onDelete(resolvedSelected)}
+          isAdmin={isAdmin}
+          onImageChanged={(patch) => {
+            if (resolvedSelected.kind === "catalog") {
+              patchCatalogRecipe(resolvedSelected.id, patch);
+              setSelected({ ...resolvedSelected, recipe: { ...resolvedSelected.recipe, ...patch } });
+            } else {
+              setSaved((prev) => prev.map((r) => (r.path === resolvedSelected.recipe.path ? { ...r, ...patch } : r)));
+            }
+          }}
         />
       </>
     );

@@ -2,6 +2,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { FeedRecipe, Recipe, SavedRecipe } from "../types";
 import { formatStrip } from "../features/nutrition";
 import { safeHref, hrefHost } from "../features/safeUrl";
+import { generateRecipePhoto, isAiPhotoAvailable } from "../features/aiPhoto";
+import { adminRemoveRecipeImage, adminSetRecipeImage, recipeIdFromPath, setOwnRecipeImage } from "../bridge/recipesApi";
+import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
 import { categoryOf } from "../features/recipeLook";
 import { RecipePlate } from "../components/RecipePlate";
 import { CHEF_NAME } from "./StudioScreen";
@@ -39,6 +42,10 @@ interface Props {
   onSaveToLibrary?: () => void; // catalog only
   onMade?: () => void; // saved only
   onDelete?: () => void; // saved only
+  /** Admins can give ANY recipe (catalog included) an AI photo, or take a photo off. */
+  isAdmin?: boolean;
+  /** The recipe's photo changed on the server; patch it into the screen's state. */
+  onImageChanged?: (patch: { imageUrl?: string; imageAi?: boolean }) => void;
 }
 
 /**
@@ -56,6 +63,8 @@ export function RecipeDetail({
   onSaveToLibrary,
   onMade,
   onDelete,
+  isAdmin = false,
+  onImageChanged,
 }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -87,6 +96,48 @@ export function RecipeDetail({
   const isCatalog = feed.kind === "catalog";
   const category = categoryOf(feed);
 
+  // ── photo actions ─────────────────────────────────────────────────────
+  // Your own recipe goes through the ordinary update (ownership is the
+  // check); anyone else's — or a catalog row — only through the admin
+  // actions, which recipes-db re-checks.
+  const [photoBusy, setPhotoBusy] = useState<null | "generating" | "removing">(null);
+  const [photoErr, setPhotoErr] = useState<string | null>(null);
+  const ownRecipe = feed.kind === "saved";
+  const canGenerate = RECIPE_PHOTOS_ENABLED && isAiPhotoAvailable() && (ownRecipe || isAdmin);
+  const canRemovePhoto = RECIPE_PHOTOS_ENABLED && !!recipe.imageUrl && (ownRecipe || isAdmin);
+  const recipeDbId = feed.kind === "catalog" ? feed.id : recipeIdFromPath(feed.recipe.path);
+
+  const generatePhoto = async () => {
+    setMenuOpen(false);
+    setPhotoErr(null);
+    setPhotoBusy("generating");
+    try {
+      const { url } = await generateRecipePhoto(recipe, category);
+      if (feed.kind === "saved") await setOwnRecipeImage(recipeDbId, recipe, url);
+      else await adminSetRecipeImage(recipeDbId, url);
+      onImageChanged?.({ imageUrl: url, imageAi: true });
+    } catch (e) {
+      setPhotoErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPhotoBusy(null);
+    }
+  };
+
+  const removePhoto = async () => {
+    setMenuOpen(false);
+    setPhotoErr(null);
+    setPhotoBusy("removing");
+    try {
+      if (feed.kind === "saved") await setOwnRecipeImage(recipeDbId, recipe, null);
+      else await adminRemoveRecipeImage(recipeDbId);
+      onImageChanged?.({ imageUrl: undefined, imageAi: false });
+    } catch (e) {
+      setPhotoErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPhotoBusy(null);
+    }
+  };
+
   const cook = () => onCook(recipe, feed.kind === "saved" ? feed.recipe : null);
 
   return (
@@ -110,6 +161,16 @@ export function RecipeDetail({
           </button>
           {menuOpen && (
             <div className="overflow-menu" role="menu">
+              {canGenerate && (
+                <button className="overflow-item" onClick={() => void generatePhoto()} disabled={!!photoBusy}>
+                  <Icon name="wand" /> {recipe.imageUrl ? "New AI photo" : "Generate AI photo"}
+                </button>
+              )}
+              {canRemovePhoto && (
+                <button className="overflow-item danger" onClick={() => void removePhoto()} disabled={!!photoBusy}>
+                  <Icon name="xmark" /> Remove photo
+                </button>
+              )}
               {isCatalog ? (
                 <button
                   className="overflow-item"
@@ -135,6 +196,23 @@ export function RecipeDetail({
           )}
         </div>
       </div>
+
+      {photoBusy && (
+        <div className="status-banner">
+          <div className="spinner" style={{ width: 14, height: 14 }} />
+          <span>
+            {photoBusy === "generating"
+              ? "Generating a photo — this can take up to a minute. It will be marked “AI-generated”."
+              : "Removing the photo…"}
+          </span>
+        </div>
+      )}
+      {photoErr && (
+        <div className="status-banner error">
+          <Icon name="triangle-exclamation" />
+          <span>{photoErr}</span>
+        </div>
+      )}
 
       {confirmDelete && (
         <div className="confirm-row">
@@ -173,6 +251,14 @@ export function RecipeDetail({
             </span>
             {feed.kind === "saved" && feed.recipe.madeCount > 0 && (
               <span className="pill">made {feed.recipe.madeCount}×</span>
+            )}
+            {/* The stamp on an AI image sits in its bottom-right corner, which
+                the fade over the picture can cover on this layout — so the
+                page says it too. */}
+            {RECIPE_PHOTOS_ENABLED && recipe.imageUrl && recipe.imageAi && (
+              <span className="pill ai" title="This image was generated by AI">
+                AI image
+              </span>
             )}
           </div>
           {recipe.nutrition && <div className="recipe-cover-nutrition">{formatStrip(recipe.nutrition)}</div>}

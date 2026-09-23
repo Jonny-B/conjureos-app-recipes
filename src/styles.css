@@ -2766,3 +2766,75 @@ button.step-row { display: flex; }
     align-items: end;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   Moderation, terms and AI photos (0.56.0)
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* "AI image": data, so a pill; the support hue marks it apart from the
+   category / difficulty pills beside it. 14% wash, like the other pills. */
+.pill.ai {
+  background: color-mix(in srgb, var(--cui-support) 14%, transparent);
+  color: var(--cui-support-text);
+}
+
+/* Image picker: the AI button and its note. */
+.image-picker-ai { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: var(--t-sm); }
+.ai-cost { font-weight: var(--cui-weight-regular); opacity: 0.8; }
+
+/* Admin: a wider column now that rows carry actions. */
+.admin-screen { max-width: 820px; }
+.admin-role { display: flex; align-items: center; gap: 6px; }
+.admin-banned { margin: 0; }
+.admin-manage { flex-basis: 100%; margin-top: 10px; padding-top: 10px; border-top: var(--hair); }
+.admin-manage .admin-confirm { margin-top: 0; padding-top: 0; border-top: none; }
+.admin-manage-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-checks { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; font-size: var(--t-md); }
+.admin-checks label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.admin-reason {
+  flex-basis: 100%;
+  padding: 9px 12px;
+  background: var(--bg-0);
+  border: var(--hair);
+  border-radius: var(--r-1);
+  color: var(--fg);
+}
+.admin-reason:focus { outline: none; border-color: var(--cui-accent); }
+
+.mod-row { align-items: flex-start; }
+.mod-row .admin-id { flex: 1 1 200px; }
+.mod-thumb {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--r-1);
+  background: var(--bg-2);
+  color: var(--fg-faint);
+}
+.mod-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mod-thumb .fa-icon { width: 20px; height: 20px; }
+.mod-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.mod-pills .pill { margin-right: 0; }
+.mod-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.mod-actions .btn { padding: 6px 10px; font-size: var(--t-md); }
+
+/* Terms sheet: a readable column that scrolls inside the sheet. */
+.terms-sheet { max-width: 620px; display: flex; flex-direction: column; gap: 10px; padding: 12px 18px 16px; }
+.terms-title { margin: 4px 0 0; font-family: var(--font-display); font-size: var(--t-2xl); }
+.terms-lede { margin: 0; color: var(--fg-dim); font-size: var(--t-md); }
+.terms-body {
+  max-height: 52vh;
+  overflow-y: auto;
+  padding-right: 6px;
+  font-size: var(--t-md);
+  line-height: 1.6;
+  color: var(--fg);
+}
+.terms-body p { margin: 0 0 10px; }
+.terms-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.terms-actions .muted { margin-right: auto; font-size: var(--t-sm); }
+
+.banned-notice h2 { margin: 0 0 8px; font-family: var(--font-display); color: var(--fg); }

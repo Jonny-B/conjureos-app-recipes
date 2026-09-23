@@ -80,6 +80,8 @@ export interface Recipe {
    * and returns this URL. Absent/empty means no image.
    */
   imageUrl?: string;
+  /** True when imageUrl is an AI-generated image (server-set; stamped on the pixels). */
+  imageAi?: boolean;
   /** True when this is a promoted "Chef Payson" recipe (server-set). */
   chefFeatured?: boolean;
 }

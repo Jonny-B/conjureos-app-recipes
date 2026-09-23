@@ -10,8 +10,9 @@ import { Icon } from "../icons";
  *
  * With a photo (and RECIPE_PHOTOS_ENABLED) it is the photo. Without one it is
  * a PLATE: a flat field of the category's hue with the category's glyph —
- * never a grey placeholder, because the catalog has no photos today and a
- * grid of 1,120 empty frames is worse than no frames at all (see flags.ts).
+ * never a grey placeholder, because most of the catalog will never have a
+ * photo (only USDA-credited recipes get one, see flags.ts) and a grid of
+ * empty frames is worse than no frames at all.
  * The slot is the same box either way, so turning photos on changes what
  * fills it and nothing about the layout around it.
  *

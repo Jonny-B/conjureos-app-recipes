@@ -117,6 +117,16 @@ export async function withRecipeBody<T extends { recipe: { id?: string; ingredie
   return { ...fi, recipe: await loadRecipeBody(fi.recipe) };
 }
 
+/**
+ * Patch one catalog row in memory — an admin just gave it a new photo (or
+ * took one away) and the feed and open page should show that without a full
+ * reload. The server already holds the change.
+ */
+export function patchCatalogRecipe(id: string, patch: Partial<CatalogRecipe>): void {
+  const row = catalog.find((r) => r.id === id);
+  if (row) Object.assign(row, patch);
+}
+
 export function getCatalogRecipe(id: string): CatalogRecipe | undefined {
   return catalog.find((r) => r.id === id);
 }

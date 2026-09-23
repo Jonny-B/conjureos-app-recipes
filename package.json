@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.55.0",
+  "version": "0.56.0",
   "description": "Recipes for ConjureOS: a library you add to, browse and cook from. Write a recipe, photograph one, or describe a dish and have one written; then cook it step by step.",
   "type": "module",
   "license": "MIT",
@@ -14,6 +14,7 @@
     "icon": "fa:utensils",
     "permissions": [
       "ai.complete",
+      "ai.image",
       "vfs.read",
       "vfs.write"
     ],

@@ -12,6 +12,8 @@ import { useRole } from "./hooks/useRole";
 import { Icon } from "./icons";
 import type { IconName } from "./icons";
 import { AppearanceSheet } from "./components/AppearanceSheet";
+import { TermsSheet } from "./components/TermsSheet";
+import { registerTermsOpener } from "./features/terms";
 import { APP_VERSION } from "./version";
 
 /**
@@ -55,7 +57,7 @@ export function App() {
   // Role comes from recipes-db (derived from the minted identity token) — the
   // server is authoritative; these tabs are just the reveal (Studio for
   // chef/admin, Admin for admin). Every write re-checks the role server-side.
-  const { role, email: myEmail, loading: roleLoading, err: roleErr } = useRole();
+  const { role, email: myEmail, loading: roleLoading, err: roleErr, banned } = useRole();
   const tabs: { id: Tab; label: string; icon: IconName }[] = [];
   // Only worth drawing a bar when there is more than one thing in it.
   if (role === "chef" || role === "admin") {
@@ -72,6 +74,15 @@ export function App() {
   // Appearance lives behind the cog rather than on a tab: it is set once and
   // then almost never.
   const [appearanceOpen, setAppearanceOpen] = useState(false);
+  /**
+   * The Recipes terms sheet. `resolve` is set when a save is waiting on the
+   * answer (features/terms.ts's gate); unset when it was opened to read.
+   */
+  const [terms, setTerms] = useState<null | { resolve?: (ok: boolean) => void }>(null);
+  useEffect(() => {
+    registerTermsOpener(() => new Promise<boolean>((resolve) => setTerms({ resolve })));
+    return () => registerTermsOpener(null);
+  }, []);
 
   useEffect(() => {
     registerActions().catch((err) => {
@@ -106,14 +117,27 @@ export function App() {
         </button>
       </header>
       <main className="app-body">
+        {banned && (
+          // Server-side every action already refuses; this says so instead of
+          // letting each screen fail on its own.
+          <div className="empty-state banned-notice">
+            <Icon name="circle-info" className="empty-icon" />
+            <h2>Your access to Recipes has been removed</h2>
+            <div>
+              An administrator removed your access to Recipes. Your ConjureOS account and your other apps are not
+              affected.
+            </div>
+          </div>
+        )}
         {/* Hidden, not unmounted, while the guided cook is open — see startCook. */}
-        <div hidden={cooking}>
+        <div hidden={cooking || banned}>
           {tab === "recipes" && (
             <RecipesBrowseScreen
               source={recipeSource}
               onSourceChange={setRecipeSource}
               onCook={startCook}
               catalogVersion={catalogVersion}
+              isAdmin={role === "admin"}
             />
           )}
           {tab === "studio" && <StudioScreen />}
@@ -192,6 +216,15 @@ export function App() {
             >
               <Icon name="palette" /> Appearance
             </button>
+            <button
+              className="sheet-item"
+              onClick={() => {
+                setCogOpen(false);
+                setTerms({});
+              }}
+            >
+              <Icon name="circle-info" /> Recipe terms
+            </button>
             <button className="sheet-item sheet-cancel" onClick={() => setCogOpen(false)}>
               Close
             </button>
@@ -199,6 +232,15 @@ export function App() {
         </div>
       )}
       {appearanceOpen && <AppearanceSheet onClose={() => setAppearanceOpen(false)} />}
+      {terms && (
+        <TermsSheet
+          asking={!!terms.resolve}
+          onClose={(ok) => {
+            terms.resolve?.(ok);
+            setTerms(null);
+          }}
+        />
+      )}
     </div>
   );
 }

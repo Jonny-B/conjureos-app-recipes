@@ -15,6 +15,7 @@
  * (the old VFS markdown path is gone); use recipeIdFromPath() to recover the id.
  */
 import type { CatalogRecipe, Difficulty, NutritionStrip, Recipe, SavedRecipe } from "../types";
+import { ensureTermsAccepted } from "../features/terms";
 
 /** Dev project recipes-db, used when the host has not injected a URL (conj-pack dev). */
 const DEV_RECIPES_URL = "https://mqpvjlsywrptefgwuztn.supabase.co/functions/v1/recipes-db";
@@ -68,6 +69,8 @@ interface DbRecipe {
   summary: string | null;
   blog: string | null;
   imageUrl: string | null;
+  /** True when the photo is AI-generated (server-derived, migration 153). */
+  imageAi?: boolean;
   chefFeatured: boolean;
   favorite: boolean;
   tags: string[];
@@ -108,6 +111,7 @@ export function toCatalogRecipe(r: DbRecipe): CatalogRecipe {
     nutrition: toStrip(r.nutrition, r.ingredients.length),
     blog: r.blog ?? undefined,
     imageUrl: r.imageUrl ?? undefined,
+    imageAi: !!r.imageAi,
     chefFeatured: r.chefFeatured,
     tags: r.tags,
     sourceUrl: r.sourceUrl ?? "",
@@ -127,6 +131,7 @@ export function toSavedRecipe(r: DbRecipe): SavedRecipe {
     nutrition: toStrip(r.nutrition, r.ingredients.length),
     blog: r.blog ?? undefined,
     imageUrl: r.imageUrl ?? undefined,
+    imageAi: !!r.imageAi,
     chefFeatured: r.chefFeatured,
     path: `db:${r.id}`,
     slug: r.id,
@@ -271,16 +276,43 @@ export async function listMine(): Promise<SavedRecipe[]> {
   return (r.recipes ?? []).map(toSavedRecipe);
 }
 
+/** Writes that add content need the Recipes terms accepted — ask first. */
+async function beforeContentWrite(): Promise<void> {
+  if (isBackendAvailable()) await ensureTermsAccepted();
+}
+
 export async function addRecipe(
   recipe: Recipe & { category?: string; tags?: string[]; tokens?: string[]; sourceUrl?: string; visibility?: string },
 ): Promise<SavedRecipe> {
+  await beforeContentWrite();
   const r = await invoke("add", { recipe: toPayload(recipe) });
   if (!r.recipe) throw new Error("add failed");
   return toSavedRecipe(r.recipe);
 }
 
 export async function updateRecipe(id: string, recipe: Recipe): Promise<SavedRecipe> {
+  await beforeContentWrite();
   const r = await invoke("update", { id, recipe: toPayload(recipe) });
+  if (!r.recipe) throw new Error("update failed");
+  return toSavedRecipe(r.recipe);
+}
+
+/**
+ * Change ONLY the photo on one of your own recipes. `update` merges only the
+ * fields a payload mentions, so this sends the three the server always needs
+ * plus `imageUrl` — never `toPayload`'s defaults, whose `visibility:
+ * "private"` would quietly unpublish a public recipe. Null clears the photo.
+ */
+export async function setOwnRecipeImage(
+  id: string,
+  recipe: Pick<Recipe, "title" | "ingredients" | "instructions">,
+  imageUrl: string | null,
+): Promise<SavedRecipe> {
+  await beforeContentWrite();
+  const r = await invoke("update", {
+    id,
+    recipe: { title: recipe.title, ingredients: recipe.ingredients, instructions: recipe.instructions, imageUrl },
+  });
   if (!r.recipe) throw new Error("update failed");
   return toSavedRecipe(r.recipe);
 }
@@ -329,6 +361,7 @@ export async function publishChefRecipe(
   recipe: Recipe & { category?: string; tags?: string[]; sourceUrl?: string; blog?: string },
   id?: string,
 ): Promise<SavedRecipe> {
+  await beforeContentWrite();
   const r = await invoke("chefUpsert", { ...(id ? { id } : {}), recipe: toPayload(recipe) });
   if (!r.recipe) throw new Error("publish failed");
   return toSavedRecipe(r.recipe);
@@ -361,9 +394,19 @@ export async function fetchChefLatest(limit = 12): Promise<CatalogRecipe[]> {
  * Under `npm run dev` (no backend) we echo a local data URL so the picker +
  * preview stay iterable without a live upload.
  */
-export async function uploadRecipeImage(mediaType: string, base64: string): Promise<string> {
+export async function uploadRecipeImage(
+  mediaType: string,
+  base64: string,
+  opts: { ai?: boolean } = {},
+): Promise<string> {
   if (!isBackendAvailable()) return `data:${mediaType};base64,${base64}`;
-  const r = await invokeRaw<{ url?: string }>("uploadImage", { image: { mediaType, data: base64 } });
+  await beforeContentWrite();
+  // `ai` files it under an `ai-` key, which is how the server marks a recipe's
+  // photo as AI-generated. The pixels already carry the stamp (aiPhoto.ts).
+  const r = await invokeRaw<{ url?: string }>("uploadImage", {
+    image: { mediaType, data: base64 },
+    ...(opts.ai ? { ai: true } : {}),
+  });
   if (!r.url) throw new Error("image upload failed");
   return r.url;
 }
@@ -379,6 +422,9 @@ export interface AppUser {
   role: AppRole;
   createdAt: string;
   lastSeenAt: string;
+  /** Set while banned from Recipes (Recipes only — not their ConjureOS account). */
+  bannedAt?: string | null;
+  banReason?: string | null;
 }
 
 /** Generic remote-action call for endpoints that don't return recipe shapes. */
@@ -394,15 +440,47 @@ async function invokeRaw<T>(action: string, params: Record<string, unknown> = {}
  * minted identity token in recipes-db, never trusted from the client.
  * Dev mock poses as admin so both gated surfaces are iterable under `npm run dev`.
  */
-export async function getMyRole(): Promise<{ role: AppRole; email: string | null; err: string | null }> {
-  if (!isBackendAvailable()) return { role: "admin", email: "dev@local", err: null };
+export interface MyRole {
+  role: AppRole;
+  email: string | null;
+  err: string | null;
+  /** Banned from Recipes by an admin. */
+  banned: boolean;
+  /** The Recipes terms version this user accepted, or null. */
+  termsVersion: string | null;
+}
+
+export async function getMyRole(): Promise<MyRole> {
+  if (!isBackendAvailable()) return { role: "admin", email: "dev@local", err: null, banned: false, termsVersion: null };
   try {
-    const r = await invokeRaw<{ role?: AppRole; email?: string | null }>("myRole");
-    return { role: r.role ?? "user", email: r.email ?? null, err: null };
+    const r = await invokeRaw<{ role?: AppRole; email?: string | null; banned?: boolean; termsVersion?: string | null }>(
+      "myRole",
+    );
+    return {
+      role: r.role ?? "user",
+      email: r.email ?? null,
+      err: null,
+      banned: !!r.banned,
+      termsVersion: r.termsVersion ?? null,
+    };
   } catch (e) {
     // Surface the reason (REQUIRES_AUTH / blocked consent / HTTP 4xx) so the
     // footer can show why the identity call didn't land, on-device.
-    return { role: "user", email: null, err: e instanceof Error ? e.message : String(e) };
+    return { role: "user", email: null, err: e instanceof Error ? e.message : String(e), banned: false, termsVersion: null };
+  }
+}
+
+/** Record acceptance of the Recipes terms (features/terms.ts). */
+export async function acceptTerms(version: string): Promise<void> {
+  if (!isBackendAvailable()) return;
+  try {
+    await invokeRaw("acceptTerms", { version });
+  } catch (e) {
+    // A recipes-db from before migration 153 doesn't know this action and
+    // doesn't gate writes either, so there is nothing to record yet. Letting
+    // it through means the app can ship ahead of the backend without every
+    // save stalling on a terms prompt that can't be answered.
+    if (!/unknown_action/.test(e instanceof Error ? e.message : String(e))) throw e;
   }
 }
 
@@ -430,3 +508,76 @@ const MOCK_USERS: AppUser[] = [
   { userId: "u-2", email: "uncle@dev.local", displayName: "Uncle (Chef)", role: "chef", createdAt: "2026-06-01T00:00:00Z", lastSeenAt: "2026-07-19T09:00:00Z" },
   { userId: "u-3", email: "tester@dev.local", displayName: "Tester", role: "user", createdAt: "2026-06-10T00:00:00Z", lastSeenAt: "2026-07-18T20:00:00Z" },
 ];
+
+// ── moderation (admin only; every call re-checked server-side) ───────────
+
+export interface ModRecipe {
+  id: string;
+  title: string;
+  category: string | null;
+  /** For an admin generating an AI photo from the list (the prompt names them). */
+  ingredients: string[];
+  creatorId: string;
+  creatorEmail: string | null;
+  visibility: string;
+  imageUrl: string | null;
+  imageAi: boolean;
+  chefFeatured: boolean;
+  createdAt: string;
+}
+
+/**
+ * Ban a user from Recipes (never their ConjureOS account), optionally deleting
+ * their recipes and/or their images in the same step.
+ */
+export async function adminBanUser(
+  userId: string,
+  opts: { reason?: string; deleteRecipes?: boolean; deleteImages?: boolean } = {},
+): Promise<{ user: AppUser; recipesDeleted: number; imagesRemoved: number }> {
+  const r = await invokeRaw<{ user?: AppUser; recipesDeleted?: number; imagesRemoved?: number }>("adminBanUser", {
+    userId,
+    ...opts,
+  });
+  if (!r.user) throw new Error("ban failed");
+  return { user: r.user, recipesDeleted: r.recipesDeleted ?? 0, imagesRemoved: r.imagesRemoved ?? 0 };
+}
+
+export async function adminUnbanUser(userId: string): Promise<AppUser> {
+  const r = await invokeRaw<{ user?: AppUser }>("adminUnbanUser", { userId });
+  if (!r.user) throw new Error("unban failed");
+  return r.user;
+}
+
+/** Delete a user's recipes and/or images without banning them. */
+export async function adminPurgeUserContent(
+  userId: string,
+  what: { recipes?: boolean; images?: boolean },
+): Promise<{ recipesDeleted: number; imagesRemoved: number }> {
+  const r = await invokeRaw<{ recipesDeleted?: number; imagesRemoved?: number }>("adminPurgeUserContent", {
+    userId,
+    ...what,
+  });
+  return { recipesDeleted: r.recipesDeleted ?? 0, imagesRemoved: r.imagesRemoved ?? 0 };
+}
+
+/** Every user-added recipe (not the catalog), newest first; or one user's. */
+export async function adminListRecipes(
+  opts: { query?: string; userId?: string; onlyAi?: boolean; limit?: number; offset?: number } = {},
+): Promise<{ recipes: ModRecipe[]; total: number }> {
+  if (!isBackendAvailable()) return { recipes: [], total: 0 };
+  const r = await invokeRaw<{ recipes?: ModRecipe[]; total?: number }>("adminListRecipes", opts);
+  return { recipes: r.recipes ?? [], total: r.total ?? 0 };
+}
+
+export async function adminDeleteRecipe(id: string): Promise<void> {
+  await invokeRaw("adminDeleteRecipe", { id });
+}
+
+export async function adminRemoveRecipeImage(id: string): Promise<void> {
+  await invokeRaw("adminRemoveRecipeImage", { id });
+}
+
+/** Put an image the admin just uploaded on ANY recipe, catalog rows included. */
+export async function adminSetRecipeImage(id: string, url: string): Promise<void> {
+  await invokeRaw("adminSetRecipeImage", { id, url });
+}
