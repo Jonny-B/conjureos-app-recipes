@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.52.0",
+  "version": "0.53.0",
   "description": "Recipes for ConjureOS: a library you add to, browse and cook from. Write a recipe, photograph one, or describe a dish and have one written; then cook it step by step.",
   "type": "module",
   "license": "MIT",
@@ -383,7 +383,7 @@
       },
       "searchRecipes": {
         "permission": "actions.read",
-        "description": "Search the built-in recipe catalog (~1,200 recipes) by free text and/or category. Use this to FIND a recipe the user does not already have; listRecipes only sees their own saved library.",
+        "description": "Search the built-in recipe catalog (~1,200 recipes) by free text and/or category. Use this to FIND a recipe the user does not already have; listRecipes only sees their own saved library. Each result carries its ingredients as canonical names without quantities (\"chicken breasts\", \"sour cream\"), which is what a caller matching recipes against what is in a kitchen wants.",
         "params": {
           "type": "object",
           "properties": {
@@ -419,6 +419,13 @@
                   "title": {
                     "type": "string"
                   },
+                  "ingredients": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Canonical ingredient names, lowercase, no quantities or preparation."
+                  },
                   "category": {
                     "type": "string"
                   },
@@ -437,10 +444,18 @@
                       "type": "string"
                     }
                   }
-                }
+                },
+                "required": [
+                  "id",
+                  "title",
+                  "ingredients"
+                ]
               }
             }
-          }
+          },
+          "required": [
+            "recipes"
+          ]
         }
       },
       "listCategories": {

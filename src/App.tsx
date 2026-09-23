@@ -95,7 +95,7 @@ export function App() {
   const cooking = !!cookTarget;
 
   return (
-    <div className="app">
+    <div className={`app${tabs.length > 1 ? " app--rail" : ""}`}>
       <header className="topbar">
         <span className="brand-mark">
           <Icon name="utensils" />

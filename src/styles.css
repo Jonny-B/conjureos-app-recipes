@@ -875,6 +875,11 @@ select {
   color: var(--cui-error);
 }
 
+.pill.cat {
+  background: color-mix(in srgb, var(--cui-accent) 16%, transparent);
+  color: var(--accent-soft);
+}
+
 .recipe-card .summary {
   color: var(--fg-dim);
   font-size: var(--t-md);
@@ -1166,6 +1171,14 @@ select {
   margin-top: 4px;
 }
 
+.browse-item .title .fav-mark {
+  width: 12px;
+  height: 12px;
+  color: var(--grape);
+  margin-left: 8px;
+  vertical-align: -1px;
+}
+
 .browse-item .made-pill {
   font-size: var(--t-sm);
   font-weight: var(--cui-weight-bold);
@@ -1313,17 +1326,47 @@ select {
  * widening it flips to this one, which is the behaviour you'd want. */
 @media (min-width: 860px) and (pointer: fine) {
   .app {
-    /* The rail spans all three rows; the content column carries its own
-       header, body and footer. */
     max-width: 1600px;
     display: grid;
-    grid-template-columns: 232px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "top"
+      "body"
+      "ver";
+  }
+
+  /* The rail column exists only when there IS a rail. Only a chef or an
+     admin has more than one tab, so for everyone else App renders no tab
+     bar at all — and a 232px column reserved for it anyway was the empty
+     strip down the left of every desktop window (#917). The rail spans all
+     three rows; the content column carries its own header, body and
+     footer. */
+  .app.app--rail {
+    grid-template-columns: 232px minmax(0, 1fr);
     grid-template-areas:
       "rail top"
       "rail body"
       "rail ver";
   }
+
+  /* A bottom sheet is a thumb gesture. With a mouse it opened pinned to the
+     bottom edge, a whole window away from the cog that opened it, and a
+     short window cut it off (#920). Here it is a centred dialog instead. */
+  .sheet-overlay {
+    align-items: center;
+    padding: 24px;
+  }
+  .settings-sheet {
+    max-width: 420px;
+    max-height: 100%;
+    overflow-y: auto;
+    border-bottom: var(--hair);
+    border-radius: var(--r-2);
+    padding: 12px 10px;
+  }
+  .settings-sheet .sheet-handle { display: none; }
+
 
   .topbar { grid-area: top; }
   .app-body { grid-area: body; padding: 32px 40px 40px; }
@@ -1611,6 +1654,14 @@ select {
 
 .lib-header { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
 .lib-header .browse-filter { flex: 1; }
+
+/* The library feed under the search bar gets a count line, so "1,120 recipes"
+   is a fact you can see rather than a claim in the marketing copy. */
+.lib-count {
+  font-size: var(--t-sm);
+  color: var(--fg-faint);
+  margin: -4px 0 2px;
+}
 .lib-icon {
   position: relative;
   flex: 0 0 auto;
@@ -1843,6 +1894,55 @@ select {
 .card-fav .fa-icon { width: 18px; height: 18px; }
 
 .detail-cook-bottom { align-self: flex-start; margin-top: 4px; }
+
+/* ── Recipe detail: the action row, the back caret, the source link ─────
+ * These went out with the pantry's "Recipe detail: coverage banner…"
+ * section in 0.52.0, which also held them, and four screens still use them.
+ * Without `.detail-actions` the row fell back to a block: Back, Cook this
+ * and ••• stacked in a column, and `.overflow-wrap` stretched to the full
+ * width, so its menu (anchored `right: 0`) opened a screen away from its
+ * button (#919). Without `.back-caret` the chevron-down glyph was never
+ * turned to point left. */
+
+/* Step / detail footer: a compact Back on the left and the primary action
+   filling the rest — one row, never wraps. Single-button footers (just Back)
+   keep Back compact at the left. */
+.detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+.detail-actions > .btn.ghost {
+  flex: 0 0 auto;
+}
+.detail-actions > .btn:not(.ghost) {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+/* On a phone the primary action fills the row beside Back, a thumb-sized
+   target. At 1120px the same rule made "Cook this" half a screen wide, so
+   with a mouse it keeps its own width and the row's spacer pushes it right.
+   (After the rule above, not in the Desktop block, so it wins on order.) */
+@media (min-width: 860px) and (pointer: fine) {
+  .detail-actions > .btn:not(.ghost) { flex: 0 0 auto; }
+}
+
+.back-caret {
+  transform: rotate(90deg);
+  width: 12px;
+  height: 12px;
+}
+
+.source-link {
+  color: var(--accent-soft);
+  text-decoration: none;
+}
+
+.source-link:hover {
+  text-decoration: underline;
+}
 
 /* ── Chef Payson ─────────────────────────────────────────────────────── */
 

@@ -29,17 +29,24 @@ Pantry through the action bridge, never to grow a second copy of it.
 
 ## Conjure Pantry discovers this app, and a schema change can break it silently
 
-`listRecipes` and `getRecipe` are a published contract, not just a convenience
-API. Pantry declares the SHAPE it wants (`manifest.needs`) and the ConjureOS
-kernel matches it **structurally** against the `returns` schemas in this app's
-`package.json` — no app names, no allow-list, nothing coordinated between the
-two authors. Today `listRecipes` satisfies Pantry's `recipeSearch` need and
-`getRecipe` satisfies `recipe`.
+`listRecipes`, `searchRecipes` and `getRecipe` are a published contract, not
+just a convenience API. Pantry declares the SHAPE it wants (`manifest.needs`)
+and the ConjureOS kernel matches it **structurally** against the `returns`
+schemas in this app's `package.json` — no app names, no allow-list, nothing
+coordinated between the two authors. Today `listRecipes` (the saved library)
+and `searchRecipes` (the catalog) both satisfy Pantry's `recipeSearch` need,
+and `getRecipe` satisfies `recipe`.
 
-`schemaSatisfies` **fails closed**. So dropping a field from `listRecipes`'
-`required` array, or narrowing a type, disconnects Pantry with **no error
-anywhere** — it just reports that nothing can suggest meals, and plans nothing.
-Nothing in this repo's tests will fail. Before touching either schema, run
+`searchRecipes` only matches because its results carry `ingredients` (the
+catalog's canonical tokens) and declare them `required`. Without that, Pantry
+could plan only from the handful of recipes a user has saved; with an empty
+library it planned nothing at all (ConjureOS #915).
+
+`schemaSatisfies` **fails closed**. So dropping a field from either list
+action's `required` array, or narrowing a type, disconnects Pantry with **no
+error anywhere** — it just reports that nothing can suggest meals, and plans
+nothing. Nothing in this repo's tests will fail. Before touching any of the
+three schemas, run
 `conjureos-pantry/scripts/needs.test.ts`, which checks this app's real shapes
 against Pantry's declared needs using the kernel's own matcher.
 

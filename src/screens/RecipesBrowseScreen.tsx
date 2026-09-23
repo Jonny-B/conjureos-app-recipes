@@ -287,6 +287,42 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
         ))}
       </div>
 
+      {/* Tonight's pick and the chef's newest come BEFORE the search row (#918):
+          they are what the tab opens on, and search is how you leave them.
+          Both vanish while a query is typed, so the row moves up then. */}
+      {browsing && hero && (
+        <HeroPick
+          scored={hero}
+          onView={() => run(async () => setSelected(await withRecipeBody(hero.fi)))}
+          onShuffle={() => setShuffle((n) => n + 1)}
+          canShuffle={heroPool.length > 1}
+        />
+      )}
+
+      {browsing && chefPick && (
+        <button
+          className="chef-promo"
+          onClick={() =>
+            run(async () =>
+              setSelected(
+                await withRecipeBody({
+                  kind: "catalog" as const,
+                  id: chefPick.id,
+                  recipe: chefPick,
+                  favorite: favs.has(chefPick.id),
+                }),
+              ),
+            )
+          }
+        >
+          <span className="chef-promo-eyebrow">
+            <Icon name="utensils" /> {CHEF_NAME}'s newest recipe
+          </span>
+          <span className="chef-promo-title">{chefPick.title}</span>
+          {chefPick.summary && <span className="chef-promo-sub">{chefPick.summary}</span>}
+        </button>
+      )}
+
       {/* One slim control bar: search + filter + add. Everything else is the list. */}
       <div className="lib-header">
         <div className="browse-filter">
@@ -355,39 +391,6 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
             <Icon name="wand" /> Describe a dish
           </button>
         </div>
-      )}
-
-      {browsing && hero && (
-        <HeroPick
-          scored={hero}
-          onView={() => run(async () => setSelected(await withRecipeBody(hero.fi)))}
-          onShuffle={() => setShuffle((n) => n + 1)}
-          canShuffle={heroPool.length > 1}
-        />
-      )}
-
-      {browsing && chefPick && (
-        <button
-          className="chef-promo"
-          onClick={() =>
-            run(async () =>
-              setSelected(
-                await withRecipeBody({
-                  kind: "catalog" as const,
-                  id: chefPick.id,
-                  recipe: chefPick,
-                  favorite: favs.has(chefPick.id),
-                }),
-              ),
-            )
-          }
-        >
-          <span className="chef-promo-eyebrow">
-            <Icon name="utensils" /> {CHEF_NAME}'s newest recipe
-          </span>
-          <span className="chef-promo-title">{chefPick.title}</span>
-          {chefPick.summary && <span className="chef-promo-sub">{chefPick.summary}</span>}
-        </button>
       )}
 
       {loaded && ranked.length > 0 && (

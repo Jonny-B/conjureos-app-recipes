@@ -7,14 +7,15 @@
  * (`manifest.needs`) and the kernel matches it STRUCTURALLY against the
  * `returns` schemas declared for the actions below — no app names, no
  * allow-list, nothing coordinated between the two authors. `listRecipes`
- * satisfies its `recipeSearch` need and `getRecipe` satisfies `recipe`.
+ * (the saved library) and `searchRecipes` (the catalog) both satisfy its
+ * `recipeSearch` need, and `getRecipe` satisfies `recipe`.
  *
  * The practical consequence: changing a `returns` schema in package.json can
  * silently DISCONNECT Pantry. `schemaSatisfies` fails closed, so the failure is
  * not an error anywhere — Pantry just shows "nothing can suggest meals yet" and
- * plans nothing. Drop a field from `listRecipes`' `required` array and you have
- * broken another app with no test failing. Treat those two schemas as a
- * published contract.
+ * plans nothing. Drop a field from `listRecipes`' or `searchRecipes`' `required`
+ * array and you have broken another app with no test failing. Treat those three
+ * schemas as a published contract.
  *
  * WHO CAN CALL THESE, and what that means for the exclusions below.
  *
@@ -433,6 +434,13 @@ async function markCooked(rawParams?: unknown): Promise<{ madeCount: number; las
  * Search the ~1,200-recipe catalog. Distinct from `listRecipes`, which only
  * ever saw the user's OWN library — an orchestrator asked "find me a chilli
  * recipe" had no way to reach the catalog at all.
+ *
+ * `ingredients` here are the catalog's canonical TOKENS ("chicken breasts"),
+ * not the recipe's lines ("2 chicken breasts (boneless, skinless)"): the list
+ * payload never carries the lines, and the tokens are what a caller matching
+ * recipes against a kitchen wants anyway. Declaring them `required` is what
+ * lets Conjure Pantry's `recipeSearch` need match this action, so the catalog
+ * reaches its planner and not only the handful of recipes a user has saved.
  */
 async function searchRecipes(rawParams?: unknown): Promise<{ recipes: unknown[] }> {
   const p = asObject(rawParams ?? {});
@@ -446,6 +454,7 @@ async function searchRecipes(rawParams?: unknown): Promise<{ recipes: unknown[] 
     recipes: hits.slice(0, Math.max(1, limit)).map((r) => ({
       id: r.id,
       title: r.title,
+      ingredients: Array.isArray(r.tokens) ? [...r.tokens] : [],
       category: r.category,
       difficulty: r.difficulty,
       cookTime: r.cookTime,
