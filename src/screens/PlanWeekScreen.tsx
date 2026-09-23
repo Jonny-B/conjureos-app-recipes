@@ -9,7 +9,7 @@ import type {
 } from "../types";
 import { getCatalog } from "../features/catalog";
 import { listSavedRecipes } from "../features/storage";
-import { loadFavorites } from "../features/favorites";
+import { loadFavorites, toggleCatalogFavorite } from "../features/favorites";
 import { blockRecipe, loadBlocked, unblockRecipe } from "../features/blocked";
 import { ingredientsFromPantry } from "../features/pantry";
 import {
@@ -371,6 +371,23 @@ export function PlanWeekScreen({
     await runPlan([...excludeIds, id], constraints ?? undefined, all.filter((p) => p !== id), at);
   };
 
+  /**
+   * Thumbs-up: "I like this one". Records it in the favorites index, which
+   * every later plan sends as `favoriteIds`, so liked meals come back more
+   * often. The meal stays in this plan, and a swap elsewhere keeps it pinned.
+   * Pressing it again takes the like back. A saved recipe that is already a
+   * favourite has nothing to record (ConjureOS #618).
+   */
+  const likePick = async (id: string) => {
+    if (savedCandidates.some((s) => s.id === id)) return;
+    setBlockWarning(null);
+    try {
+      setFavs(await toggleCatalogFavorite(id));
+    } catch {
+      setBlockWarning("Couldn't save that thumbs-up. Try again in a moment.");
+    }
+  };
+
   /** Undo the last thumbs-down. Doesn't put the meal back in this plan — it
    *  just makes the recipe eligible for future suggestions again. */
   const undoBlock = async () => {
@@ -494,6 +511,8 @@ export function PlanWeekScreen({
           plan={plan}
           onReroll={rerollPick}
           onBlock={(id) => void blockPick(id)}
+          isLiked={(id) => favs.has(id) || savedCandidates.some((s) => s.id === id)}
+          onLike={(id) => void likePick(id)}
           lastBlocked={lastBlocked}
           onUndoBlock={() => void undoBlock()}
           onBack={() => setStep("scan")}
@@ -746,6 +765,8 @@ function ReviewStep({
   plan,
   onReroll,
   onBlock,
+  isLiked,
+  onLike,
   lastBlocked,
   onUndoBlock,
   onBack,
@@ -754,6 +775,8 @@ function ReviewStep({
   plan: WeekPlan;
   onReroll: (id: string) => void;
   onBlock: (id: string) => void;
+  isLiked: (id: string) => boolean;
+  onLike: (id: string) => void;
   lastBlocked: { id: string; title: string } | null;
   onUndoBlock: () => void;
   onBack: () => void;
@@ -794,9 +817,20 @@ function ReviewStep({
               <h3>{pick.title}</h3>
               <div className="meal-card-actions">
                 <button
+                  className={`icon-btn meal-like${isLiked(pick.id) ? " liked" : ""}`}
+                  onClick={() => onLike(pick.id)}
+                  aria-pressed={isLiked(pick.id)}
+                  title={isLiked(pick.id) ? "Liked. Suggested more often" : "Keep it and suggest it more often"}
+                  aria-label={
+                    isLiked(pick.id) ? `You like ${pick.title}. Tap to take the like back` : `Like ${pick.title}`
+                  }
+                >
+                  <Icon name="thumbs-up" />
+                </button>
+                <button
                   className="icon-btn meal-swap"
                   onClick={() => onReroll(pick.id)}
-                  title="Suggest a different meal for this slot"
+                  title="Not this week: suggest a different meal for this slot"
                   aria-label={`Replace ${pick.title} with a different meal`}
                 >
                   <Icon name="arrows-rotate" />

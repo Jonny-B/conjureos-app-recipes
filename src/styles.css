@@ -2152,6 +2152,11 @@ select {
   align-items: center;
   gap: 2px;
 }
+.meal-card-actions .icon-btn {
+  width: 44px;
+  height: 44px;
+}
+.meal-like,
 .meal-swap,
 .meal-block {
   flex: 0 0 auto;
@@ -2159,8 +2164,13 @@ select {
   transition: opacity var(--cui-duration-fast) var(--cui-ease),
               color var(--cui-duration-fast) var(--cui-ease);
 }
-.meal-swap:hover {
+.meal-swap:hover,
+.meal-like:hover {
   opacity: 1;
+}
+.meal-like.liked {
+  opacity: 1;
+  color: var(--cui-accent);
 }
 /* Thumbs-down is destructive-ish (it's remembered), so it earns a warning
    tint on hover that the plain regenerate doesn't. */
