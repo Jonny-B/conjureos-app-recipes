@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { FeedRecipe, Recipe, SavedRecipe } from "../types";
+import { formatStrip } from "../features/nutrition";
 import { safeHref, hrefHost } from "../features/safeUrl";
-import { categoryOf, lookFor, splitIngredient } from "../features/recipeLook";
+import { categoryOf } from "../features/recipeLook";
 import { RecipePlate } from "../components/RecipePlate";
-import { RecipeStats } from "../components/RecipeStats";
 import { CHEF_NAME } from "./StudioScreen";
 import { Icon } from "../icons";
 
@@ -87,14 +87,16 @@ export function RecipeDetail({
   const isCatalog = feed.kind === "catalog";
   const category = categoryOf(feed);
 
+  const cook = () => onCook(recipe, feed.kind === "saved" ? feed.recipe : null);
+
   return (
-    <div className="browse-screen">
+    <div className="browse-screen detail-screen">
       <div className="detail-actions">
         <button className="btn ghost" onClick={onBack}>
           <Icon name="chevron-down" className="back-caret" /> Back
         </button>
         <div style={{ flex: 1 }} />
-        <button className="btn" onClick={() => onCook(recipe, feed.kind === "saved" ? feed.recipe : null)}>
+        <button className="btn" onClick={cook}>
           <Icon name="bowl-food" /> Cook this
         </button>
         <div className="overflow-wrap" ref={menuRef}>
@@ -142,101 +144,100 @@ export function RecipeDetail({
         </div>
       )}
 
-      <article className="recipe-sheet">
-        <header className="recipe-head">
-          <RecipePlate recipe={recipe} category={category} variant="poster" />
-          <div className="recipe-head-body">
-            <button
-              className={`card-fav${feed.favorite ? " on" : ""}`}
-              onClick={onToggleFavorite}
-              aria-label={feed.favorite ? "Remove from favorites" : "Add to favorites"}
-              title={feed.favorite ? "Remove from favorites" : "Add to favorites"}
-            >
-              <Icon name="heart" />
-            </button>
-            <div className={`recipe-eyebrow hue-${lookFor(category).hue}`}>
-              {category ?? "My recipe"}
-              {feed.kind === "saved" && feed.recipe.madeCount > 0 && (
-                <span className="recipe-made"> · made {feed.recipe.madeCount}×</span>
-              )}
-            </div>
-            <h2 className="recipe-title">{recipe.title}</h2>
-            {recipe.chefFeatured && <div className="chef-byline">By {CHEF_NAME}</div>}
-            {recipe.summary && <p className="recipe-summary">{recipe.summary}</p>}
+      {/* The open recipe, laid out to the owner's mockup (2026-09-23): the
+          recipe's picture behind the card, the page laid over it on a fade of
+          the card's own background, the ingredients down the left and the
+          instructions in two columns. With no photo, the category plate fills
+          the same box — see components/RecipePlate. */}
+      <article className="recipe-cover">
+        <div className="recipe-cover-media">
+          <RecipePlate recipe={recipe} category={category} variant="cover" />
+        </div>
+        <button
+          className={`card-fav${feed.favorite ? " on" : ""}`}
+          onClick={onToggleFavorite}
+          aria-label={feed.favorite ? "Remove from favorites" : "Add to favorites"}
+          title={feed.favorite ? "Remove from favorites" : "Add to favorites"}
+        >
+          <Icon name="heart" />
+        </button>
+
+        <div className="recipe-cover-body">
+          <h2 className="recipe-cover-title">{recipe.title}</h2>
+          <div className="recipe-cover-pills">
+            {category && <span className="pill cat">{category}</span>}
+            <span className={`pill ${recipe.difficulty}`}>{recipe.difficulty}</span>
+            {recipe.cookTime > 0 && <span className="pill">{recipe.cookTime} min</span>}
+            <span className="pill">
+              {recipe.servings} serving{recipe.servings === 1 ? "" : "s"}
+            </span>
+            {feed.kind === "saved" && feed.recipe.madeCount > 0 && (
+              <span className="pill">made {feed.recipe.madeCount}×</span>
+            )}
           </div>
-        </header>
+          {recipe.nutrition && <div className="recipe-cover-nutrition">{formatStrip(recipe.nutrition)}</div>}
+          {recipe.chefFeatured && <div className="chef-byline">By {CHEF_NAME}</div>}
+          {recipe.summary && <p className="recipe-cover-summary">{recipe.summary}</p>}
 
-        <RecipeStats recipe={recipe} />
+          {/* Chef's blog: the story you scroll past on recipe sites — with a skip. */}
+          {recipe.blog && (
+            <section className="chef-blog">
+              <button
+                className="btn ghost jump-to-recipe"
+                onClick={() => recipeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              >
+                Jump to recipe <Icon name="chevron-down" />
+              </button>
+              <div className="chef-blog-body">{renderBlog(recipe.blog)}</div>
+            </section>
+          )}
 
-        {/* Chef's blog: the story you scroll past on recipe sites — with a skip. */}
-        {recipe.blog && (
-          <section className="chef-blog">
-            <button
-              className="btn ghost jump-to-recipe"
-              onClick={() => recipeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-            >
-              Jump to recipe <Icon name="chevron-down" />
-            </button>
-            <div className="chef-blog-body">{renderBlog(recipe.blog)}</div>
-          </section>
-        )}
-
-        <div ref={recipeRef} />
-        {/* Cookbook layout: the ingredient table beside the method on a wide
-            screen, stacked on a phone. Amounts get their own column so you
-            can read down it while shopping or measuring. */}
-        <div className="recipe-body">
-          <section className="recipe-ingredients">
-            <h3 className="recipe-section-head">
-              Ingredients <span>{recipe.ingredients.length}</span>
-            </h3>
-            <ul className="ing-table">
-              {recipe.ingredients.map((ing, i) => {
-                const { qty, name, note } = splitIngredient(ing);
-                return (
-                  <li key={i}>
-                    <span className="ing-qty">{qty}</span>
-                    <span className="ing-name">
-                      {name}
-                      {note && <span className="ing-note"> {note}</span>}
-                    </span>
-                  </li>
-                );
-              })}
+          <div ref={recipeRef} />
+          <section className="recipe-cover-ingredients">
+            <h3 className="recipe-cover-head">Ingredients</h3>
+            <ul className="cover-ing">
+              {recipe.ingredients.map((ing, i) => (
+                <li key={i}>{ing}</li>
+              ))}
             </ul>
           </section>
 
-          <section className="recipe-method">
-            <h3 className="recipe-section-head">
-              Method <span>{recipe.instructions.length} steps</span>
-            </h3>
-            <ol className="method">
+          <section>
+            <h3 className="recipe-cover-head">Instructions</h3>
+            <ol className="cover-steps">
               {recipe.instructions.map((step, i) => (
                 <li key={i}>
-                  <span className="method-num">{String(i + 1).padStart(2, "0")}</span>
-                  <p>{step}</p>
+                  {/* The <ol> already numbers these for a screen reader. */}
+                  <span className="cover-step-num" aria-hidden="true">
+                    {i + 1}
+                  </span>
+                  <span>{step}</span>
                 </li>
               ))}
             </ol>
-            <button
-              className="btn detail-cook-bottom"
-              onClick={() => onCook(recipe, feed.kind === "saved" ? feed.recipe : null)}
-            >
+          </section>
+
+          <footer className="recipe-cover-foot">
+            <button className="btn detail-cook-bottom" onClick={cook}>
               <Icon name="bowl-food" /> Cook this
             </button>
-          </section>
+            {isCatalog && sourceHref && (
+              <div className="recipe-cover-source">
+                Source:{" "}
+                <a
+                  href={archivedHref(sourceHref)}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="source-link"
+                  title={isRetiredSource(sourceHref) ? "Opens the Internet Archive's copy — myplate.gov was retired in 2026" : undefined}
+                >
+                  {hrefHost(sourceHref) ?? "source"}
+                </a>
+              </div>
+            )}
+            {feed.kind === "saved" && <div className="recipe-cover-source">{feed.recipe.path}</div>}
+          </footer>
         </div>
-
-        {isCatalog && sourceHref && (
-          <div className="recipe-source">
-            Source:{" "}
-            <a href={archivedHref(sourceHref)} target="_blank" rel="noreferrer noopener" className="source-link">
-              {hrefHost(sourceHref) ?? "source"}
-              {isRetiredSource(sourceHref) && " (archived)"}
-            </a>
-          </div>
-        )}
-        {feed.kind === "saved" && <div className="recipe-source">{feed.recipe.path}</div>}
       </article>
     </div>
   );

@@ -1,6 +1,5 @@
 import type { Recipe } from "../types";
 import { macroShares, type Hue } from "../features/recipeLook";
-import { DifficultyMark } from "./RecipePlate";
 
 /** Protein / carbs / fat each get a hue of their own, used for the bar and its key. */
 const MACRO_HUE: Record<"protein" | "carbs" | "fat", Hue> = {
@@ -10,36 +9,20 @@ const MACRO_HUE: Record<"protein" | "carbs" | "fat", Hue> = {
 };
 
 /**
- * The numbers row under a recipe's title: a hairline grid of cells, each a
- * big figure over a small label, and under it one bar splitting the serving's
- * calories into protein / carbs / fat.
- *
- * The figures used to be one grey sentence — "~154 cal · 17g P · 7g F · 6g C
- * · per serving · est." — which is all the data and none of the shape. The
- * bar is what shows a salad and a cake apart at a glance.
- *
- * `compact` (Tonight's pick) keeps the nutrition (and time, when a recipe
- * has one) and drops servings/level, which the recipe page shows and a
- * teaser doesn't need.
+ * Tonight's pick's numbers: a hairline grid of cells, each a big figure over
+ * a small label, and under it one bar splitting the serving's calories into
+ * protein / carbs / fat — the bar is what shows a salad and a cake apart at a
+ * glance. (The open recipe prints the same facts as one line, per the owner's
+ * mockup; see RecipeDetail.)
  */
-export function RecipeStats({
-  recipe,
-  servings,
-  compact = false,
-}: {
-  recipe: Recipe;
-  /** Shown servings, when the caller scales; defaults to the recipe's own. */
-  servings?: number;
-  compact?: boolean;
-}) {
+export function RecipeStats({ recipe }: { recipe: Recipe }) {
   const n = recipe.nutrition;
   const macros = macroShares(n);
-  const serves = servings ?? recipe.servings;
   const hasCalories = !!n && n.calories > 0;
-  if (compact && !hasCalories && !macros) return null;
+  if (!hasCalories && !macros && !(recipe.cookTime > 0)) return null;
 
   return (
-    <div className={`stats${compact ? " stats--compact" : ""}`}>
+    <div className="stats">
       <dl className="stats-cells">
         {hasCalories && (
           <div className="stat">
@@ -59,27 +42,12 @@ export function RecipeStats({
             </dd>
           </div>
         ))}
-        {!compact && serves > 0 && (
-          <div className="stat">
-            <dt>Serves</dt>
-            <dd>{serves}</dd>
-          </div>
-        )}
         {recipe.cookTime > 0 && (
           <div className="stat">
             <dt>Time</dt>
             <dd>
               {recipe.cookTime}
               <small>min</small>
-            </dd>
-          </div>
-        )}
-        {!compact && (
-          <div className="stat">
-            <dt>Level</dt>
-            <dd className="stat-level">
-              <DifficultyMark recipe={recipe} decorative />
-              <span>{recipe.difficulty}</span>
             </dd>
           </div>
         )}

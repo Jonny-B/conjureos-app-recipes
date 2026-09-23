@@ -165,6 +165,13 @@ hairlines alone read as a 2001 directory listing:
   flat hue-and-glyph plate today, the photo in the same box if
   `RECIPE_PHOTOS_ENABLED` is ever flipped (see `src/features/flags.ts` for why
   it isn't, yet). Don't add a second, photo-only layout.
+- **The open recipe is laid out to the owner's mockup** (2026-09-23, the
+  "Pumpkin Cookies" image): the recipe's picture behind the whole card, serif
+  title, the app's own pills, the one-line nutrition strip, ingredients down the
+  left, instructions in two columns with round step numbers. Its photo scrim and
+  those round numbers are deliberate exceptions to the rules above, documented
+  in `src/styles.css` ("Open recipe: the cover"). Don't redesign this screen
+  without the owner.
 
 ## Publishing
 

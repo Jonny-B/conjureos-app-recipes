@@ -464,7 +464,7 @@ function HeroPick({
         </div>
         <h3 className="hero-title">{r.title}</h3>
         {keys.length > 0 && <div className="hero-keys">{keys.join(" · ")}</div>}
-        <RecipeStats recipe={r} compact />
+        <RecipeStats recipe={r} />
         <div className="hero-foot">
           <button className="btn" onClick={onView}>
             View recipe

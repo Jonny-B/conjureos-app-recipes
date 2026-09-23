@@ -6,7 +6,7 @@ import { Icon } from "../icons";
 
 /**
  * The picture slot every recipe surface has: a feed row's square tile, the
- * poster at the top of Tonight's pick and the recipe page.
+ * poster in Tonight's pick, and the cover behind an open recipe.
  *
  * With a photo (and RECIPE_PHOTOS_ENABLED) it is the photo. Without one it is
  * a PLATE: a flat field of the category's hue with the category's glyph —
@@ -25,8 +25,12 @@ export function RecipePlate({
 }: {
   recipe: Pick<Recipe, "imageUrl" | "title">;
   category: string | null | undefined;
-  /** "tile": the square in a feed row. "poster": the large one on a page. */
-  variant: "tile" | "poster";
+  /**
+   * "tile": the square in a feed row. "poster": Tonight's pick. "cover": the
+   * picture the open recipe is laid over — no label or small glyph of its
+   * own, because the page's pills already name the category.
+   */
+  variant: "tile" | "poster" | "cover";
 }) {
   const [broken, setBroken] = useState(false);
   const look = lookFor(category);
@@ -43,9 +47,9 @@ export function RecipePlate({
     <div className={`plate plate--${variant} hue-${look.hue}`} aria-hidden="true">
       {/* The poster sets the glyph twice: once large, bled off the corner as
           a watermark, and once at reading size. The tile only has room for
-          the one. */}
-      {variant === "poster" && <Icon name={look.glyph} className="plate-mark" />}
-      <Icon name={look.glyph} className="plate-glyph" />
+          the one, and the cover only wants the watermark. */}
+      {variant !== "tile" && <Icon name={look.glyph} className="plate-mark" />}
+      {variant !== "cover" && <Icon name={look.glyph} className="plate-glyph" />}
       {variant === "poster" && category && <span className="plate-label">{category}</span>}
     </div>
   );

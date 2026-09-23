@@ -26,10 +26,10 @@
  * Since 0.54.0 the UI no longer needs photos to look finished: every recipe
  * surface has a picture slot (components/RecipePlate.tsx) that shows a
  * category plate — hue + glyph — when there is no photo. Flipping this to
- * `true` puts photos in that same slot (the feed tile and the page/hero
- * poster) wherever a row has an image_url, keeps the plate where it doesn't,
- * and restores the recipe-photo picker in the editor. The layout around the
- * slot does not change.
+ * `true` puts photos in that same slot (the feed tile, Tonight's pick, and
+ * the picture behind an open recipe) wherever a row has an image_url, keeps
+ * the plate where it doesn't, and restores the recipe-photo picker in the
+ * editor. The layout around the slot does not change.
  *
  * What this flag does NOT do:
  *   - It does not remove backend support. `recipes.image_url`, the

@@ -7,7 +7,8 @@
  *   2. Borders carry the structure. Not shadows — one shadow token exists and
  *      only genuinely floating layers may use it.
  *   3. The canvas is flat. A tinted background makes a hairline vanish.
- *   4. One gradient, on one element per screen: the primary action.
+ *   4. One gradient, on one element per screen: the primary action. (The
+ *      open recipe's photo SCRIM is not one — see "Open recipe: the cover".)
  *   5. Hierarchy comes from the type scale, because nothing else is left to
  *      carry it.
  *   6. Never hard-code a colour. Spring's --cui-on-accent is DARK in the dark
@@ -73,7 +74,8 @@
   --r-2: 4px;      /* the largest radius in the app: sheets, image frames */
   --r-pill: 999px; /* RATIONED — status chips and count badges ONLY. A pill
                       says "this is data"; structure goes square. */
-  --r-circle: 50%; /* the spinner, and nothing else */
+  --r-circle: 50%; /* the spinner, and the open recipe's step numbers (the
+                      owner's mockup, 2026-09-23) — nothing else */
 
   /* ── Type scale ───────────────────────────────────────────────────────
      With the ornament gone (glows, washes, gradients, bouncy hovers),
@@ -2491,9 +2493,11 @@ button.step-row { display: flex; }
   border-radius: var(--r-1);
   overflow: hidden;
 }
+/* 60px basis: Tonight's pick carries four cells, and they stay on one row
+   at phone width. */
 .stat {
-  flex: 1 1 88px;
-  padding: 10px 14px 11px;
+  flex: 1 1 60px;
+  padding: 9px 10px 10px;
   background: var(--bg-1);
 }
 .stat dt {
@@ -2522,17 +2526,6 @@ button.step-row { display: flex; }
   font-weight: var(--cui-weight-regular);
   color: var(--fg-faint);
 }
-.stat-level {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.stat-level > span:last-child {
-  font-family: var(--cui-font-sans);
-  font-size: var(--t-base);
-  text-transform: capitalize;
-}
-.stat-level .diff-mark > span { width: 8px; height: 8px; }
 .swatch {
   display: inline-block;
   width: 8px;
@@ -2542,134 +2535,191 @@ button.step-row { display: flex; }
 .macro-bar { display: flex; gap: 2px; height: 6px; }
 .macro-bar > span { min-width: 2px; background: var(--hue); }
 .stats-note { font-size: var(--t-xs); color: var(--fg-faint); }
-/* Tonight's pick carries four cells; keep them on one row at phone width. */
-.stats--compact .stat { flex-basis: 60px; padding: 9px 10px 10px; }
 
-/* ── Recipe page ───────────────────────────────────────────────────────
-   Not a card any more: a poster, a title set large, the stat strip, then
-   the ingredients and method under full-contrast rules — the way a cookbook
-   page is built. The rules are borders, so rule 2 still holds. */
-.recipe-sheet { display: flex; flex-direction: column; gap: 22px; }
-.recipe-head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 18px;
-}
-.recipe-head > .plate--poster { aspect-ratio: 16 / 7; }
-/* The eyebrow beside it already names the category. */
-.recipe-head .plate-label { display: none; }
-.recipe-head-body {
+/* ── Open recipe: the cover ───────────────────────────────────────────
+   Laid out to the owner's mockup (2026-09-23): the recipe's picture behind
+   the whole card, and the page laid over it — serif title, the app's own
+   pills, the nutrition line, ingredients down the left, instructions in two
+   columns, Cook this and the source at the foot.
+
+   Two things here are the mockup's and nowhere else in the app:
+     - A SCRIM: the card's own background fading out over the picture. It is
+       not a gradient in rule 4's sense (no accent, nothing decorative) — it
+       is what lets text sit on a photo, and MyPlate's photos are mostly
+       bright food on white, so the text can never rely on the photo being
+       dark the way the mockup's was. It is built from --bg-1 alone, so it is
+       dark in the dark flavour and light in the light one.
+     - Round step numbers (--r-circle), as drawn. Cook mode keeps its squares.
+
+   Phone: the picture is a band across the top and the title starts over its
+   faded lower edge. Desktop: the picture fills the top-right, the scrim fades
+   it in from the left and the bottom, and the text column stays on the
+   opaque side of the fade (see the Desktop block below). */
+.browse-screen.detail-screen { max-width: 960px; }
+
+.recipe-cover {
   position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--bg-1);
+  border: var(--hair);
+  border-radius: var(--r-2);
+}
+.recipe-cover-media {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: -1;
+  width: 100%;
+  height: 300px;
+}
+.recipe-cover-media > .plate {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+.recipe-cover-media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    var(--bg-1) 12%,
+    color-mix(in srgb, var(--bg-1) 55%, transparent) 55%,
+    color-mix(in srgb, var(--bg-1) 10%, transparent) 100%
+  );
+}
+/* No photo: the watermark glyph sits where the dish would. */
+.plate--cover .plate-mark {
+  top: 8%;
+  right: 6%;
+  bottom: auto;
+  width: 44%;
+  height: 76%;
+  opacity: 0.2;
+}
+
+/* The favourite heart, over the picture: a pane of the card's own colour so
+   it reads on anything. */
+.recipe-cover > .card-fav {
+  top: 14px;
+  right: 14px;
+  background: color-mix(in srgb, var(--bg-1) 78%, transparent);
+}
+.recipe-cover > .card-fav:hover { background: var(--bg-2); }
+
+.recipe-cover-body {
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-  gap: 10px;
-  min-width: 0;
+  gap: 14px;
+  padding: 200px 20px 22px;
 }
-.recipe-head-body .card-fav { top: 0; right: 0; }
-.recipe-eyebrow {
-  padding-right: 48px;
-  font-size: var(--t-xs);
-  font-weight: var(--cui-weight-bold);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--hue-text, var(--cui-link));
-}
-.recipe-made { color: var(--fg-faint); }
-.recipe-title {
+.recipe-cover-title {
   margin: 0;
   padding-right: 48px;
   font-family: var(--font-display);
   font-size: var(--t-4xl);
   font-weight: var(--cui-weight-semibold);
-  line-height: 1.1;
+  line-height: 1.08;
+  color: var(--fg);
 }
-.recipe-summary {
+.recipe-cover-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.recipe-cover-pills .pill { margin-right: 0; }
+.recipe-cover-nutrition {
+  font-size: var(--t-md);
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.recipe-cover-summary {
   margin: 0;
-  max-width: 62ch;
-  font-size: var(--t-lg);
+  font-size: var(--t-base);
   line-height: 1.6;
   color: var(--fg-dim);
 }
 
-.recipe-body { display: flex; flex-direction: column; gap: 28px; }
-.recipe-section-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin: 0 0 4px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--cui-fg);
-  font-size: var(--t-xs);
+.recipe-cover-head {
+  margin: 10px 0 8px;
+  font-size: var(--t-sm);
   font-weight: var(--cui-weight-bold);
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--fg);
-}
-.recipe-section-head > span {
-  font-weight: var(--cui-weight-regular);
-  letter-spacing: 0.04em;
-  color: var(--fg-faint);
+  color: var(--cui-link);
 }
 
-/* Ingredient table: amount column, then the ingredient. The amount column
-   is sized ONCE for the whole list (subgrid), to its longest amount up to
-   9em, so "1 tablespoon" doesn't wrap and "2" doesn't leave a gulf. */
-.ing-table {
-  display: grid;
-  grid-template-columns: fit-content(9em) minmax(0, 1fr);
+.cover-ing {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: var(--t-base);
+  line-height: 1.5;
+  color: var(--fg);
+}
+.cover-ing li {
+  position: relative;
+  padding: 2px 0 2px 20px;
+}
+.cover-ing li::before {
+  content: "•";
+  position: absolute;
+  left: 4px;
+  color: var(--cui-link);
+  font-weight: var(--cui-weight-bold);
+}
+
+.cover-steps {
   list-style: none;
   margin: 0;
   padding: 0;
 }
-.ing-table li {
-  display: grid;
-  grid-template-columns: subgrid;
-  grid-column: 1 / -1;
-  padding: 9px 0;
-  border-bottom: var(--hair);
-  font-size: var(--t-base);
-  line-height: 1.45;
-}
-.ing-qty {
-  padding-right: 14px;
-  font-weight: var(--cui-weight-semibold);
-  font-variant-numeric: tabular-nums;
-  color: var(--fg);
-}
-.ing-name { color: var(--fg); }
-.ing-note { color: var(--fg-faint); }
-
-/* Method: big numerals down the left. */
-.method { list-style: none; margin: 0; padding: 0; }
-.method li {
-  display: grid;
-  grid-template-columns: 2.6em minmax(0, 1fr);
+.cover-steps li {
+  display: flex;
+  align-items: flex-start;
   gap: 12px;
-  padding: 14px 0;
-  border-bottom: var(--hair);
-}
-.method-num {
-  font-family: var(--font-display);
-  font-size: var(--t-2xl);
-  font-weight: var(--cui-weight-semibold);
-  line-height: 1.15;
-  font-variant-numeric: tabular-nums;
-  color: var(--cui-link);
-}
-.method p {
-  margin: 0;
-  max-width: 68ch;
-  font-size: var(--t-lg);
-  line-height: 1.6;
+  padding: 6px 0;
+  break-inside: avoid;
+  font-size: var(--t-base);
+  line-height: 1.5;
   color: var(--fg);
 }
-.recipe-method .detail-cook-bottom { margin-top: 18px; }
-.recipe-source {
-  padding-top: 12px;
-  border-top: var(--hair);
+/* Solid accent: the one fill --cui-on-accent is calibrated against. */
+.cover-step-num {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-top: -1px;
+  border-radius: var(--r-circle);
+  background: var(--cui-accent);
+  color: var(--cui-on-accent);
+  font-size: var(--t-sm);
+  font-weight: var(--cui-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.recipe-cover-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  margin-top: 6px;
+}
+.recipe-cover-foot .detail-cook-bottom { margin-top: 0; justify-self: start; }
+.recipe-cover-source {
   font-size: var(--t-xs);
   color: var(--fg-faint);
+}
+/* The short rule over the source line, as drawn. */
+.recipe-cover-source::before {
+  content: "";
+  display: block;
+  width: 80px;
+  margin-bottom: 8px;
+  border-top: var(--hair-strong);
 }
 
 @media (min-width: 860px) and (pointer: fine) {
@@ -2684,17 +2734,35 @@ button.step-row { display: flex; }
   .hero-card > .plate--poster { height: auto; min-height: 250px; }
   .hero-body { padding: 26px 28px 26px; justify-content: center; }
 
-  .recipe-head {
-    grid-template-columns: minmax(260px, 38%) minmax(0, 1fr);
-    gap: 28px;
+  /* The open recipe: picture top-right, faded in from the left and the
+     bottom; the text column stays on the opaque side of the fade. */
+  .recipe-cover-media {
+    width: 64%;
+    height: min(100%, 540px);
   }
-  .recipe-head > .plate--poster { aspect-ratio: 4 / 3; }
-  .recipe-title { font-size: var(--t-5xl); }
-
-  .recipe-body {
+  .recipe-cover-media::after {
+    background:
+      linear-gradient(
+        to right,
+        var(--bg-1) 0%,
+        color-mix(in srgb, var(--bg-1) 82%, transparent) 24%,
+        transparent 64%
+      ),
+      linear-gradient(to top, var(--bg-1) 0%, var(--bg-1) 16%, transparent 58%);
+  }
+  .recipe-cover-body { padding: 34px 40px 30px; }
+  .recipe-cover-title { font-size: var(--t-5xl); padding-right: 0; }
+  .recipe-cover-title,
+  .recipe-cover-pills,
+  .recipe-cover-nutrition,
+  .recipe-cover-summary,
+  .recipe-cover .chef-blog { max-width: 56%; }
+  .recipe-cover-ingredients { max-width: 44%; }
+  .cover-steps { columns: 2; column-gap: 40px; }
+  .recipe-cover-foot {
     display: grid;
-    grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr);
-    gap: 44px;
-    align-items: start;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 40px;
+    align-items: end;
   }
 }
