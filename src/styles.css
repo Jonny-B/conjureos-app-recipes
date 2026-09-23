@@ -14,6 +14,21 @@
  *      flavour and white in the light one, so `color: #fff` on a filled button
  *      is a real bug, not a shortcut. Both flavours get checked, every time.
  *
+ * The cookbook layer (0.54.0). Squares and hairlines alone made a recipe app
+ * read as a 2001 directory listing: every row the same box, the same capsules,
+ * the same weight. Two things were added, both rationed like the rest:
+ *
+ *   7. A display face (--font-display, a system serif stack) for RECIPE
+ *      TITLES and the figures in a stat strip — nothing else. Labels, meta,
+ *      controls and body copy stay sans. The contrast between the two is the
+ *      point, so the serif never shows up small.
+ *   8. Category hues (.hue-*). Each category is a --cui-* role (accent,
+ *      info, third, success, warning, support, error), never a value, so it
+ *      follows the palette and both flavours. A hue is DATA, like a pill: it
+ *      marks what kind of dish something is — the plate, the category word,
+ *      the rail chip, the macro key — and is never decoration on anything
+ *      else. Washes of it stay at or under 16%, same as the pill washes.
+ *
  * Tokens are defined on `.cui-ui` (the <body> wrapper) rather than :root
  * because the --cui-* tokens live on .cui-ui — a custom property can only read
  * another one defined on the same element or an ancestor, and :root (html) is
@@ -74,6 +89,13 @@
   --t-2xl: 20px;   /* section heads, the top bar */
   --t-3xl: 25px;   /* screen titles */
   --t-4xl: 32px;   /* the one number on a screen that matters */
+  --t-5xl: 40px;   /* a recipe's own title, on its own page (display face) */
+
+  /* ── Display face ─────────────────────────────────────────────────────
+     Still system fonts only — no web font is fetched. New York (ui-serif)
+     and Iowan/Charter on Apple, Charter on Linux, Sitka or Georgia on
+     Windows. Rationed: recipe titles and stat figures (rule 7 above). */
+  --font-display: ui-serif, "Iowan Old Style", Charter, "Bitstream Charter", "Sitka Heading", Georgia, Cambria, serif;
 
   /* ── Structure ────────────────────────────────────────────────────────
      Borders carry the structure now, not shadows. --cui-border is already
@@ -1142,13 +1164,14 @@ select {
   border: none;
   border-top: var(--hair);
   border-radius: 0;
-  padding: 13px 14px;
+  padding: 12px;
   display: flex;
   align-items: center;
   gap: 14px;
   min-height: 44px;
   cursor: pointer;
-  transition: background 0.18s;
+  transition: background var(--cui-duration-fast) var(--cui-ease),
+              border-color var(--cui-duration-fast) var(--cui-ease);
 }
 .browse-item:first-child { border-top: none; }
 
@@ -1158,23 +1181,44 @@ select {
 
 .browse-item .title-block {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
+/* The row title is a recipe title, so it is set in the display face. */
 .browse-item .title-block .title {
-  font-weight: var(--cui-weight-bold);
-  font-size: var(--t-lg);
+  font-family: var(--font-display);
+  font-weight: var(--cui-weight-semibold);
+  font-size: var(--t-xl);
+  line-height: 1.25;
+}
+
+/* What's in it — the line that says what the dish IS. One line, clipped. */
+.browse-item .title-block .keys {
+  font-size: var(--t-md);
+  color: var(--fg-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .browse-item .title-block .meta {
-  font-size: var(--t-sm);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  font-size: var(--t-xs);
   color: var(--fg-faint);
-  margin-top: 4px;
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
 }
 
 .browse-item .title .fav-mark {
   width: 12px;
   height: 12px;
-  color: var(--grape);
+  color: var(--cui-support-text);
   margin-left: 8px;
   vertical-align: -1px;
 }
@@ -1488,18 +1532,32 @@ select {
   margin-top: 4px;
 }
 
-/* Tonight's pick: the one hero surface. It says so with an accent hairline
-   and the app's largest radius, not with a wash and a glow. */
+/* Tonight's pick: the one hero surface. It says so with an accent hairline,
+   the app's largest radius and a poster — the recipe's plate or photo — not
+   with a wash and a glow. Poster on top on a phone, beside the pitch on a
+   desktop (see the Desktop block). */
 .hero-card {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 24px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   border-radius: var(--r-2);
   background: var(--bg-1);
   border: var(--hair-accent);
   overflow: hidden;
+}
+.hero-card > .plate--poster {
+  aspect-ratio: auto;
+  height: 132px;
+  border-radius: 0;
+}
+
+.hero-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 22px 22px;
+  min-width: 0;
 }
 
 .hero-eyebrow {
@@ -1510,7 +1568,7 @@ select {
   font-weight: var(--cui-weight-bold);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--bubblegum);
+  color: var(--cui-link);
 }
 
 .hero-eyebrow .fa-icon {
@@ -1520,46 +1578,30 @@ select {
 
 .hero-title {
   margin: 0;
-  font-size: var(--t-3xl);
+  padding-right: 44px;
+  font-family: var(--font-display);
+  font-size: var(--t-4xl);
   font-weight: var(--cui-weight-semibold);
-  line-height: 1.15;
-  letter-spacing: 0.01em;
+  line-height: 1.1;
 }
 
-.hero-meta {
+.hero-keys {
+  font-size: var(--t-base);
+  color: var(--fg-dim);
+  line-height: 1.5;
+}
+
+.hero-foot {
   display: flex;
+  align-items: center;
+  gap: 14px;
   flex-wrap: wrap;
-  gap: 6px;
+  margin-top: 2px;
 }
 
 .hero-why {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--t-base);
-  color: var(--fg-dim);
-}
-
-.hero-why .fa-icon {
-  width: 14px;
-  height: 14px;
-  color: var(--accent-soft);
-  flex: 0 0 auto;
-}
-
-.hero-why.have {
-  color: var(--mint);
-}
-
-.hero-why.have .fa-icon {
-  color: var(--mint);
-}
-
-.hero-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 4px;
+  font-size: var(--t-md);
+  color: var(--fg-faint);
 }
 
 /* At-a-glance stats */
@@ -1704,8 +1746,12 @@ select {
 .guided-head { display: flex; align-items: center; gap: 12px; }
 .guided-progress { flex: 1; height: 6px; background: var(--bg-3); border-radius: var(--r-0); overflow: hidden; }
 .guided-progress-bar { height: 100%; background: var(--cui-accent); border-radius: var(--r-0); transition: width var(--cui-duration) var(--cui-ease); }
-.guided-title { margin: 0; font-size: var(--t-3xl); font-weight: var(--cui-weight-semibold); }
-.guided-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.guided-title { margin: 0; font-family: var(--font-display); font-size: var(--t-4xl); font-weight: var(--cui-weight-semibold); line-height: 1.15; }
+.guided-meta {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px;
+  font-size: var(--t-sm); color: var(--fg-faint); font-variant-numeric: tabular-nums;
+}
+.guided-level { display: inline-flex; align-items: center; gap: 6px; text-transform: capitalize; }
 .guided-section { display: flex; flex-direction: column; gap: 8px; }
 .guided-section-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -1728,13 +1774,41 @@ select {
 }
 .check-row.checked, .step-row.checked { opacity: 0.55; }
 .check-row.checked .check-text, .step-row.checked .step-text { text-decoration: line-through; }
-.check-mark { flex: 0 0 auto; width: 18px; height: 18px; margin-top: 1px; color: var(--fg-faint); }
-.check-row.checked .check-mark { color: var(--mint); }
+/* Square checkboxes, drawn rather than borrowed from a glyph: the circle
+   icon was the one round thing left in a square language. Filled with the
+   solid accent when ticked — the only fill --cui-on-accent is calibrated
+   against — so the tick itself is on-accent. */
+.tick {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 18px; height: 18px; margin-top: 1px;
+  border: var(--hair-strong);
+  border-radius: var(--r-1);
+  color: var(--cui-on-accent);
+}
+.tick .fa-icon { width: 11px; height: 11px; }
+.check-row.checked .tick { background: var(--cui-accent); border-color: var(--cui-accent); }
+.check-qty { font-weight: var(--cui-weight-semibold); }
 .check-text, .step-text { flex: 1; line-height: 1.45; }
-.step-num { flex: 0 0 auto; width: 20px; height: 20px; color: var(--fg-faint); margin-top: 1px; }
-.step-num .fa-icon { width: 18px; height: 18px; }
+/* The step's number in a square. The current step's square fills with the
+   accent, so "you are here" is one filled box in a column of outlines. */
+.step-num {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 24px; height: 24px; margin-top: -2px;
+  border: var(--hair-strong);
+  border-radius: var(--r-1);
+  font-size: var(--t-sm);
+  font-weight: var(--cui-weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-dim);
+}
+.step-num .fa-icon { width: 12px; height: 12px; }
 .step-row.checked .step-num { color: var(--mint); }
 .step-row.current { border-color: var(--cui-accent); }
+.step-row.current .step-num { background: var(--cui-accent); border-color: var(--cui-accent); color: var(--cui-on-accent); }
 /* 16% measured under 4.5:1 in three dark palettes (Spring/Summer/Christmas,
    ~4.37-4.45:1) for the same reason the pill wash needed nudging: error as
    text on its own wash, over --bg-1 via .step-row. 14% matches the value
@@ -2017,27 +2091,9 @@ select {
 
 /* ── Recipe / blog images ─────────────────────────────────────────────── */
 
-/* Hero image at the top of a recipe/chef-blog detail card. Full-bleed to the
-   card edges (the card has 20px padding), 16:9, rounded to the card radius. */
-.recipe-hero {
-  margin: -4px -20px 14px;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  border-radius: var(--r-2) var(--r-2) 0 0;
-  background: var(--bg-2);
-}
-.recipe-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
-
-/* Thumbnail on a browse/feed row. Square, like everything else. */
-.browse-thumb {
-  flex: 0 0 auto;
-  width: 52px;
-  height: 52px;
-  border-radius: var(--r-1);
-  overflow: hidden;
-  background: var(--bg-2);
-}
-.browse-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Recipe photos live in `.plate--photo` (the Cookbook section below): the
+   feed tile and the page poster are the same slot whether a photo or a plate
+   fills it. */
 
 /* ── Image picker (recipe editor / chef Studio) ───────────────────────── */
 .image-picker { display: flex; flex-direction: column; gap: 8px; margin: 4px 0; }
@@ -2281,3 +2337,364 @@ button.step-row { display: flex; }
 /* The paste counter under the free-form recipe box. Quiet until it matters. */
 .create-count { font-size: var(--t-xs); margin-top: 6px; text-align: right; }
 .create-count.at-cap { color: var(--tangerine); font-weight: var(--cui-weight-semibold); text-align: left; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   Cookbook layer (0.54.0): category hues, plates, the stat strip, the
+   category rail and the recipe page. Rules 7 and 8 at the top of the file.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Category hues ─────────────────────────────────────────────────────
+   --hue is the mark itself (a plate's glyph, a swatch, a bar segment).
+   --hue-text is the same role's TEXT-grade token, for words set in the hue:
+   support and third have dedicated -text tokens because their base values are
+   fills, too light for type in the light flavour; accent's text token is
+   --cui-link; the four status roles are already text-grade in both. */
+.hue-accent  { --hue: var(--cui-accent);  --hue-text: var(--cui-link); }
+.hue-info    { --hue: var(--cui-info);    --hue-text: var(--cui-info); }
+.hue-third   { --hue: var(--cui-third);   --hue-text: var(--cui-third-text); }
+.hue-success { --hue: var(--cui-success); --hue-text: var(--cui-success); }
+.hue-warning { --hue: var(--cui-warning); --hue-text: var(--cui-warning); }
+.hue-support { --hue: var(--cui-support); --hue-text: var(--cui-support-text); }
+.hue-error   { --hue: var(--cui-error);   --hue-text: var(--cui-error); }
+
+/* ── Plates ────────────────────────────────────────────────────────────
+   The picture slot (components/RecipePlate.tsx): a photo when there is one,
+   otherwise a flat field of the category's hue with its glyph. Flat on
+   purpose — a 16% wash over the card surface, no gradient, no shadow. */
+.plate {
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--r-1);
+  background: color-mix(in srgb, var(--hue, var(--cui-accent)) 16%, var(--bg-1));
+  color: var(--hue-text, var(--cui-link));
+}
+.plate--tile { width: 64px; height: 64px; }
+.plate--tile .plate-glyph { width: 26px; height: 26px; }
+
+.plate--poster {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--r-2);
+}
+/* Reading-size glyph and the category word pin to the poster's corners... */
+.plate--poster .plate-glyph {
+  position: absolute;
+  top: 18px;
+  left: 20px;
+  width: 22px;
+  height: 22px;
+}
+.plate-label {
+  position: absolute;
+  left: 20px;
+  bottom: 16px;
+  font-size: var(--t-xs);
+  font-weight: var(--cui-weight-bold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hue-text, var(--cui-link));
+}
+/* ...and the same glyph, huge and faint, bleeds off the bottom-right edge.
+   Decoration inside the one element whose whole job is to picture the dish. */
+.plate-mark {
+  position: absolute;
+  right: -6%;
+  bottom: -16%;
+  width: 62%;
+  height: 92%;
+  color: var(--hue, var(--cui-accent));
+  opacity: 0.22;
+}
+
+.plate--photo { background: var(--bg-2); }
+.plate--photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* The category word in a feed row's meta line. */
+.meta-cat {
+  color: var(--hue-text, var(--cui-link));
+  font-weight: var(--cui-weight-bold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: var(--t-micro);
+}
+
+/* Difficulty: three squares, one to three filled. */
+.diff-mark { display: inline-flex; align-items: center; gap: 2px; }
+.diff-mark > span {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-0);
+  background: var(--cui-border-strong);
+}
+.diff-mark > span.on { background: var(--fg-dim); }
+
+/* ── Category rail ─────────────────────────────────────────────────────
+   Structure, so square (--r-1), not a pill: these are buttons you press,
+   not data you read. Scrolls sideways on a phone; wraps on a desktop. */
+.cat-rail {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-top: -6px;
+  padding-bottom: 2px;
+}
+.cat-rail::-webkit-scrollbar { display: none; }
+.cat-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  background: var(--bg-1);
+  border: var(--hair);
+  border-radius: var(--r-1);
+  color: var(--fg-dim);
+  font-size: var(--t-md);
+  font-weight: var(--cui-weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color var(--cui-duration-fast) var(--cui-ease),
+              color var(--cui-duration-fast) var(--cui-ease),
+              background var(--cui-duration-fast) var(--cui-ease);
+}
+.cat-chip .fa-icon { width: 13px; height: 13px; color: var(--hue-text, var(--cui-link)); }
+.cat-chip:hover { border-color: var(--cui-border-strong); color: var(--fg); }
+.cat-chip.active {
+  border-color: var(--hue, var(--cui-accent));
+  background: color-mix(in srgb, var(--hue, var(--cui-accent)) 12%, var(--bg-1));
+  color: var(--fg);
+}
+.cat-count {
+  font-size: var(--t-xs);
+  font-weight: var(--cui-weight-regular);
+  color: var(--fg-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Stat strip ────────────────────────────────────────────────────────
+   Cells divided by hairlines. The hairlines are the 1px gaps showing the
+   border colour behind the cells, so a wrapped second row gets its divider
+   for free — and flex (not grid) so a short last row stretches instead of
+   leaving a border-coloured hole. */
+.stats { display: flex; flex-direction: column; gap: 8px; }
+.stats-cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  margin: 0;
+  background: var(--cui-border);
+  border: var(--hair);
+  border-radius: var(--r-1);
+  overflow: hidden;
+}
+.stat {
+  flex: 1 1 88px;
+  padding: 10px 14px 11px;
+  background: var(--bg-1);
+}
+.stat dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-micro);
+  font-weight: var(--cui-weight-bold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+.stat dd {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: var(--t-2xl);
+  font-weight: var(--cui-weight-semibold);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+.stat dd small {
+  margin-left: 2px;
+  font-family: var(--cui-font-sans);
+  font-size: var(--t-sm);
+  font-weight: var(--cui-weight-regular);
+  color: var(--fg-faint);
+}
+.stat-level {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stat-level > span:last-child {
+  font-family: var(--cui-font-sans);
+  font-size: var(--t-base);
+  text-transform: capitalize;
+}
+.stat-level .diff-mark > span { width: 8px; height: 8px; }
+.swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: var(--hue);
+}
+.macro-bar { display: flex; gap: 2px; height: 6px; }
+.macro-bar > span { min-width: 2px; background: var(--hue); }
+.stats-note { font-size: var(--t-xs); color: var(--fg-faint); }
+/* Tonight's pick carries four cells; keep them on one row at phone width. */
+.stats--compact .stat { flex-basis: 60px; padding: 9px 10px 10px; }
+
+/* ── Recipe page ───────────────────────────────────────────────────────
+   Not a card any more: a poster, a title set large, the stat strip, then
+   the ingredients and method under full-contrast rules — the way a cookbook
+   page is built. The rules are borders, so rule 2 still holds. */
+.recipe-sheet { display: flex; flex-direction: column; gap: 22px; }
+.recipe-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+.recipe-head > .plate--poster { aspect-ratio: 16 / 7; }
+/* The eyebrow beside it already names the category. */
+.recipe-head .plate-label { display: none; }
+.recipe-head-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+.recipe-head-body .card-fav { top: 0; right: 0; }
+.recipe-eyebrow {
+  padding-right: 48px;
+  font-size: var(--t-xs);
+  font-weight: var(--cui-weight-bold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hue-text, var(--cui-link));
+}
+.recipe-made { color: var(--fg-faint); }
+.recipe-title {
+  margin: 0;
+  padding-right: 48px;
+  font-family: var(--font-display);
+  font-size: var(--t-4xl);
+  font-weight: var(--cui-weight-semibold);
+  line-height: 1.1;
+}
+.recipe-summary {
+  margin: 0;
+  max-width: 62ch;
+  font-size: var(--t-lg);
+  line-height: 1.6;
+  color: var(--fg-dim);
+}
+
+.recipe-body { display: flex; flex-direction: column; gap: 28px; }
+.recipe-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0 0 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--cui-fg);
+  font-size: var(--t-xs);
+  font-weight: var(--cui-weight-bold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg);
+}
+.recipe-section-head > span {
+  font-weight: var(--cui-weight-regular);
+  letter-spacing: 0.04em;
+  color: var(--fg-faint);
+}
+
+/* Ingredient table: amount column, then the ingredient. The amount column
+   is sized ONCE for the whole list (subgrid), to its longest amount up to
+   9em, so "1 tablespoon" doesn't wrap and "2" doesn't leave a gulf. */
+.ing-table {
+  display: grid;
+  grid-template-columns: fit-content(9em) minmax(0, 1fr);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ing-table li {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  padding: 9px 0;
+  border-bottom: var(--hair);
+  font-size: var(--t-base);
+  line-height: 1.45;
+}
+.ing-qty {
+  padding-right: 14px;
+  font-weight: var(--cui-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+.ing-name { color: var(--fg); }
+.ing-note { color: var(--fg-faint); }
+
+/* Method: big numerals down the left. */
+.method { list-style: none; margin: 0; padding: 0; }
+.method li {
+  display: grid;
+  grid-template-columns: 2.6em minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: var(--hair);
+}
+.method-num {
+  font-family: var(--font-display);
+  font-size: var(--t-2xl);
+  font-weight: var(--cui-weight-semibold);
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  color: var(--cui-link);
+}
+.method p {
+  margin: 0;
+  max-width: 68ch;
+  font-size: var(--t-lg);
+  line-height: 1.6;
+  color: var(--fg);
+}
+.recipe-method .detail-cook-bottom { margin-top: 18px; }
+.recipe-source {
+  padding-top: 12px;
+  border-top: var(--hair);
+  font-size: var(--t-xs);
+  color: var(--fg-faint);
+}
+
+@media (min-width: 860px) and (pointer: fine) {
+  /* Wider cards now that each row carries a plate. */
+  .browse-screen > .browse-list { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+  .browse-screen > .browse-list > .browse-item:hover { border-color: var(--cui-border-strong); }
+
+  /* With a mouse, a sideways-scrolling strip is a chore; let it wrap. */
+  .cat-rail { flex-wrap: wrap; overflow: visible; }
+
+  .hero-card { grid-template-columns: minmax(240px, 36%) minmax(0, 1fr); }
+  .hero-card > .plate--poster { height: auto; min-height: 250px; }
+  .hero-body { padding: 26px 28px 26px; justify-content: center; }
+
+  .recipe-head {
+    grid-template-columns: minmax(260px, 38%) minmax(0, 1fr);
+    gap: 28px;
+  }
+  .recipe-head > .plate--poster { aspect-ratio: 4 / 3; }
+  .recipe-title { font-size: var(--t-5xl); }
+
+  .recipe-body {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr);
+    gap: 44px;
+    align-items: start;
+  }
+}

@@ -137,7 +137,7 @@ rules live at the top of `src/styles.css`; the short version:
 - **Every radius comes from the scale** (`--r-0/1/2/pill/circle`). No component
   picks its own curve. `--r-pill` is RATIONED to status chips and count badges:
   a pill says "this is data", structure goes square.
-- **Every type size comes from the scale** (`--t-micro` … `--t-4xl`).
+- **Every type size comes from the scale** (`--t-micro` … `--t-5xl`).
 - **One shadow** (`--shadow-float`), and only genuinely floating layers get it:
   bottom sheets, dropdowns, popovers. Cards and rows get `--hair`.
 - **One gradient** (`--grad-primary`), on one element per screen: the primary
@@ -151,6 +151,20 @@ rules live at the top of `src/styles.css`; the short version:
 - **Never hardcode a colour.** Spring's `--cui-on-accent` is DARK (`#0d1108`) in
   the dark flavour and white in light, so `color: #fff` on a filled button is a
   real bug in Spring dark. Use the token and check both flavours.
+
+The **cookbook layer** (0.54.0) sits on top of that, because squares and
+hairlines alone read as a 2001 directory listing:
+
+- **A display face** (`--font-display`, a system serif stack — still no web
+  fonts) for recipe titles and stat-strip figures ONLY. Everything else is sans.
+- **Category hues** (`.hue-*` in `src/styles.css`, mapped per category in
+  `src/features/recipeLook.ts`). Each is a `--cui-*` ROLE, never a value. A hue
+  marks what kind of dish something is (plate, category word, rail chip, macro
+  key) and is never decoration on anything else.
+- **Every recipe surface has a picture slot**, `components/RecipePlate.tsx`: a
+  flat hue-and-glyph plate today, the photo in the same box if
+  `RECIPE_PHOTOS_ENABLED` is ever flipped (see `src/features/flags.ts` for why
+  it isn't, yet). Don't add a second, photo-only layout.
 
 ## Publishing
 

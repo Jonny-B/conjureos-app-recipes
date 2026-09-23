@@ -1,10 +1,17 @@
 import type { FeedRecipe } from "../types";
-import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
+import { categoryOf, keyIngredients, lookFor } from "../features/recipeLook";
+import { DifficultyMark, RecipePlate } from "./RecipePlate";
 import { Icon } from "../icons";
 
 /**
- * One dense recipe row for the browse and favourites feeds. Title, meta and a
- * favourite mark.
+ * One recipe row for the browse and favourites feeds: the plate (or photo),
+ * the title, what's in it, and one quiet meta line.
+ *
+ * It used to be a title over a row of capsules — DINNER, EASY — repeated
+ * 1,120 times, which made the feed read as a directory listing. What a row
+ * needs to answer is "what is this dish?", and the ingredients answer that
+ * better than a category chip does, so they get the second line and the
+ * category drops to a coloured word in the meta line.
  *
  * It used to take a `cov` and draw have/short/missing chips against the pantry.
  * That moved to Conjure Pantry with the pantry, and `CoverageChips` went with
@@ -18,34 +25,29 @@ export function RecipeRow({
   onOpen: () => void;
 }) {
   const r = fi.recipe;
-  const category = fi.kind === "catalog" ? fi.recipe.category : null;
+  const category = categoryOf(fi);
+  const keys = keyIngredients(fi);
   return (
     // A button, not a div-with-onClick: every recipe row in the app is this
     // component, so the whole feed was keyboard-unreachable. `type="button"`
     // matters because these do appear inside forms.
     <button type="button" className="browse-item" onClick={onOpen}>
-      {RECIPE_PHOTOS_ENABLED && r.imageUrl && (
-        <div className="browse-thumb">
-          <img src={r.imageUrl} alt="" loading="lazy" />
-        </div>
-      )}
+      <RecipePlate recipe={r} category={category} variant="tile" />
       <div className="title-block">
         <div className="title">
           {r.title}
           {fi.favorite && <Icon name="heart" className="fav-mark" />}
         </div>
+        {keys.length > 0 && <div className="keys">{keys.join(" · ")}</div>}
         <div className="meta">
-          {category && (
-            <>
-              <span className="pill cat">{category}</span>{" "}
-            </>
-          )}
-          <span className={`pill ${r.difficulty}`}>{r.difficulty}</span>
+          <span className={`meta-cat hue-${lookFor(category).hue}`}>{category ?? "My recipe"}</span>
           {/* The USDA corpus carries no times, so an unguarded "{cookTime} min"
               prints "0 min" on all 1,120 rows. Guarded at every call site. */}
-          {r.cookTime > 0 && ` · ${r.cookTime} min`}
-          {r.nutrition && ` · ~${r.nutrition.calories} cal`}
-          {fi.kind === "saved" && " · saved"}
+          {r.cookTime > 0 && <span>{r.cookTime} min</span>}
+          {r.nutrition && r.nutrition.calories > 0 && <span>~{r.nutrition.calories} cal</span>}
+          {r.nutrition && r.nutrition.protein > 0 && <span>{r.nutrition.protein}g protein</span>}
+          {fi.kind === "saved" && fi.recipe.madeCount > 0 && <span>made {fi.recipe.madeCount}×</span>}
+          <DifficultyMark recipe={r} />
         </div>
       </div>
     </button>

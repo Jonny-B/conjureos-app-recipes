@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Recipe } from "../types";
 import { scaleRecipe } from "../features/scaling";
 import { Icon } from "../icons";
+import { DifficultyMark } from "../components/RecipePlate";
+import { splitIngredient } from "../features/recipeLook";
 import { ChefChat } from "./ChefChat";
 import {
   clearCookSession,
@@ -163,10 +165,15 @@ export function GuidedCook({ recipe, saved, savedPath = null, onBack, onMade, on
 
       <h2 className="guided-title">{recipe.title}</h2>
       <div className="guided-meta">
-        <span className={`pill ${recipe.difficulty}`}>{recipe.difficulty}</span>
-        {recipe.cookTime > 0 && <span className="pill">{recipe.cookTime} min</span>}
-        <span className="pill">{servings} serving{servings === 1 ? "" : "s"}</span>
-        {doneSteps > 0 && <span className="pill">{doneSteps}/{totalSteps} steps</span>}
+        <span className="guided-level">
+          <DifficultyMark recipe={recipe} decorative />
+          {recipe.difficulty}
+        </span>
+        {recipe.cookTime > 0 && <span>{recipe.cookTime} min</span>}
+        <span>{servings} serving{servings === 1 ? "" : "s"}</span>
+        <span>
+          {doneSteps}/{totalSteps} steps
+        </span>
       </div>
 
       <section className="guided-section">
@@ -192,8 +199,10 @@ export function GuidedCook({ recipe, saved, savedPath = null, onBack, onMade, on
                     className={`check-row${checked ? " checked" : ""}`}
                     onClick={() => toggle(checkedIng, i, setCheckedIng)}
                   >
-                    <Icon name={checked ? "check" : "circle"} className="check-mark" />
-                    <span className="check-text">{ing}</span>
+                    <span className="tick" aria-hidden="true">
+                      {checked && <Icon name="check" />}
+                    </span>
+                    <IngredientText line={ing} />
                   </button>
                 </li>
               );
@@ -217,7 +226,9 @@ export function GuidedCook({ recipe, saved, savedPath = null, onBack, onMade, on
                   className={`step-row${checked ? " checked" : ""}${isCurrent ? " current" : ""}`}
                   onClick={() => toggle(checkedStep, i, setCheckedStep)}
                 >
-                  <span className="step-num"><Icon name={checked ? "check" : "circle"} /></span>
+                  <span className="step-num" aria-hidden="true">
+                    {checked ? <Icon name="check" /> : i + 1}
+                  </span>
                   <span className="step-text">{step}</span>
                 </button>
               </li>
@@ -276,5 +287,17 @@ export function GuidedCook({ recipe, saved, savedPath = null, onBack, onMade, on
 
       <ChefChat recipe={scaled} open={chefOpen} onClose={() => setChefOpen(false)} />
     </div>
+  );
+}
+
+/** An ingredient line with its amount set in bold, so it reads at arm's length. */
+function IngredientText({ line }: { line: string }) {
+  const { qty, name, note } = splitIngredient(line);
+  return (
+    <span className="check-text">
+      {qty && <strong className="check-qty">{qty} </strong>}
+      {name}
+      {note && ` ${note}`}
+    </span>
   );
 }

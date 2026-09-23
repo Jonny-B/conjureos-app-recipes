@@ -9,8 +9,10 @@ import {
   setSavedFavorite,
 } from "../features/storage";
 import { loadFavorites, toggleCatalogFavorite } from "../features/favorites";
-import { Dropdown, type DropdownOption } from "../components/Dropdown";
 import { RecipeRow } from "../components/RecipeRow";
+import { RecipePlate } from "../components/RecipePlate";
+import { RecipeStats } from "../components/RecipeStats";
+import { categoryOf, keyIngredients, lookFor } from "../features/recipeLook";
 import { RecipeDetail } from "./RecipeDetail";
 import { CreateScreen } from "./CreateScreen";
 import { SnapRecipeScreen } from "./SnapRecipeScreen";
@@ -71,7 +73,6 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<FeedRecipe | null>(null);
   const [mode, setMode] = useState<Mode>("list");
-  const [filterOpen, setFilterOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   /** Re-rolls the top recommendation past its equal-scored ties. */
   const [shuffle, setShuffle] = useState(0);
@@ -160,18 +161,13 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
   const heroPool = scored.slice(0, 12);
   const hero: Scored | null = heroPool.length ? heroPool[shuffle % heroPool.length]! : null;
 
-  const categoryOptions = useMemo<DropdownOption<string>[]>(
-    () => [
-      { value: "all", label: "All categories" },
-      ...categories().map((c) => ({ value: c.name, label: `${c.name} (${c.count})` })),
-    ],
+  // Biggest first, so the rail opens on Dinner (585) and ends on Snack (4).
+  const categoryList = useMemo(
+    () => categories().slice().sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
     [catalogVersion],
   );
 
   const resetPaging = () => setPage(1);
-  // Source now lives in the always-visible segmented switch, so it's no longer a
-  // hidden "filter"; only the category dropdown (All view) counts here.
-  const activeFilters = source === "all" && category !== "all" ? 1 : 0;
 
   // ── mutations ──────────────────────────────────────────────────────
   // All four go through `run` so a failure surfaces in the banner instead of
@@ -278,7 +274,6 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
             className={`seg-btn${source === t.id ? " active" : ""}`}
             onClick={() => {
               onSourceChange(t.id);
-              setFilterOpen(false);
               resetPaging();
             }}
           >
@@ -323,7 +318,7 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
         </button>
       )}
 
-      {/* One slim control bar: search + filter + add. Everything else is the list. */}
+      {/* One slim control bar: search + add. The category rail sits under it. */}
       <div className="lib-header">
         <div className="browse-filter">
           <Icon name="magnifying-glass" />
@@ -337,25 +332,10 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
             }}
           />
         </div>
-        {source === "all" && (
-          <button
-            className={`icon-btn lib-icon${filterOpen || activeFilters ? " active" : ""}`}
-            onClick={() => {
-              setFilterOpen((v) => !v);
-              setAddOpen(false);
-            }}
-            aria-label="Filter"
-            title="Filter by category"
-          >
-            <Icon name="sliders" />
-            {activeFilters > 0 && <span className="lib-badge">{activeFilters}</span>}
-          </button>
-        )}
         <button
           className={`icon-btn lib-icon${addOpen ? " active" : ""}`}
           onClick={() => {
             setAddOpen((v) => !v);
-            setFilterOpen(false);
           }}
           aria-label="Add a recipe"
           title="Add a recipe"
@@ -363,21 +343,6 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
           <Icon name="plus" />
         </button>
       </div>
-
-      {filterOpen && source === "all" && (
-        <div className="lib-panel">
-          <div className="lib-panel-label">Category</div>
-          <Dropdown
-            options={categoryOptions}
-            value={category}
-            onChange={(v) => {
-              setCategory(v);
-              resetPaging();
-            }}
-            ariaLabel="Filter by category"
-          />
-        </div>
-      )}
 
       {addOpen && (
         <div className="lib-panel add-panel">
@@ -390,6 +355,45 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
           <button className="btn secondary" onClick={() => { setAddOpen(false); setMode("describe"); }}>
             <Icon name="wand" /> Describe a dish
           </button>
+        </div>
+      )}
+
+      {/* Categories, out in the open. They used to sit behind a filter icon in
+          a dropdown, so the one way to browse 1,120 recipes by kind was two
+          clicks deep and looked like a settings menu. */}
+      {source === "all" && categoryList.length > 0 && (
+        <div className="cat-rail" role="group" aria-label="Category">
+          <button
+            type="button"
+            aria-pressed={category === "all"}
+            className={`cat-chip${category === "all" ? " active" : ""}`}
+            onClick={() => {
+              setCategory("all");
+              resetPaging();
+            }}
+          >
+            All
+          </button>
+          {categoryList.map((c) => {
+            const look = lookFor(c.name);
+            const on = category === c.name;
+            return (
+              <button
+                key={c.name}
+                type="button"
+                aria-pressed={on}
+                className={`cat-chip hue-${look.hue}${on ? " active" : ""}`}
+                onClick={() => {
+                  setCategory(on ? "all" : c.name);
+                  resetPaging();
+                }}
+              >
+                <Icon name={look.glyph} />
+                {c.name}
+                <span className="cat-count">{c.count}</span>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -428,9 +432,9 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
 }
 
 /**
- * The library's one recommendation. Lifted verbatim off the old Home screen,
- * minus its glow and gradient wash (the visual language has one hero surface
- * and it says so with an accent hairline now).
+ * The library's one recommendation. Lifted off the old Home screen; since
+ * 0.54.0 it is a poster (the recipe's plate, or its photo) beside the pitch,
+ * because a feature that looks exactly like a feed row is just a big row.
  */
 function HeroPick({
   scored,
@@ -444,33 +448,29 @@ function HeroPick({
   canShuffle: boolean;
 }) {
   const r = scored.fi.recipe;
+  const category = categoryOf(scored.fi);
+  const keys = keyIngredients(scored.fi, 5);
   return (
     <article className="hero-card">
-      {canShuffle && (
-        <button className="hero-refresh" onClick={onShuffle} aria-label="Another idea" title="Another idea">
-          <Icon name="rotate" />
-        </button>
-      )}
-      <div className="hero-eyebrow">
-        <Icon name="wand" /> Tonight's pick
-      </div>
-      <h3 className="hero-title">{r.title}</h3>
-      <div className="hero-meta">
-        {scored.fi.kind === "catalog" && <span className="pill cat">{scored.fi.recipe.category}</span>}
-        <span className={`pill ${r.difficulty}`}>{r.difficulty}</span>
-        {/* The USDA corpus carries no times, so a `0 min` pill would print on
-            all 1,120 rows. Fixed at 0.43.1; do not drop the guard. */}
-        {r.cookTime > 0 && <span className="pill">{r.cookTime} min</span>}
-        {r.nutrition && <span className="pill">~{r.nutrition.calories} cal</span>}
-      </div>
-      <div className="hero-why">
-        <Icon name="circle-info" />
-        {scored.reason}
-      </div>
-      <div className="hero-actions">
-        <button className="btn" onClick={onView}>
-          View recipe
-        </button>
+      <RecipePlate recipe={r} category={category} variant="poster" />
+      <div className="hero-body">
+        {canShuffle && (
+          <button className="hero-refresh" onClick={onShuffle} aria-label="Another idea" title="Another idea">
+            <Icon name="rotate" />
+          </button>
+        )}
+        <div className="hero-eyebrow">
+          <Icon name="wand" /> Tonight's pick
+        </div>
+        <h3 className="hero-title">{r.title}</h3>
+        {keys.length > 0 && <div className="hero-keys">{keys.join(" · ")}</div>}
+        <RecipeStats recipe={r} compact />
+        <div className="hero-foot">
+          <button className="btn" onClick={onView}>
+            View recipe
+          </button>
+          <span className="hero-why">{scored.reason}</span>
+        </div>
       </div>
     </article>
   );

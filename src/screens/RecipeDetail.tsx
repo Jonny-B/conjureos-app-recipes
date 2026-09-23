@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { FeedRecipe, Recipe, SavedRecipe } from "../types";
-import { formatStrip } from "../features/nutrition";
-import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
 import { safeHref, hrefHost } from "../features/safeUrl";
+import { categoryOf, lookFor, splitIngredient } from "../features/recipeLook";
+import { RecipePlate } from "../components/RecipePlate";
+import { RecipeStats } from "../components/RecipeStats";
 import { CHEF_NAME } from "./StudioScreen";
 import { Icon } from "../icons";
 
@@ -84,6 +85,7 @@ export function RecipeDetail({
   }, [menuOpen]);
 
   const isCatalog = feed.kind === "catalog";
+  const category = categoryOf(feed);
 
   return (
     <div className="browse-screen">
@@ -140,36 +142,31 @@ export function RecipeDetail({
         </div>
       )}
 
-      <article className="recipe-card recipe-card--static" style={{ maxWidth: "100%" }}>
-        <button
-          className={`card-fav${feed.favorite ? " on" : ""}`}
-          onClick={onToggleFavorite}
-          aria-label={feed.favorite ? "Remove from favorites" : "Add to favorites"}
-          title={feed.favorite ? "Remove from favorites" : "Add to favorites"}
-        >
-          <Icon name="heart" />
-        </button>
-        {RECIPE_PHOTOS_ENABLED && recipe.imageUrl && (
-          <div className="recipe-hero">
-            <img src={recipe.imageUrl} alt={recipe.title} loading="lazy" />
+      <article className="recipe-sheet">
+        <header className="recipe-head">
+          <RecipePlate recipe={recipe} category={category} variant="poster" />
+          <div className="recipe-head-body">
+            <button
+              className={`card-fav${feed.favorite ? " on" : ""}`}
+              onClick={onToggleFavorite}
+              aria-label={feed.favorite ? "Remove from favorites" : "Add to favorites"}
+              title={feed.favorite ? "Remove from favorites" : "Add to favorites"}
+            >
+              <Icon name="heart" />
+            </button>
+            <div className={`recipe-eyebrow hue-${lookFor(category).hue}`}>
+              {category ?? "My recipe"}
+              {feed.kind === "saved" && feed.recipe.madeCount > 0 && (
+                <span className="recipe-made"> · made {feed.recipe.madeCount}×</span>
+              )}
+            </div>
+            <h2 className="recipe-title">{recipe.title}</h2>
+            {recipe.chefFeatured && <div className="chef-byline">By {CHEF_NAME}</div>}
+            {recipe.summary && <p className="recipe-summary">{recipe.summary}</p>}
           </div>
-        )}
-        <h3 style={{ fontSize: 22, paddingRight: 40 }}>{recipe.title}</h3>
-        <div>
-          {isCatalog && <span className="pill">{feed.recipe.category}</span>}
-          <span className={`pill ${recipe.difficulty}`}>{recipe.difficulty}</span>
-          {recipe.cookTime > 0 && <span className="pill">{recipe.cookTime} min</span>}
-          <span className="pill">{recipe.servings} serving{recipe.servings === 1 ? "" : "s"}</span>
-          {feed.kind === "saved" && feed.recipe.madeCount > 0 && (
-            <span className="pill">made {feed.recipe.madeCount}×</span>
-          )}
-        </div>
-        {recipe.chefFeatured && <div className="chef-byline">By {CHEF_NAME}</div>}
+        </header>
 
-        {recipe.summary && <p className="summary">{recipe.summary}</p>}
-        {recipe.nutrition && (
-          <div className="muted" style={{ fontSize: 12, lineHeight: 1.4 }}>{formatStrip(recipe.nutrition)}</div>
-        )}
+        <RecipeStats recipe={recipe} />
 
         {/* Chef's blog: the story you scroll past on recipe sites — with a skip. */}
         {recipe.blog && (
@@ -184,45 +181,77 @@ export function RecipeDetail({
           </section>
         )}
 
-
         <div ref={recipeRef} />
-        <section>
-          <h4>Ingredients</h4>
-          <ul>
-            {recipe.ingredients.map((ing, i) => (
-              <li key={i}>{ing}</li>
-            ))}
-          </ul>
-        </section>
+        {/* Cookbook layout: the ingredient table beside the method on a wide
+            screen, stacked on a phone. Amounts get their own column so you
+            can read down it while shopping or measuring. */}
+        <div className="recipe-body">
+          <section className="recipe-ingredients">
+            <h3 className="recipe-section-head">
+              Ingredients <span>{recipe.ingredients.length}</span>
+            </h3>
+            <ul className="ing-table">
+              {recipe.ingredients.map((ing, i) => {
+                const { qty, name, note } = splitIngredient(ing);
+                return (
+                  <li key={i}>
+                    <span className="ing-qty">{qty}</span>
+                    <span className="ing-name">
+                      {name}
+                      {note && <span className="ing-note"> {note}</span>}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
 
-        <section>
-          <h4>Instructions</h4>
-          <ol>
-            {recipe.instructions.map((step, i) => (
-              <li key={i}>{step}</li>
-            ))}
-          </ol>
-        </section>
-
-        <button
-          className="btn detail-cook-bottom"
-          onClick={() => onCook(recipe, feed.kind === "saved" ? feed.recipe : null)}
-        >
-          <Icon name="bowl-food" /> Cook this
-        </button>
+          <section className="recipe-method">
+            <h3 className="recipe-section-head">
+              Method <span>{recipe.instructions.length} steps</span>
+            </h3>
+            <ol className="method">
+              {recipe.instructions.map((step, i) => (
+                <li key={i}>
+                  <span className="method-num">{String(i + 1).padStart(2, "0")}</span>
+                  <p>{step}</p>
+                </li>
+              ))}
+            </ol>
+            <button
+              className="btn detail-cook-bottom"
+              onClick={() => onCook(recipe, feed.kind === "saved" ? feed.recipe : null)}
+            >
+              <Icon name="bowl-food" /> Cook this
+            </button>
+          </section>
+        </div>
 
         {isCatalog && sourceHref && (
-          <div className="faint" style={{ fontSize: 11, marginTop: 8 }}>
+          <div className="recipe-source">
             Source:{" "}
-            <a href={sourceHref} target="_blank" rel="noreferrer noopener" className="source-link">
-              {hrefHost(sourceHref) ?? "AllRecipes"}
+            <a href={archivedHref(sourceHref)} target="_blank" rel="noreferrer noopener" className="source-link">
+              {hrefHost(sourceHref) ?? "source"}
+              {isRetiredSource(sourceHref) && " (archived)"}
             </a>
           </div>
         )}
-        {feed.kind === "saved" && (
-          <div className="faint" style={{ fontSize: 11, marginTop: 8 }}>{feed.recipe.path}</div>
-        )}
+        {feed.kind === "saved" && <div className="recipe-source">{feed.recipe.path}</div>}
       </article>
     </div>
   );
+}
+
+/**
+ * myplate.gov was retired in January 2026: every catalog row's source URL now
+ * redirects to the site's front page, so "Source: myplate.gov" was a link to
+ * the wrong page. The Internet Archive's capture — the same pages the corpus
+ * was ingested from — is the page the link means.
+ */
+function isRetiredSource(href: string): boolean {
+  return hrefHost(href) === "myplate.gov";
+}
+
+function archivedHref(href: string): string {
+  return isRetiredSource(href) ? `https://web.archive.org/web/2025/${href}` : href;
 }
