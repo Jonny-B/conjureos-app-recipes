@@ -2143,6 +2143,42 @@ select {
   font-weight: 700;
   line-height: 1.25;
 }
+/* The meal's title opens its recipe in place, so it can be read before it is
+   kept or swapped. A full-height tap target, not just the text. */
+.meal-open {
+  all: unset;
+  box-sizing: border-box;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+.meal-open:focus-visible {
+  outline: 2px solid var(--cui-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.meal-open .fa-icon {
+  font-size: 12px;
+  opacity: 0.7;
+}
+.meal-preview {
+  font-size: 14px;
+  line-height: 1.45;
+}
+.meal-preview h4 {
+  margin: 6px 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.meal-preview ul,
+.meal-preview ol {
+  margin: 0;
+  padding-left: 20px;
+}
 /* Two distinct outs for a meal you don't want, side by side: regenerate just
    this slot, or never suggest it again. They read as quiet affordances until
    hovered — the plan is the content, these are the escape hatches. */

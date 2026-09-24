@@ -12,7 +12,7 @@ import { generateFromDescription } from "./features/recipes";
 import { registerActions } from "./bridge/actions";
 import { vfs } from "./bridge/vfs";
 import { joinFamily } from "./bridge/recipesApi";
-import { ensureCatalogLoaded } from "./features/catalog";
+import { ensureCatalogLoaded, loadRecipeBody } from "./features/catalog";
 import { loadPantry, ingredientsFromPantry } from "./features/pantry";
 import { markMade, unmarkMade, saveRecipe } from "./features/storage";
 import { useWhoami } from "./hooks/useWhoami";
@@ -148,9 +148,18 @@ export function App() {
 
   // Every "cook this" doorway routes here: load the recipe into the guided cook
   // and switch to the Cook tab.
-  const startCook = (recipe: Recipe, saved: SavedRecipe | null = null) => {
-    setCookOrigin(tab);
-    setCookTarget({ recipe, saved });
+  /**
+   * Every "open this recipe" path lands here, so the body is filled in HERE
+   * rather than at each call site. A catalog row is slim (no ingredients, no
+   * steps) until it is fetched, and each screen that forgot to fetch it opened
+   * a cook with "Ingredients 0/0" and no steps (ConjureOS #643). loadRecipeBody
+   * is a no-op for a recipe that already carries its body.
+   */
+  const startCook = async (recipe: Recipe, saved: SavedRecipe | null = null) => {
+    const origin = tab;
+    const full = await loadRecipeBody(recipe as Recipe & { id?: string });
+    setCookOrigin(origin);
+    setCookTarget({ recipe: full, saved });
     setTab("cook");
   };
   const endCook = () => {
@@ -249,6 +258,7 @@ export function App() {
             onIntentConsumed={() => setPlansIntent(null)}
             onCogItems={setCogExtras}
             familyEpoch={familyEpoch}
+            onCook={(r) => void startCook(r)}
           />
         )}
         {tab === "studio" && <StudioScreen />}
