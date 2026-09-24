@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.44.0",
+  "version": "0.45.0",
   "description": "Recipes for ConjureOS: browse a catalog, keep a pantry, get suggestions ranked by what you have, and plan a week of meals that shares a shopping list.",
   "type": "module",
   "license": "MIT",
@@ -383,7 +383,7 @@
       },
       "searchRecipes": {
         "permission": "actions.read",
-        "description": "Search the built-in recipe catalog (~1,200 recipes) by free text and/or category. Use this to FIND a recipe the user does not already have; listRecipes only sees their own saved library.",
+        "description": "Search the built-in recipe catalog (~1,200 recipes) by free text and/or category, with each hit's ingredients. Use this to FIND a recipe the user does not already have; listRecipes only sees their own saved library.",
         "params": {
           "type": "object",
           "properties": {
@@ -419,6 +419,12 @@
                   "title": {
                     "type": "string"
                   },
+                  "ingredients": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
                   "category": {
                     "type": "string"
                   },
@@ -437,10 +443,18 @@
                       "type": "string"
                     }
                   }
-                }
+                },
+                "required": [
+                  "id",
+                  "title",
+                  "ingredients"
+                ]
               }
             }
-          }
+          },
+          "required": [
+            "recipes"
+          ]
         }
       },
       "listCategories": {
