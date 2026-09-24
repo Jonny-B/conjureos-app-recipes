@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { PantryItem, WeekPlan } from "../types";
+import type { PantryItem, Recipe, WeekPlan } from "../types";
 import { importVfsPlansOnce, planTitle } from "../features/planStorage";
 import { PlanWriter } from "../features/planSync";
 import {
@@ -102,8 +102,11 @@ export function PlansScreen({
   onIntentConsumed,
   onCogItems,
   familyEpoch = 0,
+  onCook,
 }: {
   pantry: PantryItem[] | null;
+  /** Open a planned meal's recipe (ConjureOS #621 / #643). */
+  onCook?: (recipe: Recipe) => void;
   catalogVersion?: number;
   /**
    * Bumped by the host when the user joins a family from OUTSIDE this screen
@@ -592,6 +595,7 @@ export function PlansScreen({
               onToggle={(c) => toggleChecked(current, c)}
               onUncheckAll={() => uncheckAll(current)}
               onManageStores={() => setMode("stores")}
+              onOpenMeal={onCook}
             />
             {active.length > 1 && (
               <section className="home-section">
@@ -678,6 +682,7 @@ function PlanView({
   onToggle,
   onUncheckAll,
   onManageStores,
+  onOpenMeal,
 }: {
   rec: PlanRecord;
   isLatest: boolean;
@@ -685,6 +690,7 @@ function PlanView({
   onToggle: (canonical: string) => void;
   onUncheckAll: () => void;
   onManageStores: () => void;
+  onOpenMeal?: (recipe: Recipe) => void;
 }) {
   const plan = rec.data;
 
@@ -858,7 +864,19 @@ function PlanView({
         </div>
         <div className="browse-list">
           {(plan.picks ?? []).map((pick) => (
-            <div key={pick.id} className="browse-item" style={{ cursor: "default" }}>
+            <button
+              key={pick.id}
+              type="button"
+              className="browse-item"
+              disabled={!onOpenMeal || !pick.recipe}
+              aria-label={`Open ${pick.title}`}
+              // A saved plan holds the whole recipe it was built from. The id
+              // rides along so a plan saved with a slim catalog row (no
+              // ingredients or steps) can still have its body fetched on open.
+              onClick={() =>
+                onOpenMeal?.({ ...pick.recipe, id: (pick.recipe as Recipe & { id?: string }).id ?? pick.id } as Recipe)
+              }
+            >
               <div className="title-block">
                 <div className="title">{pick.title}</div>
                 <div className="meta">
@@ -866,7 +884,7 @@ function PlanView({
                   {pick.marginalNew.length > 0 && ` · ${pick.marginalNew.length} to buy`}
                 </div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </section>

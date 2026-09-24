@@ -21,6 +21,8 @@ import {
   type PlanCandidate,
 } from "../features/planWeek";
 import { planWeekRemote } from "../bridge/recipesApi";
+import { loadRecipeBody } from "../features/catalog";
+import { spliceReroll } from "../features/reroll";
 import { identifyIngredients } from "../features/vision";
 import { sanitizeName } from "../features/vision";
 import { prettyIngredient } from "../features/scaling";
@@ -95,6 +97,16 @@ export function PlanWeekScreen({
   const [constraints, setConstraints] = useState<MoodConstraints | null>(null);
   const [plan, setPlan] = useState<WeekPlan | null>(null);
   const [excludeIds, setExcludeIds] = useState<string[]>([]);
+  // The latest plan and exclude list, read by swap/thumbs-down. The handlers
+  // are closures from the render the tap happened in, so a second tap while
+  // the first swap was still in flight used to pin the meal that swap had just
+  // rejected and put it back, overwriting the first swap's result (#620).
+  const planRef = useRef<WeekPlan | null>(null);
+  planRef.current = plan;
+  const excludeRef = useRef<string[]>([]);
+  excludeRef.current = excludeIds;
+  /** One swap at a time: a tap during a swap is ignored, not queued. */
+  const swapInFlight = useRef(false);
   const [busy, setBusy] = useState<null | "mood" | "saving">(null);
   const [planning, setPlanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -224,8 +236,8 @@ export function PlanWeekScreen({
     exclude: string[],
     c = constraints,
     keep?: string[],
-    /** Slot the replacement should occupy, so a rerolled meal doesn't jump to the end. */
-    replaceAt?: number,
+    /** The meal being swapped out. Every other meal on screen stays put. */
+    rejectedId?: string,
   ): Promise<boolean> => {
     if (!c) return false;
     setPlanning(true);
@@ -267,15 +279,19 @@ export function PlanWeekScreen({
         tags: r.tags,
         isFavorite: favs.has(r.id),
       }));
-      // The server returns pins first, then whatever it filled — so a rerolled
-      // meal would otherwise appear at the BOTTOM of the list, which is its own
-      // kind of "the list changed under me". Put it back in the slot the
-      // rejected meal occupied.
-      if (keep && typeof replaceAt === "number") {
-        const kept = keep.map((id) => chosen.find((x) => x.id === id)).filter(Boolean) as PlanCandidate[];
-        const fresh = chosen.filter((x) => !keep.includes(x.id));
-        kept.splice(replaceAt, 0, ...fresh);
-        chosen = kept;
+      // Swapping one meal: the keepers come from the plan on screen, not from
+      // the response, and the response contributes one meal in the rejected
+      // slot. See features/reroll.ts.
+      if (rejectedId && planRef.current) {
+        const onScreen: PlanCandidate[] = planRef.current.picks.map((p) => ({
+          id: p.id,
+          title: p.title,
+          recipe: p.recipe,
+          category: "",
+          tags: [],
+          isFavorite: favs.has(p.id),
+        }));
+        chosen = spliceReroll(onScreen, rejectedId, chosen);
       }
       // A pin the planner couldn't use is dropped server-side (excluded, or
       // filtered out by an avoid/dietary rule). Say so: the user asked for a
@@ -337,10 +353,19 @@ export function PlanWeekScreen({
    * slot gets filled, and the replacement is still chosen to share ingredients
    * with the meals you kept.
    */
-  const rerollPick = (id: string) => {
-    const all = (plan?.picks ?? []).map((p) => p.id);
-    const at = all.indexOf(id);
-    void runPlan([...excludeIds, id], constraints ?? undefined, all.filter((p) => p !== id), at);
+  const swapOne = async (id: string) => {
+    const all = (planRef.current?.picks ?? []).map((p) => p.id);
+    await runPlan([...excludeRef.current, id], constraints ?? undefined, all.filter((p) => p !== id), id);
+  };
+
+  const rerollPick = async (id: string) => {
+    if (swapInFlight.current) return;
+    swapInFlight.current = true;
+    try {
+      await swapOne(id);
+    } finally {
+      swapInFlight.current = false;
+    }
   };
 
   /**
@@ -349,7 +374,17 @@ export function PlanWeekScreen({
    * RECOMMENDATIONS — the recipe stays searchable and cookable.
    */
   const blockPick = async (id: string) => {
-    const title = (plan?.picks ?? []).find((p) => p.id === id)?.title ?? "That meal";
+    if (swapInFlight.current) return;
+    swapInFlight.current = true;
+    try {
+      await blockAndSwap(id);
+    } finally {
+      swapInFlight.current = false;
+    }
+  };
+
+  const blockAndSwap = async (id: string) => {
+    const title = (planRef.current?.picks ?? []).find((p) => p.id === id)?.title ?? "That meal";
     // The block is meant to be DURABLE and cross-device. The old `.catch`
     // fabricated a client-only Set and carried on, and the "won't suggest
     // that again" banner showed anyway — so the user was told a permanent
@@ -366,9 +401,7 @@ export function PlanWeekScreen({
       );
     }
     setLastBlocked({ id, title });
-    const all = (plan?.picks ?? []).map((p) => p.id);
-    const at = all.indexOf(id);
-    await runPlan([...excludeIds, id], constraints ?? undefined, all.filter((p) => p !== id), at);
+    await swapOne(id);
   };
 
   /**
@@ -509,7 +542,8 @@ export function PlanWeekScreen({
       {step === "review" && plan && (
         <ReviewStep
           plan={plan}
-          onReroll={rerollPick}
+          onReroll={(id) => void rerollPick(id)}
+          swapping={planning}
           onBlock={(id) => void blockPick(id)}
           isLiked={(id) => favs.has(id) || savedCandidates.some((s) => s.id === id)}
           onLike={(id) => void likePick(id)}
@@ -771,8 +805,11 @@ function ReviewStep({
   onUndoBlock,
   onBack,
   onNext,
+  swapping,
 }: {
   plan: WeekPlan;
+  /** A swap is in flight: the swap and thumbs-down buttons wait for it. */
+  swapping: boolean;
   onReroll: (id: string) => void;
   onBlock: (id: string) => void;
   isLiked: (id: string) => boolean;
@@ -782,6 +819,19 @@ function ReviewStep({
   onBack: () => void;
   onNext: () => void;
 }) {
+  // Which meal's recipe is open for a look, so a meal can be judged before it
+  // is kept or swapped (#620). The body is fetched on first open when the
+  // pick is a slim row; `bodies` holds what came back.
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [bodies, setBodies] = useState<Record<string, { ingredients: string[]; instructions: string[] }>>({});
+  const toggleOpen = (pick: WeekPlan["picks"][number]) => {
+    if (openId === pick.id) return setOpenId(null);
+    setOpenId(pick.id);
+    if (bodies[pick.id] || (pick.recipe.ingredients.length > 0 && pick.recipe.instructions.length > 0)) return;
+    void loadRecipeBody({ ...pick.recipe, id: pick.id }).then((r) =>
+      setBodies((b) => ({ ...b, [pick.id]: { ingredients: r.ingredients, instructions: r.instructions } })),
+    );
+  };
   return (
     <>
       {plan.warnings.map((w, i) => (
@@ -814,7 +864,17 @@ function ReviewStep({
         {plan.picks.map((pick) => (
           <article key={pick.id} className="meal-card">
             <div className="meal-card-head">
-              <h3>{pick.title}</h3>
+              <h3>
+                <button
+                  type="button"
+                  className="meal-open"
+                  aria-expanded={openId === pick.id}
+                  onClick={() => toggleOpen(pick)}
+                >
+                  {pick.title}
+                  <Icon name={openId === pick.id ? "chevron-up" : "chevron-down"} />
+                </button>
+              </h3>
               <div className="meal-card-actions">
                 <button
                   className={`icon-btn meal-like${isLiked(pick.id) ? " liked" : ""}`}
@@ -829,6 +889,7 @@ function ReviewStep({
                 </button>
                 <button
                   className="icon-btn meal-swap"
+                  disabled={swapping}
                   onClick={() => onReroll(pick.id)}
                   title="Not this week: suggest a different meal for this slot"
                   aria-label={`Replace ${pick.title} with a different meal`}
@@ -837,6 +898,7 @@ function ReviewStep({
                 </button>
                 <button
                   className="icon-btn meal-block"
+                  disabled={swapping}
                   onClick={() => onBlock(pick.id)}
                   title="Don't suggest this again"
                   aria-label={`Never suggest ${pick.title} again`}
@@ -853,6 +915,13 @@ function ReviewStep({
                 <span className="muted meal-adds-count">· adds {pick.marginalNew.length} to list</span>
               )}
             </div>
+            {openId === pick.id && (
+              <MealPreview
+                ingredients={bodies[pick.id]?.ingredients ?? pick.recipe.ingredients}
+                instructions={bodies[pick.id]?.instructions ?? pick.recipe.instructions}
+                loading={!bodies[pick.id] && pick.recipe.instructions.length === 0}
+              />
+            )}
             {pick.marginalNew.length > 0 && (
               <div className="cov-strip meal-adds">
                 {pick.marginalNew.map((t) => (
@@ -873,6 +942,45 @@ function ReviewStep({
         </button>
       </div>
     </>
+  );
+}
+
+function MealPreview({
+  ingredients,
+  instructions,
+  loading,
+}: {
+  ingredients: string[];
+  instructions: string[];
+  loading: boolean;
+}) {
+  if (loading) return <div className="meal-preview muted">Loading the recipe…</div>;
+  if (ingredients.length === 0 && instructions.length === 0) {
+    return <div className="meal-preview muted">Couldn't load this recipe. Try again in a moment.</div>;
+  }
+  return (
+    <div className="meal-preview">
+      {ingredients.length > 0 && (
+        <>
+          <h4>Ingredients</h4>
+          <ul>
+            {ingredients.map((l, i) => (
+              <li key={i}>{l}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {instructions.length > 0 && (
+        <>
+          <h4>Steps</h4>
+          <ol>
+            {instructions.map((l, i) => (
+              <li key={i}>{l}</li>
+            ))}
+          </ol>
+        </>
+      )}
+    </div>
   );
 }
 
