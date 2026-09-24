@@ -69,6 +69,10 @@ export function App() {
   // server is authoritative; these tabs are just the reveal (Studio for
   // chef/admin, Admin for admin). Every write re-checks the role server-side.
   const { role, email: myEmail, loading: roleLoading, err: roleErr } = useRole();
+  // Backend diagnostics belong in the console, never on screen (ConjureOS #921).
+  useEffect(() => {
+    if (roleErr) console.warn("[recipes] role lookup failed:", roleErr, "host:", who);
+  }, [roleErr, who]);
   const tabs = [...TABS];
   // Studio (chef blog authoring) is open to chefs AND admins — admins see all
   // role surfaces. The recipes-db chefUpsert re-verifies the role server-side.
@@ -287,12 +291,7 @@ export function App() {
       </nav>
       <footer className="app-version">
         v{APP_VERSION}
-        {!roleLoading &&
-          (myEmail
-            ? ` · ${myEmail} · ${role}`
-            : ` · host:${who ? (who.signedIn ? who.email ?? "anon" : "out") : "?"} · ${
-                roleErr ? `backend: ${roleErr.slice(0, 60)}` : "not signed in"
-              }`)}
+        {!roleLoading && (myEmail ? ` · ${myEmail} · ${role}` : roleErr ? " · Couldn't reach Recipes. Some features may not work." : "")}
       </footer>
       {cogOpen && (
         <div className="sheet-overlay" onClick={() => setCogOpen(false)}>
