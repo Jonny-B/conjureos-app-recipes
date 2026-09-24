@@ -84,7 +84,7 @@ export const AI_MARK_TEXT = "AI-generated";
  * Draw the image onto a canvas (at most 1024px on the long edge) with the
  * "AI-generated" mark burned into the TOP-RIGHT corner, and return a JPEG
  * as bare base64. The mark scales with the image so it reads the same at any
- * size: a translucent dark box, white text, about 2.4% of the width tall.
+ * size: a faint dark box and soft white text, about 1.7% of the width tall.
  */
 export async function stampAiMark(dataUrl: string): Promise<string> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -104,13 +104,15 @@ export async function stampAiMark(dataUrl: string): Promise<string> {
   ctx.drawImage(img, 0, 0, w, h);
 
   // Pixel colours on an image, not UI colours: the palette tokens don't apply.
-  const fontPx = Math.max(12, Math.round(w * 0.024));
-  ctx.font = `600 ${fontPx}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+  // Deliberately quiet (owner: "not so visible"): small, a faint box, soft
+  // text — present and legible, not a banner across the food.
+  const fontPx = Math.max(11, Math.round(w * 0.017));
+  ctx.font = `500 ${fontPx}px system-ui, -apple-system, "Segoe UI", sans-serif`;
   const textW = Math.ceil(ctx.measureText(AI_MARK_TEXT).width);
-  const padX = Math.round(fontPx * 0.7);
+  const padX = Math.round(fontPx * 0.6);
   const boxW = textW + padX * 2;
-  const boxH = Math.round(fontPx * 1.8);
-  const margin = Math.round(w * 0.025);
+  const boxH = Math.round(fontPx * 1.7);
+  const margin = Math.round(w * 0.02);
   // Top-right, not the conventional bottom-right: on the open recipe the
   // picture fades into the card from the left and from the bottom, which
   // hid a bottom-right stamp completely. Top-right is the one corner no
@@ -118,9 +120,9 @@ export async function stampAiMark(dataUrl: string): Promise<string> {
   // (styles.css .plate--photo) so a crop never takes it either.
   const x = w - boxW - margin;
   const y = margin;
-  ctx.fillStyle = "rgba(0, 0, 0, 0.58)";
+  ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
   ctx.fillRect(x, y, boxW, boxH);
-  ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
   ctx.textBaseline = "middle";
   ctx.fillText(AI_MARK_TEXT, x + padX, y + boxH / 2 + 1);
 
