@@ -11,7 +11,8 @@
  * script imports exactly what that file lists and nothing else.
  *
  * What it does, per recipe:
- *   1. Fetch the photo from the Internet Archive's capture of myplate.gov
+ *   1. Fetch the photo from the Internet Archive's capture of myplate.gov,
+ *      trying each archived size in turn
  *      (the live site and its image CDN were retired in January 2026).
  *      Cached under scripts/.cache/usda-photos/, so a re-run doesn't refetch.
  *   2. Upload it to the public `recipe-images` bucket (migration 109) at
@@ -59,9 +60,18 @@ const auth = { Authorization: `Bearer ${KEY}`, apikey: KEY };
 async function fetchPhoto(entry) {
   const file = join(CACHE, `${entry.slug}.jpg`);
   if (existsSync(file) && statSync(file).size > 2000) return readFileSync(file);
-  for (let attempt = 0; attempt < 6; attempt++) {
-    try {
-      const res = await fetch(entry.archivedImage, { redirect: "follow" });
+  // Every size the page linked, biggest first: the Archive often holds some
+  // renditions of a photo and not others. A 5xx/404 means "not archived" —
+  // move on; a network error means "throttled" — back off and retry.
+  for (const url of entry.archivedImages) {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      let res;
+      try {
+        res = await fetch(url, { redirect: "follow" });
+      } catch {
+        await sleep(3000 + attempt * 4000);
+        continue;
+      }
       const type = res.headers.get("content-type") || "";
       if (res.ok && type.startsWith("image/")) {
         const buf = Buffer.from(await res.arrayBuffer());
@@ -70,10 +80,8 @@ async function fetchPhoto(entry) {
           return buf;
         }
       }
-    } catch {
-      /* retry */
+      break; // answered, but not with an image: try the next size
     }
-    await sleep(3000 + attempt * 4000);
   }
   return null;
 }

@@ -48,11 +48,18 @@ FEDERAL = re.compile(
 )
 # Federally FUNDED is not federally MADE: SNAP-Ed is run by states and
 # universities, and Strategic Partners are companies and trade bodies.
-NOT_FEDERAL = re.compile(r"SNAP-Ed|MyPlate National Strategic Partner", re.I)
+# "Food Stamp Nutrition Education" is SNAP-Ed's old name.
+NOT_FEDERAL = re.compile(r"SNAP-Ed|Food Stamp Nutrition Education|MyPlate National Strategic Partner", re.I)
 
 
 def is_federal(credit):
-    return bool(credit) and bool(FEDERAL.search(credit)) and not NOT_FEDERAL.search(credit)
+    if not credit or not FEDERAL.search(credit) or NOT_FEDERAL.search(credit):
+        return False
+    # Some credits name the PHOTO's source separately — "... (photo)
+    # University of Nebraska Cooperative Extension" — and then that source is
+    # the one that has to be federal.
+    m = re.search(r"\(photo\)(.*)$", credit, re.I)
+    return not m or bool(FEDERAL.search(m.group(1)))
 
 
 def curl(args):
@@ -106,7 +113,22 @@ def parse(h):
                 elif isinstance(im, str):
                     image = im
     m = re.search(r"Source:\s*(.*?)</div>", re.sub(r"\s+", " ", h))
-    return image, (text(m.group(1))[:300] if m else None)
+    credit = text(m.group(1))[:300] if m else None
+    # The same photo at every size the page links. The Archive often holds
+    # some renditions and not others, so the importer tries them in turn,
+    # biggest first.
+    sizes = []
+    if image:
+        base = re.sub(r"^.*/public/", "", image.split("?")[0])
+        for u in re.findall(r"https://myplate-prod\.azureedge\.us/sites/default/files/[^\s\"'<>]+", h):
+            u = htmllib.unescape(u)
+            if re.sub(r"^.*/public/", "", u.split("?")[0]) == base and u not in sizes:
+                sizes.append(u)
+        if image not in sizes:
+            sizes.append(image)
+    rank = {"recipe_525_x_350_": 0, "large": 1, "medium": 2}
+    sizes.sort(key=lambda u: min((v for k, v in rank.items() if f"/styles/{k}/" in u), default=3))
+    return image, credit, sizes
 
 
 def one(row):
@@ -117,8 +139,8 @@ def one(row):
     h = page(slug)
     if h is None:
         return {"slug": slug, "title": row["title"], "error": "archive fetch failed"}
-    image, credit = parse(h)
-    return {"slug": slug, "title": row["title"], "sourceUrl": row["sourceUrl"], "image": image, "credit": credit}
+    image, credit, sizes = parse(h)
+    return {"slug": slug, "title": row["title"], "sourceUrl": row["sourceUrl"], "image": image, "credit": credit, "sizes": sizes}
 
 
 def main():
@@ -139,7 +161,7 @@ def main():
             "title": r["title"],
             "sourceUrl": r["sourceUrl"],
             "credit": r["credit"],
-            "archivedImage": "https://web.archive.org/web/2025id_/" + r["image"],
+            "archivedImages": ["https://web.archive.org/web/2025id_/" + u for u in r["sizes"]],
         }
         for r in ok
         if r["image"] and is_federal(r["credit"])
