@@ -18,6 +18,16 @@ import type { Recipe } from "../types";
 import { uploadRecipeImage } from "../bridge/recipesApi";
 import { vfs } from "../bridge/vfs";
 import { ensureTermsAccepted } from "./terms";
+import { splitIngredient } from "./recipeLook";
+
+/**
+ * The quality tier asked of ConjureOS (owner decision, 2026-09-24). The
+ * platform default, "standard", is its cheapest rung (~$0.006, "right for
+ * icons and thumbnails") and recipe photos made on it looked poor. "high" is
+ * ~$0.05 an image, billed to whoever generates it. "ultra" (~$0.21) exists
+ * too; not offered.
+ */
+export const AI_PHOTO_OPTION = "high";
 
 interface GeneratedImage {
   path: string;
@@ -53,25 +63,47 @@ export async function aiPhotoCost(): Promise<number | null> {
     const caps = (await bridge()?.capabilities?.()) ?? [];
     const cap = caps.find((c) => c.capability === "image.generate");
     if (!cap || !cap.available) return null;
-    const opt = cap.options.find((o) => o.id === cap.defaultOptionId) ?? cap.options[0];
+    const opt = cap.options.find((o) => o.id === AI_PHOTO_OPTION);
     return opt && opt.credits > 0 ? opt.credits : null;
   } catch {
     return null;
   }
 }
 
-/** The prompt: what the dish is, how it should look, and what to leave out. */
+/** Pantry basics that add nothing to a picture of the dish. */
+const UNPICTURED = /^(?:salt|pepper|black pepper|water|oil|vegetable oil|olive oil|canola oil|cooking spray|nonstick cooking spray|salt and pepper)$/i;
+
+/**
+ * The prompt: what the finished dish looks like, and how to photograph it.
+ *
+ * It used to paste the ingredient LINES — "1 can (14.5 ounces) diced
+ * tomatoes, low-sodium" — which gave the model quantities and packaging to
+ * draw instead of food. Now it names up to six main ingredients, plain,
+ * and spends its words on the photograph: a full plated scene (the platform
+ * asks for a transparent background, and a bare cut-out saved as JPEG goes
+ * black), natural light, real texture.
+ */
 export function recipePhotoPrompt(recipe: Pick<Recipe, "title" | "ingredients">, category?: string | null): string {
-  const main = recipe.ingredients
-    .slice(0, 6)
-    .map((l) => l.replace(/\(.*?\)/g, "").trim())
-    .filter(Boolean)
-    .join("; ");
+  const seen = new Set<string>();
+  const main: string[] = [];
+  for (const line of recipe.ingredients) {
+    const name = splitIngredient(line)
+      .name.replace(/\(.*?\)/g, "")
+      .split(/,|;| or /)[0]!
+      .trim()
+      .toLowerCase();
+    if (!name || UNPICTURED.test(name) || seen.has(name)) continue;
+    seen.add(name);
+    main.push(name);
+    if (main.length >= 6) break;
+  }
+  const kind = category ? `${category.toLowerCase()} ` : "";
   return [
-    `A realistic, appetizing food photograph of "${recipe.title}"${category ? `, a ${category.toLowerCase()} dish` : ""}.`,
-    main ? `It is made with: ${main}.` : "",
-    "Home-cooked and plated simply on a table, soft natural light, shot from a slight angle, shallow depth of field.",
-    "No text, no labels, no logos, no watermarks, no people, no hands.",
+    `Professional food photograph of ${recipe.title}, a finished ${kind}dish, freshly cooked and plated to serve.`,
+    main.length ? `The dish visibly features ${main.join(", ")}.` : "",
+    "A complete scene filling the whole frame: the dish on a plate or in a bowl on a wooden or stone table, with a softly blurred kitchen background.",
+    "Natural window light, three-quarter angle, shallow depth of field, rich true-to-life colours, appetizing and realistic textures, editorial cookbook style.",
+    "Photorealistic. No text, no labels, no logos, no watermarks, no people, no hands, no cutlery clutter.",
   ]
     .filter(Boolean)
     .join(" ");
@@ -101,6 +133,11 @@ export async function stampAiMark(dataUrl: string): Promise<string> {
   canvas.height = h;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Couldn't prepare the image.");
+  // A neutral table colour UNDER the image: the platform asks the model for a
+  // transparent background, and any transparent pixels would otherwise turn
+  // black in the JPEG. (Pixel colour on an image, not a UI colour.)
+  ctx.fillStyle = "#e9e4dc";
+  ctx.fillRect(0, 0, w, h);
   ctx.drawImage(img, 0, 0, w, h);
 
   // Pixel colours on an image, not UI colours: the palette tokens don't apply.
@@ -144,7 +181,7 @@ export async function generateRecipePhoto(
   // Terms BEFORE the spend: asking at upload time meant someone who declined
   // had already paid for an image that could never be saved.
   await ensureTermsAccepted();
-  const image = await gen({ prompt: recipePhotoPrompt(recipe, category) });
+  const image = await gen({ prompt: recipePhotoPrompt(recipe, category), option: AI_PHOTO_OPTION });
   const b64 = (await vfs.read(image.path)).replace(/^data:[^,]*,/, "");
   const stamped = await stampAiMark(`data:${image.mediaType};base64,${b64}`);
   const url = await uploadRecipeImage("image/jpeg", stamped, { ai: true });
