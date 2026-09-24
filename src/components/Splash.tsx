@@ -10,7 +10,8 @@ import art from "../assets/splash-art.webp";
  * would lose the top and bottom rows of props, so it is drawn twice instead,
  * height-fitted: the left half of the screen shows the art's left edge and
  * the right half its right edge, each fading toward the middle into the
- * art's own base colour (styles.css .splash). On any shape of screen the
+ * fill matched to the art's own lighting, under a faint film grain that
+ * hides the fade's banding (styles.css .splash). On any shape of screen the
  * herbs, tomatoes, oil and spinach stay in their corners.
  *
  * Always Spring DARK (`cui-t-spr-d`), whatever flavour the user picked: the
@@ -24,6 +25,7 @@ export function Splash({ leaving }: { leaving: boolean }) {
       role="status"
       aria-label="Loading recipes"
     >
+      <div className="splash-grain" aria-hidden="true" />
       <div className="splash-mark" aria-hidden="true">
         <svg className="splash-icon" viewBox="0 0 64 64" fill="none">
           {/* Each drawn upright, then crossed: fork leaning left, spoon right. */}

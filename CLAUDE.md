@@ -112,7 +112,7 @@ the upstream package — put it back from git history before committing.
 
 `components/Splash.tsx` covers the app until the catalog loads (at most 6s,
 `SPLASH_MAX_MS` in `App.tsx`). The art, `src/assets/splash-art.webp`, is the
-owner's (2026-09-24), re-encoded to ~80 KB: the store bundle inlines images
+owner's (2026-09-24), re-encoded (WebP q0.8) to ~115 KB: the store bundle inlines images
 only up to 256 KB and silently drops anything bigger from a single-HTML
 publish. It is portrait, so it is never stretched to `cover` (that crops the
 corner props on a wide screen): it is drawn as two height-fitted halves pinned
