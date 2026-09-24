@@ -97,6 +97,7 @@ import {
   isCatalogLoaded,
   searchCatalog,
   getCatalog,
+  loadRecipeBody,
   categories as catalogCategories,
 } from "../features/catalog";
 import {
@@ -482,10 +483,14 @@ async function searchRecipes(rawParams?: unknown): Promise<{ recipes: unknown[] 
   await requireCatalog();
   let hits = query ? searchCatalog(query) : getCatalog();
   if (category) hits = hits.filter((r) => r.category.toLowerCase() === category.toLowerCase());
+  // The slim catalog rows carry no ingredients; fill the body for just the
+  // hits returned, so a caller can match on what a recipe actually uses.
+  const page = await Promise.all(hits.slice(0, Math.max(1, limit)).map((r) => loadRecipeBody(r)));
   return {
-    recipes: hits.slice(0, Math.max(1, limit)).map((r) => ({
+    recipes: page.map((r) => ({
       id: r.id,
       title: r.title,
+      ingredients: r.ingredients,
       category: r.category,
       difficulty: r.difficulty,
       cookTime: r.cookTime,
