@@ -13,6 +13,7 @@ import { Icon } from "./icons";
 import type { IconName } from "./icons";
 import { AppearanceSheet } from "./components/AppearanceSheet";
 import { TermsSheet } from "./components/TermsSheet";
+import { Splash } from "./components/Splash";
 import { registerTermsOpener } from "./features/terms";
 import { APP_VERSION } from "./version";
 
@@ -39,6 +40,9 @@ import { APP_VERSION } from "./version";
  * its state intact.
  */
 type Tab = "recipes" | "studio" | "admin";
+
+/** The longest the opening screen waits for the catalog before stepping aside. */
+const SPLASH_MAX_MS = 6000;
 
 const TAB_TITLE: Record<Tab, string> = {
   recipes: "Recipes",
@@ -71,6 +75,8 @@ export function App() {
   const [cookTarget, setCookTarget] = useState<CookTarget | null>(null);
   const [catalogVersion, setCatalogVersion] = useState(0);
   const [cogOpen, setCogOpen] = useState(false);
+  // The opening screen, up until the catalog has loaded (or SPLASH_MAX_MS).
+  const [splash, setSplash] = useState<"up" | "leaving" | "gone">("up");
   // Appearance lives behind the cog rather than on a tab: it is set once and
   // then almost never.
   const [appearanceOpen, setAppearanceOpen] = useState(false);
@@ -91,8 +97,19 @@ export function App() {
     });
     ensureCatalogLoaded()
       .then((changed) => changed && setCatalogVersion((v) => v + 1))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setSplash((s) => (s === "up" ? "leaving" : s)));
+    // Never hold the app hostage to a slow network: past this the browse
+    // screen's own loading state takes over.
+    const cap = setTimeout(() => setSplash((s) => (s === "up" ? "leaving" : s)), SPLASH_MAX_MS);
+    return () => clearTimeout(cap);
   }, []);
+  // Unmount once the fade (styles.css .splash, 0.35s) has played.
+  useEffect(() => {
+    if (splash !== "leaving") return;
+    const t = setTimeout(() => setSplash("gone"), 400);
+    return () => clearTimeout(t);
+  }, [splash]);
 
   /**
    * Every "cook this" doorway routes here. The guided cook is an OVERLAY: the
@@ -189,6 +206,7 @@ export function App() {
           ))}
         </nav>
       )}
+      {splash !== "gone" && <Splash leaving={splash === "leaving"} />}
       <footer className="app-version">
         v{APP_VERSION}
         {!roleLoading &&

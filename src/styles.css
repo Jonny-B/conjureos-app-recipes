@@ -1315,6 +1315,87 @@ select {
   border-width: 3px;
 }
 
+/* ── Splash (components/Splash.tsx) ───────────────────────────────────── */
+
+/* The one hardcoded colour in this file, and deliberately so: #162016 is
+   not a UI colour but the art's own base (the average of its middle), so
+   the gaps the art doesn't cover, and the moment before it decodes, are
+   the same dark green as the picture. Everything drawn ON it uses tokens,
+   resolved Spring-dark by the `cui-t-spr-d` class on the element. */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  background: #162016;
+  opacity: 1;
+  transition: opacity 0.35s ease;
+}
+.splash--leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+/* The art twice, height-fitted: its left HALF pinned to the screen's left
+   edge, its right half to the right edge. Each layer is at most half the
+   fitted art wide (1154/1363/2 of the height = 42.3cqh), so it crops the
+   art at its own middle; on a screen wider than the art the two halves part
+   and the gap between is plain base colour. Each fades out toward the
+   middle, so there is never a seam, and no corner prop is ever cropped. */
+.splash {
+  container-type: size;
+}
+.splash::before,
+.splash::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: min(50cqw, 42.3cqh);
+  background-image: var(--splash-art);
+  background-repeat: no-repeat;
+  background-size: auto 100%;
+}
+.splash::before {
+  left: 0;
+  background-position: left center;
+  -webkit-mask-image: linear-gradient(to right, #000 60%, transparent);
+  mask-image: linear-gradient(to right, #000 60%, transparent);
+}
+.splash::after {
+  right: 0;
+  background-position: right center;
+  -webkit-mask-image: linear-gradient(to left, #000 60%, transparent);
+  mask-image: linear-gradient(to left, #000 60%, transparent);
+}
+.splash-mark {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(6px, 1.2vmin, 12px);
+}
+.splash-icon {
+  width: clamp(64px, 11vmin, 104px);
+  height: auto;
+  stroke: var(--cui-fg-mute);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.7;
+}
+/* A quarter arc, turning. Not the app's two-colour `.spinner`: this sits on
+   the picture, where one flat accent reads and a pink segment would not. */
+.splash-spinner {
+  width: clamp(32px, 5vmin, 44px);
+  height: clamp(32px, 5vmin, 44px);
+  border: 3px solid transparent;
+  border-bottom-color: var(--cui-accent);
+  border-radius: var(--r-circle);
+  animation: spin 0.9s linear infinite;
+}
+
 /* ── Mobile ────────────────────────────────────────────────────────── */
 
 @media (max-width: 640px) {

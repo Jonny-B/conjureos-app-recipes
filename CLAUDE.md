@@ -108,6 +108,17 @@ cp node_modules/@conjureos/ui/dist/ui.css src/conjureos-ui.css
 That also wipes the header comment at the top of the file, which is not part of
 the upstream package — put it back from git history before committing.
 
+### The opening screen
+
+`components/Splash.tsx` covers the app until the catalog loads (at most 6s,
+`SPLASH_MAX_MS` in `App.tsx`). The art, `src/assets/splash-art.webp`, is the
+owner's (2026-09-24), re-encoded to ~80 KB: the store bundle inlines images
+only up to 256 KB and silently drops anything bigger from a single-HTML
+publish. It is portrait, so it is never stretched to `cover` (that crops the
+corner props on a wide screen): it is drawn as two height-fitted halves pinned
+to the screen's edges (styles.css "Splash"). It is always Spring dark, whatever
+the user picked, because the art is dark.
+
 ## Versioning
 
 Bump `version` in BOTH `package.json` and `src/version.ts` together. CI fails the
