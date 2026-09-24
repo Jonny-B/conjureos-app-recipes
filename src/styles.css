@@ -1317,18 +1317,27 @@ select {
 
 /* ── Splash (components/Splash.tsx) ───────────────────────────────────── */
 
-/* The one hardcoded colour in this file, and deliberately so: #162016 is
-   not a UI colour but the art's own base (the average of its middle), so
-   the gaps the art doesn't cover, and the moment before it decodes, are
-   the same dark green as the picture. Everything drawn ON it uses tokens,
-   resolved Spring-dark by the `cui-t-spr-d` class on the element. */
+/* The one set of hardcoded colours in this file, and deliberately so: they
+   are not UI colours but the art's own, sampled down its middle. The art is
+   lit from the top (about rgb 34 46 34 there, 12 20 13 at the foot), so the
+   fill between its two halves follows the same fall-off; a single flat
+   colour showed as a band, lighter than the art low down and darker up top.
+   It is also what shows for the moment before the art decodes. Everything
+   drawn ON it uses tokens, resolved Spring-dark by `cui-t-spr-d`. */
 .splash {
   position: fixed;
   inset: 0;
   z-index: 1000;
   display: grid;
   place-items: center;
-  background: #162016;
+  background: linear-gradient(
+    to bottom,
+    rgb(34 46 34) 0%,
+    rgb(30 41 29) 20%,
+    rgb(22 31 21) 45%,
+    rgb(15 23 15) 70%,
+    rgb(12 20 13) 100%
+  );
   opacity: 1;
   transition: opacity 0.35s ease;
 }
@@ -1340,8 +1349,9 @@ select {
    edge, its right half to the right edge. Each layer is at most half the
    fitted art wide (1154/1363/2 of the height = 42.3cqh), so it crops the
    art at its own middle; on a screen wider than the art the two halves part
-   and the gap between is plain base colour. Each fades out toward the
-   middle, so there is never a seam, and no corner prop is ever cropped. */
+   and the gap between is the fill above. Each fades out over most of its
+   width on an eased curve (a straight ramp leaves a visible edge where it
+   starts), so there is no seam, and no corner prop is ever cropped. */
 .splash {
   container-type: size;
 }
@@ -1359,14 +1369,14 @@ select {
 .splash::before {
   left: 0;
   background-position: left center;
-  -webkit-mask-image: linear-gradient(to right, #000 60%, transparent);
-  mask-image: linear-gradient(to right, #000 60%, transparent);
+  -webkit-mask-image: linear-gradient(to right, #000 25%, rgb(0 0 0 / 0.82) 40%, rgb(0 0 0 / 0.55) 55%, rgb(0 0 0 / 0.28) 70%, rgb(0 0 0 / 0.1) 82%, rgb(0 0 0 / 0.03) 91%, transparent 97%);
+  mask-image: linear-gradient(to right, #000 25%, rgb(0 0 0 / 0.82) 40%, rgb(0 0 0 / 0.55) 55%, rgb(0 0 0 / 0.28) 70%, rgb(0 0 0 / 0.1) 82%, rgb(0 0 0 / 0.03) 91%, transparent 97%);
 }
 .splash::after {
   right: 0;
   background-position: right center;
-  -webkit-mask-image: linear-gradient(to left, #000 60%, transparent);
-  mask-image: linear-gradient(to left, #000 60%, transparent);
+  -webkit-mask-image: linear-gradient(to left, #000 25%, rgb(0 0 0 / 0.82) 40%, rgb(0 0 0 / 0.55) 55%, rgb(0 0 0 / 0.28) 70%, rgb(0 0 0 / 0.1) 82%, rgb(0 0 0 / 0.03) 91%, transparent 97%);
+  mask-image: linear-gradient(to left, #000 25%, rgb(0 0 0 / 0.82) 40%, rgb(0 0 0 / 0.55) 55%, rgb(0 0 0 / 0.28) 70%, rgb(0 0 0 / 0.1) 82%, rgb(0 0 0 / 0.03) 91%, transparent 97%);
 }
 .splash-mark {
   position: relative;
