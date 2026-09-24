@@ -15,6 +15,7 @@ import {
 } from "../bridge/recipesApi";
 import { Dropdown, type DropdownOption } from "../components/Dropdown";
 import { generateRecipePhoto, isAiPhotoAvailable } from "../features/aiPhoto";
+import { ensureTermsAccepted } from "../features/terms";
 import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
 import { Icon } from "../icons";
 
@@ -524,13 +525,19 @@ function RecipesView({ userFilter, onClearUser }: { userFilter: AppUser | null; 
                     className="btn secondary"
                     type="button"
                     disabled={!!busy}
-                    onClick={() =>
-                      run(r.id, async () => {
+                    onClick={async () => {
+                      try {
+                        await ensureTermsAccepted();
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : String(e));
+                        return;
+                      }
+                      void run(r.id, async () => {
                         const { url } = await generateRecipePhoto({ title: r.title, ingredients: r.ingredients }, r.category);
                         await adminSetRecipeImage(r.id, url);
                         patch(r.id, { imageUrl: url, imageAi: true });
-                      })
-                    }
+                      });
+                    }}
                   >
                     <Icon name="wand" /> {busy === r.id ? "Working…" : "AI photo"}
                   </button>

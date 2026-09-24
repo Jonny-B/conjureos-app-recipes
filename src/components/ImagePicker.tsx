@@ -3,6 +3,7 @@ import type { Recipe } from "../types";
 import { preparePhoto } from "../features/capture";
 import { uploadRecipeImage } from "../bridge/recipesApi";
 import { aiPhotoCost, generateRecipePhoto, isAiPhotoAvailable } from "../features/aiPhoto";
+import { ensureTermsAccepted } from "../features/terms";
 import { Icon } from "../icons";
 
 /**
@@ -47,6 +48,14 @@ export function ImagePicker({
       return;
     }
     setError(null);
+    // Terms before the busy state, so "Generating…" never shows while the
+    // user is still deciding whether to agree.
+    try {
+      await ensureTermsAccepted();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return;
+    }
     setBusy(true);
     setGenerating(true);
     try {

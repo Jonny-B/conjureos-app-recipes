@@ -1947,28 +1947,6 @@ select {
 .hero-refresh:hover { background: var(--accent-wash); }
 .hero-refresh .fa-icon { width: 15px; height: 15px; }
 
-/* Favorite heart pinned to the recipe card's top-right corner. */
-.card-fav {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 38px;
-  height: 38px;
-  border-radius: var(--r-1);
-  border: none;
-  background: var(--bg-2);
-  color: var(--fg-faint);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background var(--cui-duration-fast) var(--cui-ease), color var(--cui-duration-fast) var(--cui-ease), transform var(--cui-duration) var(--cui-ease);
-}
-.card-fav:hover { background: var(--accent-wash); color: var(--fg); }
-.card-fav.on { color: var(--bubblegum); }
-.card-fav.on:hover { color: var(--bubblegum); }
-.card-fav .fa-icon { width: 18px; height: 18px; }
-
 .detail-cook-bottom { align-self: flex-start; margin-top: 4px; }
 
 /* ── Recipe detail: the action row, the back caret, the source link ─────
@@ -2412,7 +2390,10 @@ button.step-row { display: flex; }
 }
 
 .plate--photo { background: var(--bg-2); }
-.plate--photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Anchored to the TOP: when a box is shorter than the photo (a square AI
+   image in the wide cover, the phone band, Tonight's pick), the crop comes
+   off the bottom and the top-right "AI-generated" stamp always survives. */
+.plate--photo img { width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; }
 
 /* The category word in a feed row's meta line. */
 .meta-cat {
@@ -2599,14 +2580,6 @@ button.step-row { display: flex; }
   opacity: 0.2;
 }
 
-/* The favourite heart, over the picture: a pane of the card's own colour so
-   it reads on anything. */
-.recipe-cover > .card-fav {
-  top: 14px;
-  right: 14px;
-  background: color-mix(in srgb, var(--bg-1) 78%, transparent);
-}
-.recipe-cover > .card-fav:hover { background: var(--bg-2); }
 
 .recipe-cover-body {
   display: flex;
@@ -2616,7 +2589,6 @@ button.step-row { display: flex; }
 }
 .recipe-cover-title {
   margin: 0;
-  padding-right: 48px;
   font-family: var(--font-display);
   font-size: var(--t-4xl);
   font-weight: var(--cui-weight-semibold);
@@ -2751,7 +2723,7 @@ button.step-row { display: flex; }
       linear-gradient(to top, var(--bg-1) 0%, var(--bg-1) 16%, transparent 58%);
   }
   .recipe-cover-body { padding: 34px 40px 30px; }
-  .recipe-cover-title { font-size: var(--t-5xl); padding-right: 0; }
+  .recipe-cover-title { font-size: var(--t-5xl); }
   .recipe-cover-title,
   .recipe-cover-pills,
   .recipe-cover-nutrition,
@@ -2838,3 +2810,7 @@ button.step-row { display: flex; }
 .terms-actions .muted { margin-right: auto; font-size: var(--t-sm); }
 
 .banned-notice h2 { margin: 0 0 8px; font-family: var(--font-display); color: var(--fg); }
+
+/* The open recipe's favourite, in the action bar beside Cook this. */
+.detail-fav.on, .detail-fav.on:hover { color: var(--cui-support-text); }
+.detail-fav .fa-icon { width: 17px; height: 17px; }

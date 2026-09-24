@@ -5,7 +5,7 @@
  *      permission). It is billed to the signed-in user's credits — an admin
  *      generating for someone else's recipe pays with their own. Desktop only
  *      today; `isAiPhotoAvailable()` is false elsewhere and the buttons hide.
- *   2. We STAMP it: "AI-generated" is drawn into the pixels, bottom-right,
+ *   2. We STAMP it: "AI-generated" is drawn into the pixels, top-right,
  *      before it is ever uploaded (owner decision, 2026-09-23: burned in, not
  *      a web overlay, so the mark travels with the file). Doing it here, not in
  *      the Edge Function, is deliberate: Edge Functions have a tight CPU budget
@@ -82,7 +82,7 @@ export const AI_MARK_TEXT = "AI-generated";
 
 /**
  * Draw the image onto a canvas (at most 1024px on the long edge) with the
- * "AI-generated" mark burned into the bottom-right corner, and return a JPEG
+ * "AI-generated" mark burned into the TOP-RIGHT corner, and return a JPEG
  * as bare base64. The mark scales with the image so it reads the same at any
  * size: a translucent dark box, white text, about 2.4% of the width tall.
  */
@@ -111,8 +111,13 @@ export async function stampAiMark(dataUrl: string): Promise<string> {
   const boxW = textW + padX * 2;
   const boxH = Math.round(fontPx * 1.8);
   const margin = Math.round(w * 0.025);
+  // Top-right, not the conventional bottom-right: on the open recipe the
+  // picture fades into the card from the left and from the bottom, which
+  // hid a bottom-right stamp completely. Top-right is the one corner no
+  // surface fades or covers, and photos are anchored to their top edge
+  // (styles.css .plate--photo) so a crop never takes it either.
   const x = w - boxW - margin;
-  const y = h - boxH - margin;
+  const y = margin;
   ctx.fillStyle = "rgba(0, 0, 0, 0.58)";
   ctx.fillRect(x, y, boxW, boxH);
   ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
