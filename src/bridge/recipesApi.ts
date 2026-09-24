@@ -290,9 +290,33 @@ export async function addRecipe(
   return toSavedRecipe(r.recipe);
 }
 
+/**
+ * The update payload: only what the caller actually has. recipes-db's `update`
+ * merges only the fields a payload mentions, but `toPayload` fills EVERY field
+ * with a default — `visibility: "private"`, `category: "Dinner"`, null blog /
+ * photo / source — so updating a public recipe (the macros backfill does) made
+ * it private and could wipe its category, blog and photo. Undefined fields are
+ * left out, so the server keeps what it has. Title, ingredients and
+ * instructions always go: the server requires them.
+ */
+function toUpdatePayload(recipe: Recipe & { category?: string; tags?: string[]; tokens?: string[]; sourceUrl?: string; visibility?: string }): Record<string, unknown> {
+  const full = toPayload(recipe);
+  const src = recipe as unknown as Record<string, unknown>;
+  const out: Record<string, unknown> = {
+    title: full.title,
+    ingredients: full.ingredients,
+    instructions: full.instructions,
+  };
+  for (const key of Object.keys(full)) {
+    if (key in out) continue;
+    if (src[key] !== undefined) out[key] = full[key];
+  }
+  return out;
+}
+
 export async function updateRecipe(id: string, recipe: Recipe): Promise<SavedRecipe> {
   await beforeContentWrite();
-  const r = await invoke("update", { id, recipe: toPayload(recipe) });
+  const r = await invoke("update", { id, recipe: toUpdatePayload(recipe) });
   if (!r.recipe) throw new Error("update failed");
   return toSavedRecipe(r.recipe);
 }
