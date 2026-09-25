@@ -152,7 +152,7 @@ partner-credited photos without the partner's permission.
 
 ## Moderation, bans, terms and AI photos (0.56.0)
 
-Backend half lives in ConjureOS `recipes-db` + migration `153_recipes_moderation`.
+Backend half lives in ConjureOS `recipes-db` + migration `157_recipes_moderation`.
 
 - **Admins** (role `admin`; the bootstrap emails in recipes-db are admins
   automatically) get Admin → Users (search, paged; set role; ban / unban; delete
