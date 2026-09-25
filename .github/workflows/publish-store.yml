@@ -115,7 +115,7 @@ jobs:
           bot-email: conjureosbot@gmail.com
           bot-password: ${{ secrets.PUBLISH_BOT_DEV_PASSWORD }}
           source-path: .
-          project-name: Recipes
+          project-name: Conjure Pantry
           slug: recipes
           changelog: ${{ steps.changelog.outputs.text }}
 
@@ -129,6 +129,6 @@ jobs:
           bot-email: conjureosbot@gmail.com
           bot-password: ${{ secrets.PUBLISH_BOT_PROD_PASSWORD }}
           source-path: .
-          project-name: Recipes
+          project-name: Conjure Pantry
           slug: recipes
           changelog: ${{ steps.changelog.outputs.text }}

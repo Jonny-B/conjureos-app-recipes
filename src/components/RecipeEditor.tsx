@@ -188,7 +188,7 @@ function EditablePreview({
       </div>
       <div>
         <span className={`pill ${recipe.difficulty}`}>{recipe.difficulty}</span>
-        <span className="pill">{recipe.cookTime} min</span>
+        {recipe.cookTime > 0 && <span className="pill">{recipe.cookTime} min</span>}
         <span className="pill">{recipe.servings} serving{recipe.servings === 1 ? "" : "s"}</span>
       </div>
       {recipe.summary && <p className="summary">{recipe.summary}</p>}
@@ -199,6 +199,7 @@ function EditablePreview({
         <ImagePicker
           value={image}
           onChange={onImageChange}
+          aiSource={() => ({ recipe })}
           label={chefMode ? "Blog header image" : "Recipe photo"}
           hint={
             chefMode

@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { FeedRecipe, PantryItem, Recipe, SavedRecipe } from "../types";
-import { ingredientsFromPantry } from "../features/pantry";
-import { computeAvailability, computeCoverage } from "../features/scaling";
-import { parseIngredient, formatStrip } from "../features/nutrition";
-import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { FeedRecipe, Recipe, SavedRecipe } from "../types";
+import { formatStrip } from "../features/nutrition";
 import { safeHref, hrefHost } from "../features/safeUrl";
+import { generateRecipePhoto, isAiPhotoAvailable } from "../features/aiPhoto";
+import { ensureTermsAccepted } from "../features/terms";
+import { adminRemoveRecipeImage, adminSetRecipeImage, recipeIdFromPath, setOwnRecipeImage } from "../bridge/recipesApi";
+import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
+import { categoryOf } from "../features/recipeLook";
+import { RecipePlate } from "../components/RecipePlate";
 import { CHEF_NAME } from "./StudioScreen";
 import { Icon } from "../icons";
 
@@ -31,7 +34,6 @@ function renderBlog(text: string): ReactNode[] {
 
 interface Props {
   feed: FeedRecipe;
-  pantry: PantryItem[] | null;
   /** True when this catalog recipe is already in the user's saved library. */
   inLibrary?: boolean;
   /** Enter the guided cook for this recipe (savedRecipe set when it's in the library). */
@@ -41,6 +43,10 @@ interface Props {
   onSaveToLibrary?: () => void; // catalog only
   onMade?: () => void; // saved only
   onDelete?: () => void; // saved only
+  /** Admins can give ANY recipe (catalog included) an AI photo, or take a photo off. */
+  isAdmin?: boolean;
+  /** The recipe's photo changed on the server; patch it into the screen's state. */
+  onImageChanged?: (patch: { imageUrl?: string; imageAi?: boolean }) => void;
 }
 
 /**
@@ -51,7 +57,6 @@ interface Props {
  */
 export function RecipeDetail({
   feed,
-  pantry,
   inLibrary,
   onCook,
   onBack,
@@ -59,6 +64,8 @@ export function RecipeDetail({
   onSaveToLibrary,
   onMade,
   onDelete,
+  isAdmin = false,
+  onImageChanged,
 }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -86,36 +93,82 @@ export function RecipeDetail({
       document.removeEventListener("keydown", onKey);
     };
   }, [menuOpen]);
-  const pantryIng = useMemo(() => (pantry ? ingredientsFromPantry(pantry) : []), [pantry]);
-  const hasPantry = pantryIng.length > 0;
-
-  const avail = useMemo(
-    () => (hasPantry ? computeAvailability(recipe, pantryIng) : null),
-    [recipe, pantryIng, hasPantry],
-  );
-  const cov = useMemo(
-    () => (hasPantry ? computeCoverage(recipe, pantryIng) : null),
-    [recipe, pantryIng, hasPantry],
-  );
-
-  const matchByLine = useMemo(() => {
-    const m = new Map<string, { needed: number; available: number }>();
-    if (avail) for (const x of avail.matches) m.set(x.recipeLine, { needed: x.needed, available: x.available });
-    return m;
-  }, [avail]);
-  const missingSet = useMemo(() => new Set(cov?.missingNames ?? []), [cov]);
-  const shortSet = useMemo(() => new Set(cov?.shortNames ?? []), [cov]);
 
   const isCatalog = feed.kind === "catalog";
+  const category = categoryOf(feed);
+
+  // ── photo actions ─────────────────────────────────────────────────────
+  // Your own recipe goes through the ordinary update (ownership is the
+  // check); anyone else's — or a catalog row — only through the admin
+  // actions, which recipes-db re-checks.
+  const [photoBusy, setPhotoBusy] = useState<null | "generating" | "removing">(null);
+  const [photoErr, setPhotoErr] = useState<string | null>(null);
+  const ownRecipe = feed.kind === "saved";
+  const canGenerate = RECIPE_PHOTOS_ENABLED && isAiPhotoAvailable() && (ownRecipe || isAdmin);
+  const canRemovePhoto = RECIPE_PHOTOS_ENABLED && !!recipe.imageUrl && (ownRecipe || isAdmin);
+  const recipeDbId = feed.kind === "catalog" ? feed.id : recipeIdFromPath(feed.recipe.path);
+
+  const generatePhoto = async () => {
+    setMenuOpen(false);
+    setPhotoErr(null);
+    // Terms FIRST, and only then say "Generating": showing the busy banner
+    // while the terms sheet was still open read as if the image (and its
+    // cost) had started before the user agreed. It hadn't, but it looked it.
+    try {
+      await ensureTermsAccepted();
+    } catch (e) {
+      setPhotoErr(e instanceof Error ? e.message : String(e));
+      return;
+    }
+    setPhotoBusy("generating");
+    try {
+      const { url } = await generateRecipePhoto(recipe, category);
+      if (feed.kind === "saved") await setOwnRecipeImage(recipeDbId, recipe, url);
+      else await adminSetRecipeImage(recipeDbId, url);
+      onImageChanged?.({ imageUrl: url, imageAi: true });
+    } catch (e) {
+      setPhotoErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPhotoBusy(null);
+    }
+  };
+
+  const removePhoto = async () => {
+    setMenuOpen(false);
+    setPhotoErr(null);
+    setPhotoBusy("removing");
+    try {
+      if (feed.kind === "saved") await setOwnRecipeImage(recipeDbId, recipe, null);
+      else await adminRemoveRecipeImage(recipeDbId);
+      onImageChanged?.({ imageUrl: undefined, imageAi: false });
+    } catch (e) {
+      setPhotoErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPhotoBusy(null);
+    }
+  };
+
+  const cook = () => onCook(recipe, feed.kind === "saved" ? feed.recipe : null);
 
   return (
-    <div className="browse-screen">
+    <div className="browse-screen detail-screen">
       <div className="detail-actions">
         <button className="btn ghost" onClick={onBack}>
           <Icon name="chevron-down" className="back-caret" /> Back
         </button>
         <div style={{ flex: 1 }} />
-        <button className="btn" onClick={() => onCook(recipe, feed.kind === "saved" ? feed.recipe : null)}>
+        {/* The heart lives up here, not on the picture: the picture's top-right
+            corner is where an AI image carries its "AI-generated" stamp, and
+            it is the one corner of the cover that is never faded. */}
+        <button
+          className={`icon-btn detail-fav${feed.favorite ? " on" : ""}`}
+          onClick={onToggleFavorite}
+          aria-label={feed.favorite ? "Remove from favorites" : "Add to favorites"}
+          title={feed.favorite ? "Remove from favorites" : "Add to favorites"}
+        >
+          <Icon name="heart" />
+        </button>
+        <button className="btn" onClick={cook}>
           <Icon name="bowl-food" /> Cook this
         </button>
         <div className="overflow-wrap" ref={menuRef}>
@@ -129,6 +182,16 @@ export function RecipeDetail({
           </button>
           {menuOpen && (
             <div className="overflow-menu" role="menu">
+              {canGenerate && (
+                <button className="overflow-item" onClick={() => void generatePhoto()} disabled={!!photoBusy}>
+                  <Icon name="wand" /> {recipe.imageUrl ? "New AI photo" : "Generate AI photo"}
+                </button>
+              )}
+              {canRemovePhoto && (
+                <button className="overflow-item danger" onClick={() => void removePhoto()} disabled={!!photoBusy}>
+                  <Icon name="xmark" /> Remove photo
+                </button>
+              )}
               {isCatalog ? (
                 <button
                   className="overflow-item"
@@ -155,6 +218,23 @@ export function RecipeDetail({
         </div>
       </div>
 
+      {photoBusy && (
+        <div className="status-banner">
+          <div className="spinner" style={{ width: 14, height: 14 }} />
+          <span>
+            {photoBusy === "generating"
+              ? "Generating a photo — this can take up to a minute. It will be marked “AI-generated”."
+              : "Removing the photo…"}
+          </span>
+        </div>
+      )}
+      {photoErr && (
+        <div className="status-banner error">
+          <Icon name="triangle-exclamation" />
+          <span>{photoErr}</span>
+        </div>
+      )}
+
       {confirmDelete && (
         <div className="confirm-row">
           <span>Delete this recipe?</span>
@@ -163,121 +243,113 @@ export function RecipeDetail({
         </div>
       )}
 
-      <article className="recipe-card recipe-card--static" style={{ maxWidth: "100%" }}>
-        <button
-          className={`card-fav${feed.favorite ? " on" : ""}`}
-          onClick={onToggleFavorite}
-          aria-label={feed.favorite ? "Remove from favorites" : "Add to favorites"}
-          title={feed.favorite ? "Remove from favorites" : "Add to favorites"}
-        >
-          <Icon name="heart" />
-        </button>
-        {RECIPE_PHOTOS_ENABLED && recipe.imageUrl && (
-          <div className="recipe-hero">
-            <img src={recipe.imageUrl} alt={recipe.title} loading="lazy" />
-          </div>
-        )}
-        <h3 style={{ fontSize: 22, paddingRight: 40 }}>{recipe.title}</h3>
-        <div>
-          {isCatalog && <span className="pill">{feed.recipe.category}</span>}
-          <span className={`pill ${recipe.difficulty}`}>{recipe.difficulty}</span>
-          <span className="pill">{recipe.cookTime} min</span>
-          <span className="pill">{recipe.servings} serving{recipe.servings === 1 ? "" : "s"}</span>
-          {feed.kind === "saved" && feed.recipe.madeCount > 0 && (
-            <span className="pill">made {feed.recipe.madeCount}×</span>
-          )}
+      {/* The open recipe, laid out to the owner's mockup (2026-09-23): the
+          recipe's picture behind the card, the page laid over it on a fade of
+          the card's own background, the ingredients down the left and the
+          instructions in two columns. With no photo, the category plate fills
+          the same box — see components/RecipePlate. */}
+      <article className="recipe-cover">
+        <div className="recipe-cover-media">
+          <RecipePlate recipe={recipe} category={category} variant="cover" />
         </div>
-        {recipe.chefFeatured && <div className="chef-byline">By {CHEF_NAME}</div>}
+        <div className="recipe-cover-body">
+          <h2 className="recipe-cover-title">{recipe.title}</h2>
+          <div className="recipe-cover-pills">
+            {category && <span className="pill cat">{category}</span>}
+            <span className={`pill ${recipe.difficulty}`}>{recipe.difficulty}</span>
+            {recipe.cookTime > 0 && <span className="pill">{recipe.cookTime} min</span>}
+            <span className="pill">
+              {recipe.servings} serving{recipe.servings === 1 ? "" : "s"}
+            </span>
+            {feed.kind === "saved" && feed.recipe.madeCount > 0 && (
+              <span className="pill">made {feed.recipe.madeCount}×</span>
+            )}
+            {/* The page says it as well as the picture: a stamp can still be
+                cropped on an unusually shaped photo, and the pill can't. */}
+            {RECIPE_PHOTOS_ENABLED && recipe.imageUrl && recipe.imageAi && (
+              <span className="pill ai" title="This image was generated by AI">
+                AI image
+              </span>
+            )}
+          </div>
+          {recipe.nutrition && <div className="recipe-cover-nutrition">{formatStrip(recipe.nutrition)}</div>}
+          {recipe.chefFeatured && <div className="chef-byline">By {CHEF_NAME}</div>}
+          {recipe.summary && <p className="recipe-cover-summary">{recipe.summary}</p>}
 
-        {recipe.summary && <p className="summary">{recipe.summary}</p>}
-        {recipe.nutrition && (
-          <div className="muted" style={{ fontSize: 12, lineHeight: 1.4 }}>{formatStrip(recipe.nutrition)}</div>
-        )}
+          {/* Chef's blog: the story you scroll past on recipe sites — with a skip. */}
+          {recipe.blog && (
+            <section className="chef-blog">
+              <button
+                className="btn ghost jump-to-recipe"
+                onClick={() => recipeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              >
+                Jump to recipe <Icon name="chevron-down" />
+              </button>
+              <div className="chef-blog-body">{renderBlog(recipe.blog)}</div>
+            </section>
+          )}
 
-        {/* Chef's blog: the story you scroll past on recipe sites — with a skip. */}
-        {recipe.blog && (
-          <section className="chef-blog">
-            <button
-              className="btn ghost jump-to-recipe"
-              onClick={() => recipeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-            >
-              Jump to recipe <Icon name="chevron-down" />
-            </button>
-            <div className="chef-blog-body">{renderBlog(recipe.blog)}</div>
+          <div ref={recipeRef} />
+          <section className="recipe-cover-ingredients">
+            <h3 className="recipe-cover-head">Ingredients</h3>
+            <ul className="cover-ing">
+              {recipe.ingredients.map((ing, i) => (
+                <li key={i}>{ing}</li>
+              ))}
+            </ul>
           </section>
-        )}
 
-        {/* total === 0 means the ingredient list hasn't loaded (or is empty),
-            NOT that the pantry covers it — claiming "you have everything" off a
-            0-of-0 coverage is how an unloaded recipe read as fully stocked. */}
-        {cov && cov.total > 0 && (
-          <div className={`cov-banner${cov.missing === 0 ? " complete" : ""}`}>
-            <Icon name={cov.missing === 0 ? "check" : "basket-shopping"} />
-            {cov.missing === 0
-              ? "You have everything for this."
-              : `You have ${cov.have} of ${cov.total} ingredients` +
-                (cov.short ? ` (${cov.short} running low)` : "") +
-                `. ${cov.missing} to buy.`}
-          </div>
-        )}
-
-        <div ref={recipeRef} />
-        <section>
-          <h4>Ingredients</h4>
-          <ul>
-            {recipe.ingredients.map((ing, i) => {
-              const name = parseIngredient(ing)?.name;
-              const missing = hasPantry && !!name && missingSet.has(name);
-              const short = hasPantry && !!name && shortSet.has(name);
-              const m = matchByLine.get(ing);
-              return (
+          <section>
+            <h3 className="recipe-cover-head">Instructions</h3>
+            <ol className="cover-steps">
+              {recipe.instructions.map((step, i) => (
                 <li key={i}>
-                  {ing}
-                  {missing && (
-                    <span className="ing-missing">
-                      <Icon name="basket-shopping" /> not in pantry
-                    </span>
-                  )}
-                  {short && m && (
-                    <span className="ing-shortage">
-                      <Icon name="triangle-exclamation" /> running low: need ~{Math.round(m.needed)}g, have ~
-                      {Math.round(m.available)}g
-                    </span>
-                  )}
+                  {/* The <ol> already numbers these for a screen reader. */}
+                  <span className="cover-step-num" aria-hidden="true">
+                    {i + 1}
+                  </span>
+                  <span>{step}</span>
                 </li>
-              );
-            })}
-          </ul>
-        </section>
+              ))}
+            </ol>
+          </section>
 
-        <section>
-          <h4>Instructions</h4>
-          <ol>
-            {recipe.instructions.map((step, i) => (
-              <li key={i}>{step}</li>
-            ))}
-          </ol>
-        </section>
-
-        <button
-          className="btn detail-cook-bottom"
-          onClick={() => onCook(recipe, feed.kind === "saved" ? feed.recipe : null)}
-        >
-          <Icon name="bowl-food" /> Cook this
-        </button>
-
-        {isCatalog && sourceHref && (
-          <div className="faint" style={{ fontSize: 11, marginTop: 8 }}>
-            Source:{" "}
-            <a href={sourceHref} target="_blank" rel="noreferrer noopener" className="source-link">
-              {hrefHost(sourceHref) ?? "AllRecipes"}
-            </a>
-          </div>
-        )}
-        {feed.kind === "saved" && (
-          <div className="faint" style={{ fontSize: 11, marginTop: 8 }}>{feed.recipe.path}</div>
-        )}
+          <footer className="recipe-cover-foot">
+            <button className="btn detail-cook-bottom" onClick={cook}>
+              <Icon name="bowl-food" /> Cook this
+            </button>
+            {isCatalog && sourceHref && (
+              <div className="recipe-cover-source">
+                Source:{" "}
+                <a
+                  href={archivedHref(sourceHref)}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="source-link"
+                  title={isRetiredSource(sourceHref) ? "Opens the Internet Archive's copy — myplate.gov was retired in 2026" : undefined}
+                >
+                  {hrefHost(sourceHref) ?? "source"}
+                </a>
+              </div>
+            )}
+            {feed.kind === "saved" && <div className="recipe-cover-source">{feed.recipe.path}</div>}
+          </footer>
+        </div>
       </article>
     </div>
   );
+}
+
+/**
+ * myplate.gov was retired in January 2026: every catalog row's source URL now
+ * redirects to the site's front page, so "Source: myplate.gov" was a link to
+ * the wrong page. The Internet Archive's capture — the same pages the corpus
+ * was ingested from — is the page the link means.
+ */
+function isRetiredSource(href: string): boolean {
+  return hrefHost(href) === "myplate.gov";
+}
+
+function archivedHref(href: string): string {
+  return isRetiredSource(href) ? `https://web.archive.org/web/2025/${href}` : href;
 }

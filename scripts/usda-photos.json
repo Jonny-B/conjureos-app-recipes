@@ -1,0 +1,2177 @@
+{
+ "generated": "2026-09-24",
+ "summary": {
+  "catalog": 1120,
+  "pagesRead": 1119,
+  "withPhoto": 1037,
+  "federalCreditWithPhoto": 198,
+  "unreadable": [
+   "fabulous-fig-bars"
+  ]
+ },
+ "photos": [
+  {
+   "slug": "5-day-salad",
+   "title": "5 A Day Salad",
+   "sourceUrl": "https://www.myplate.gov/recipes/5-day-salad",
+   "credit": "US Department of Health and Human Services Centers for Disease Control and Prevention (CDC) 5 A Day for Better Health Program",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/5%20A%20Day%20Salad%20Pic%201.jpg?itok=dE4d5DTp",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/5%20A%20Day%20Salad%20Pic%201.jpg?itok=E2oypTJM",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/5%20A%20Day%20Salad%20Pic%201.jpg?itok=t4MVTm8Q"
+   ]
+  },
+  {
+   "slug": "apple-coffee-cake",
+   "title": "Apple Coffee Cake",
+   "sourceUrl": "https://www.myplate.gov/recipes/apple-coffee-cake",
+   "credit": "A Healthier You: Based on the Dietary Guidelines for Americans US Department of Health and Human Services Office of Disease Prevention and Health Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2025-09/Image-of-Apple-Coffee-Cake-Recipe.jpg?itok=ygG3ByTh",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2025-09/Image-of-Apple-Coffee-Cake-Recipe.jpg?itok=DO031o5z"
+   ]
+  },
+  {
+   "slug": "apple-cranberry-salad-toss",
+   "title": "Apple Cranberry Salad Toss",
+   "sourceUrl": "https://www.myplate.gov/recipes/apple-cranberry-salad-toss",
+   "credit": "Creative Recipes for Less Familiar USDA Commodities Used by Household Programs USDA, Food and Nutrition Service, Food Distribution Service",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-11/AppleCranberrySaladTossOriginal.jpg?itok=7Z5PQccy",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-11/AppleCranberrySaladTossOriginal.jpg?itok=x5zR3Haz",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-11/AppleCranberrySaladTossOriginal.jpg?itok=yhOnhvAu"
+   ]
+  },
+  {
+   "slug": "argentinian-chimichurri-sauce",
+   "title": "Argentinian Chimichurri Sauce",
+   "sourceUrl": "https://www.myplate.gov/recipes/argentinian-chimichurri-sauce",
+   "credit": "Delicious Heart-Healthy Latino Recipes/ Platillos Latinos Sabrosos y Saludables US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe_525_x_350_/public/2021-01/Argentinean%20Chimichurri%20Sauce.jpg?itok=DbW7dRGX",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/Argentinean%20Chimichurri%20Sauce.jpg?itok=cjWAzreO",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/Argentinean%20Chimichurri%20Sauce.jpg?itok=Sr1qR6Cu"
+   ]
+  },
+  {
+   "slug": "autumn-vegetable-succotash",
+   "title": "Autumn Vegetable Succotash",
+   "sourceUrl": "https://www.myplate.gov/recipes/autumn-vegetable-succotash",
+   "credit": "More Matters Recipes US Department of Health and Human Services Centers for Disease Control and Prevention (CDC)",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2024-04/Autumn%20Vegetable%20Succotash.png?itok=Eb1DUj1_",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2024-04/Autumn%20Vegetable%20Succotash.png?itok=nvGvZon2",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2024-04/Autumn%20Vegetable%20Succotash.png?itok=hJ4v9Bjo"
+   ]
+  },
+  {
+   "slug": "baked-chicken-nuggets",
+   "title": "Baked Chicken Nuggets",
+   "sourceUrl": "https://www.myplate.gov/recipes/baked-chicken-nuggets",
+   "credit": "Recipes and Tips for Healthy, Thrifty Meals USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/BakedChickenNuggets_527x323.jpg?itok=3Tdp7GHR",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/BakedChickenNuggets_527x323.jpg?itok=eJH2l7Hq"
+   ]
+  },
+  {
+   "slug": "baked-fish",
+   "title": "Baked Fish",
+   "sourceUrl": "https://www.myplate.gov/recipes/baked-fish",
+   "credit": "A Harvest of Recipes with USDA Foods Adapted from a recipe by Veronica “Babe” Newago, Red Cliff Ojibwe",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Baked%20Fish_fixed.png?itok=00r1jgUC",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Baked%20Fish_fixed.png?itok=U-tVlcrp"
+   ]
+  },
+  {
+   "slug": "baked-lemon-chicken",
+   "title": "Baked Lemon Chicken",
+   "sourceUrl": "https://www.myplate.gov/recipes/baked-lemon-chicken",
+   "credit": "Food Family Fun USDA Food and Nutrition Service Team Nutrition",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/BakedLemonChicken_527x323.jpg?itok=pJ6DfStv",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/BakedLemonChicken_527x323.jpg?itok=fpCmRkbi",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-11/BakedLemonChicken_527x323.jpg?itok=Uzd-dMcZ"
+   ]
+  },
+  {
+   "slug": "baked-pork-chops",
+   "title": "Baked Pork Chops",
+   "sourceUrl": "https://www.myplate.gov/recipes/baked-pork-chops",
+   "credit": "Heart Healthy Home Cooking: African American Style US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-11/baked%20pork%20chops.jpg?itok=69yC1PaQ",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-11/baked%20pork%20chops.jpg?itok=xb4nrsmg",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-11/baked%20pork%20chops.jpg?itok=d6h2JJyU"
+   ]
+  },
+  {
+   "slug": "baked-rice-spinach",
+   "title": "Baked Rice with Spinach",
+   "sourceUrl": "https://www.myplate.gov/recipes/baked-rice-spinach",
+   "credit": "Delicious Heart-Healthy Latino Recipes/ Platillos Latinos Sabrosos y Saludables US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/BrazilianRice_527x323.jpg?itok=NdsxyUZr",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/BrazilianRice_527x323.jpg?itok=V22ea3uz",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-11/BrazilianRice_527x323.jpg?itok=SZQN45-7"
+   ]
+  },
+  {
+   "slug": "baked-trout",
+   "title": "Baked Trout",
+   "sourceUrl": "https://www.myplate.gov/recipes/baked-trout",
+   "credit": "Delicious Heart-Healthy Latino Recipes/ Platillos Latinos Sabrosos y Saludables US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2025-09/bakedtrout1.jpg?itok=5JdHYTYP",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2025-09/bakedtrout1.jpg?itok=OQLIlROH",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2025-09/bakedtrout1.jpg?itok=KO5vbCnw"
+   ]
+  },
+  {
+   "slug": "banaha-bread",
+   "title": "Banaha Bread",
+   "sourceUrl": "https://www.myplate.gov/recipes/banaha-bread",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations Adapted from a recipe by Trista Winnett, Choctaw Nation",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Banaha%20Bread_fixed.png?itok=Fg2Y8ohI",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Banaha%20Bread_fixed.png?itok=UlsOf167",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Banaha%20Bread_fixed.png?itok=mNygEwTi"
+   ]
+  },
+  {
+   "slug": "banana-berry-muffins",
+   "title": "Banana Berry Muffins",
+   "sourceUrl": "https://www.myplate.gov/recipes/banana-berry-muffins",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations Adapted from a recipe submitted by Alicson Scott, Chickasaw Nation, Get Fresh! Nutrition Education Program",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Berry%20Mufins_fixed.png?itok=M88Cy0gp",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Berry%20Mufins_fixed.png?itok=T668wSyi"
+   ]
+  },
+  {
+   "slug": "banana-cocoa-yogurt-pops",
+   "title": "Banana Cocoa Yogurt Pops",
+   "sourceUrl": "https://www.myplate.gov/recipes/banana-cocoa-yogurt-pops",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/FruitPops6.jpg?itok=GliQ16Yq",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/FruitPops6.jpg?itok=E44w8Lwq",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/FruitPops6.jpg?itok=AAiAg4mj"
+   ]
+  },
+  {
+   "slug": "banana-walnut-oatmeal",
+   "title": "Banana Walnut Oatmeal",
+   "sourceUrl": "https://www.myplate.gov/recipes/banana-walnut-oatmeal",
+   "credit": "USDA’S Collection of Nonfat Dry Milk (NDM) Recipes USDA Food and Nutrition Service Food Distribution Service",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/BananaWalnutOatmeal_527x323.jpg?itok=JFi4TCvG",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/BananaWalnutOatmeal_527x323.jpg?itok=dlMnF9Rz",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-11/BananaWalnutOatmeal_527x323.jpg?itok=QRQxQEVK"
+   ]
+  },
+  {
+   "slug": "batido-smoothie",
+   "title": "Batido (Smoothie)",
+   "sourceUrl": "https://www.myplate.gov/recipes/batido-smoothie",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2024-04/Batido%20Smoothie.png?itok=xFgrsGFY",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2024-04/Batido%20Smoothie.png?itok=NeaytlRr",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2024-04/Batido%20Smoothie.png?itok=HH_iqy3K"
+   ]
+  },
+  {
+   "slug": "beef-and-vegetable-soup",
+   "title": "Beef and Vegetable Soup",
+   "sourceUrl": "https://www.myplate.gov/recipes/beef-and-vegetable-soup",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations Adapted from a recipe submitted by Alicson Scott, Chickasaw Nation, Get Fresh! Nutrition Education Program",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Beef%20and%20Vegetable%20Soup_fixed.png?itok=TdtwnLv3",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Beef%20and%20Vegetable%20Soup_fixed.png?itok=O25L0XvD",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Beef%20and%20Vegetable%20Soup_fixed.png?itok=s3txkvrf"
+   ]
+  },
+  {
+   "slug": "beef-and-vegetables",
+   "title": "Beef and Vegetables",
+   "sourceUrl": "https://www.myplate.gov/recipes/beef-and-vegetables",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations Adapted from a recipe by Lela Gabbard, Pala Indian Reservation",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Beef%20and%20Vegetables_fixed.png?itok=7GlPxvMG",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Beef%20and%20Vegetables_fixed.png?itok=TyFxPmHI",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Beef%20and%20Vegetables_fixed.png?itok=7MwVqV6y"
+   ]
+  },
+  {
+   "slug": "beef-stroganoff",
+   "title": "Beef Stroganoff",
+   "sourceUrl": "https://www.myplate.gov/recipes/beef-stroganoff",
+   "credit": "A Healthier You: Based on the Dietary Guidelines for Americans US Department of Health and Human Services Office of Disease Prevention and Health Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/default_images/mpk-default-1000.png?itok=ng20lrXs",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/default_images/mpk-default-1000.png?itok=MHDkRduG",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/default_images/mpk-default-1000.png?itok=NEsYVvYw"
+   ]
+  },
+  {
+   "slug": "black-bean-burgers",
+   "title": "Black Bean Burgers",
+   "sourceUrl": "https://www.myplate.gov/recipes/black-bean-burgers",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/Black%20Bean%20Burgers_MealProteinStringBeans.png?itok=raq0A0Yz",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/Black%20Bean%20Burgers_MealProteinStringBeans.png?itok=3aMiy1qj",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/Black%20Bean%20Burgers_MealProteinStringBeans.png?itok=O2_fqBkC"
+   ]
+  },
+  {
+   "slug": "black-skillet-beef-greens-and-red-potatoes",
+   "title": "Black Skillet Beef with Greens and Red Potatoes",
+   "sourceUrl": "https://www.myplate.gov/recipes/black-skillet-beef-greens-and-red-potatoes",
+   "credit": "Stay Young at Heart: Cooking the Heart-Healthy Way US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/default_images/mpk-default-1000.png?itok=ng20lrXs",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/default_images/mpk-default-1000.png?itok=MHDkRduG",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/default_images/mpk-default-1000.png?itok=NEsYVvYw"
+   ]
+  },
+  {
+   "slug": "blue-corn-pan-bread",
+   "title": "Blue Corn Pan Bread",
+   "sourceUrl": "https://www.myplate.gov/recipes/blue-corn-pan-bread",
+   "credit": "A River of Recipes: Native American Recipes Using Commodity Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-11/BlueCornPanBread.jpg?itok=9hbTaOpM",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-11/BlueCornPanBread.jpg?itok=Wtge_Hs8",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-11/BlueCornPanBread.jpg?itok=jVc1vCb8"
+   ]
+  },
+  {
+   "slug": "braised-chicken-thighs-spinach",
+   "title": "Braised Chicken Thighs with Spinach",
+   "sourceUrl": "https://www.myplate.gov/recipes/braised-chicken-thighs-spinach",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/Braised%20Chicken%20Thighs%20with%20Spinach%201_0.jpg?itok=M_XpnKBN",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/Braised%20Chicken%20Thighs%20with%20Spinach%201_0.jpg?itok=FC15W5Ui",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/Braised%20Chicken%20Thighs%20with%20Spinach%201_0.jpg?itok=nQe2ShsK"
+   ]
+  },
+  {
+   "slug": "brazilian-rice",
+   "title": "Brazilian Rice",
+   "sourceUrl": "https://www.myplate.gov/recipes/brazilian-rice",
+   "credit": "Delicious Heart-Healthy Latino Recipes/ Platillos Latinos Sabrosos y Saludables US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe_525_x_350_/public/2020-11/BrazilianRice_527x323.jpg?itok=XhILbHTN",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/BrazilianRice_527x323.jpg?itok=NdsxyUZr",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/BrazilianRice_527x323.jpg?itok=V22ea3uz"
+   ]
+  },
+  {
+   "slug": "breakfast-burrito-salsa",
+   "title": "Breakfast Burrito with Salsa",
+   "sourceUrl": "https://www.myplate.gov/recipes/breakfast-burrito-salsa",
+   "credit": "Food Family Fun USDA Food and Nutrition Service Team Nutrition",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2025-06/Image-of-Breakfast-Burrito-Salsa-recipe.png?itok=SzopCBR9",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2025-06/Image-of-Breakfast-Burrito-Salsa-recipe.png?itok=U2PFSzbZ",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2025-06/Image-of-Breakfast-Burrito-Salsa-recipe.png?itok=SB534ikQ"
+   ]
+  },
+  {
+   "slug": "bronco-beans",
+   "title": "Bronco Beans",
+   "sourceUrl": "https://www.myplate.gov/recipes/bronco-beans",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/Bronco%20Beans_ProteinBeans.jpg?itok=q4U9PcHZ",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/Bronco%20Beans_ProteinBeans.jpg?itok=BBumwrL5",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/Bronco%20Beans_ProteinBeans.jpg?itok=TxTQaSFy"
+   ]
+  },
+  {
+   "slug": "cafe-mocha",
+   "title": "Cafe Mocha",
+   "sourceUrl": "https://www.myplate.gov/recipes/cafe-mocha",
+   "credit": "USDA’S Collection of Nonfat Dry Milk (NDM) Recipes USDA Food and Nutrition Service Food Distribution Service",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/CafeMocha.jpg?itok=LmI8-qzI",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/CafeMocha.jpg?itok=RhD5RC0Q",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/CafeMocha.jpg?itok=G_oO_mxl"
+   ]
+  },
+  {
+   "slug": "candied-yams",
+   "title": "Candied Yams",
+   "sourceUrl": "https://www.myplate.gov/recipes/candied-yams",
+   "credit": "Heart Healthy Home Cooking: African American Style US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/candiedyams.jpg?itok=SMiYRjEm",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/candiedyams.jpg?itok=RMaeyBYA",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/candiedyams.jpg?itok=DiaarqNB"
+   ]
+  },
+  {
+   "slug": "caramel-sauce",
+   "title": "Caramel Sauce",
+   "sourceUrl": "https://www.myplate.gov/recipes/caramel-sauce",
+   "credit": "USDA’S Collection of Nonfat Dry Milk (NDM) Recipes USDA Food and Nutrition Service Food Distribution Service",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/CaramelSauce_527x323.jpg?itok=r23KrBWD",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/CaramelSauce_527x323.jpg?itok=x6PyesUV",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-11/CaramelSauce_527x323.jpg?itok=zKhI0L_V"
+   ]
+  },
+  {
+   "slug": "caribbean-casserole",
+   "title": "Caribbean Casserole",
+   "sourceUrl": "https://www.myplate.gov/recipes/caribbean-casserole",
+   "credit": "Heart Healthy Home Cooking: African American Style US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2023-11/CarribeanCasserole.jpg?itok=20jy5yYU",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2023-11/CarribeanCasserole.jpg?itok=H2Qm3AG6",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2023-11/CarribeanCasserole.jpg?itok=iLknYf_4"
+   ]
+  },
+  {
+   "slug": "caribbean-pink-beans",
+   "title": "Caribbean Pink Beans",
+   "sourceUrl": "https://www.myplate.gov/recipes/caribbean-pink-beans",
+   "credit": "Stay Young at Heart: Cooking the Heart-Healthy Way US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/default_images/mpk-default-1000.png?itok=ng20lrXs",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/default_images/mpk-default-1000.png?itok=MHDkRduG",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/default_images/mpk-default-1000.png?itok=NEsYVvYw"
+   ]
+  },
+  {
+   "slug": "catfish-stew-and-rice",
+   "title": "Catfish Stew and Rice",
+   "sourceUrl": "https://www.myplate.gov/recipes/catfish-stew-and-rice",
+   "credit": "A Healthier You: Based on the Dietary Guidelines for Americans US Department of Health and Human Services Office of Disease Prevention and Health Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2025-06/Image-of-Catfish-Stew-Rice-recipe.png?itok=OQkHiJPH",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2025-06/Image-of-Catfish-Stew-Rice-recipe.png?itok=4KTwn4Oa",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2025-06/Image-of-Catfish-Stew-Rice-recipe.png?itok=EMFApXTB"
+   ]
+  },
+  {
+   "slug": "chicken-and-cranberry-salad",
+   "title": "Chicken and Cranberry Salad",
+   "sourceUrl": "https://www.myplate.gov/recipes/chicken-and-cranberry-salad",
+   "credit": "Creative Recipes for Less Familiar USDA Commodities Used by Household Programs USDA Food and Nutrition Service Food Distribution Service",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2025-08/Image-of-Chicken-Cranberry-Salad.jpg?itok=GO1_JcQZ",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2025-08/Image-of-Chicken-Cranberry-Salad.jpg?itok=vXI_szpY",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2025-08/Image-of-Chicken-Cranberry-Salad.jpg?itok=AMI4DPJI"
+   ]
+  },
+  {
+   "slug": "chicken-and-spanish-rice",
+   "title": "Chicken and Spanish Rice",
+   "sourceUrl": "https://www.myplate.gov/recipes/chicken-and-spanish-rice",
+   "credit": "A Healthier You: Based on the Dietary Guidelines for Americans US Department of Health and Human Services Office of Disease Prevention and Health Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2025-07/Image-of-Chicken-Spanish-Rice-Recipe.jpg?itok=rYGpR3Z4",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2025-07/Image-of-Chicken-Spanish-Rice-Recipe.jpg?itok=Wjk1NTdK",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2025-07/Image-of-Chicken-Spanish-Rice-Recipe.jpg?itok=2kfVOAnD"
+   ]
+  },
+  {
+   "slug": "chicken-casserole",
+   "title": "Chicken Casserole",
+   "sourceUrl": "https://www.myplate.gov/recipes/chicken-casserole",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Chicken%20Casserole_fixed.png?itok=fyUymSCr",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Chicken%20Casserole_fixed.png?itok=61XZbyg5",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Chicken%20Casserole_fixed.png?itok=3TwaSj7X"
+   ]
+  },
+  {
+   "slug": "chicken-noodle-soup-0",
+   "title": "Chicken Noodle Soup",
+   "sourceUrl": "https://www.myplate.gov/recipes/chicken-noodle-soup-0",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations Adapted from a recipe submitted by Tod Robertson, Seminole Nation",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe_525_x_350_/public/recipe-images/Chicken%20Noodle%20Soup_fixed.png?itok=Emu1QuZZ",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Chicken%20Noodle%20Soup_fixed.png?itok=XUqCpEsI",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Chicken%20Noodle%20Soup_fixed.png?itok=uU1grB4X"
+   ]
+  },
+  {
+   "slug": "chicken-posole",
+   "title": "Chicken Posole",
+   "sourceUrl": "https://www.myplate.gov/recipes/chicken-posole",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe_525_x_350_/public/recipe-images/Chicken%20Posole_fixed.png?itok=VhTyB9Ad",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Chicken%20Posole_fixed.png?itok=UqJJR_0c",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Chicken%20Posole_fixed.png?itok=QuPv-Ryv"
+   ]
+  },
+  {
+   "slug": "chicken-ratatouille",
+   "title": "Chicken Ratatouille",
+   "sourceUrl": "https://www.myplate.gov/recipes/chicken-ratatouille",
+   "credit": "A Healthier You: Based on the Dietary Guidelines for Americans US Department of Health and Human Services Office of Disease Prevention and Health Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2023-06/Chicken%20Ratatouille.jpg?itok=vxHyu1vd",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2023-06/Chicken%20Ratatouille.jpg?itok=qdcfN2Tu"
+   ]
+  },
+  {
+   "slug": "chicken-salad-and-peach-sandwich",
+   "title": "Chicken Salad and Peach Sandwich",
+   "sourceUrl": "https://www.myplate.gov/recipes/chicken-salad-and-peach-sandwich",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Peach-chickensalad.jpg?itok=BTApHRr2",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Peach-chickensalad.jpg?itok=P6yZvpdU",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Peach-chickensalad.jpg?itok=dzpFZcAO"
+   ]
+  },
+  {
+   "slug": "chicken-spanish-rice",
+   "title": "Chicken Spanish Rice",
+   "sourceUrl": "https://www.myplate.gov/recipes/chicken-spanish-rice",
+   "credit": "Healthy Eating in Indian Country: Exercise USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/default_images/mpk-default-1000.png?itok=ng20lrXs",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/default_images/mpk-default-1000.png?itok=MHDkRduG",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/default_images/mpk-default-1000.png?itok=NEsYVvYw"
+   ]
+  },
+  {
+   "slug": "chicken-stew",
+   "title": "Chicken Stew",
+   "sourceUrl": "https://www.myplate.gov/recipes/chicken-stew",
+   "credit": "A Healthier You: Based on the Dietary Guidelines for Americans US Department of Health and Human Services Office of Disease Prevention and Health Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/ChickenStew_527x323.jpg?itok=kEijn0mW",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/ChickenStew_527x323.jpg?itok=2IrgluJD",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-11/ChickenStew_527x323.jpg?itok=wrm-mPJQ"
+   ]
+  },
+  {
+   "slug": "chicken-stir-fry",
+   "title": "Chicken Stir-Fry",
+   "sourceUrl": "https://www.myplate.gov/recipes/chicken-stir-fry",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Chicken%20Stir%20Fry.png?itok=o6OlB-Ay",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Chicken%20Stir%20Fry.png?itok=0u4eHiCX",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Chicken%20Stir%20Fry.png?itok=jra6-txn"
+   ]
+  },
+  {
+   "slug": "chickpea-dip",
+   "title": "Chickpea Dip",
+   "sourceUrl": "https://www.myplate.gov/recipes/chickpea-dip",
+   "credit": "More Matters Recipes US Department of Health and Human Services Centers for Disease Control and Prevention (CDC)",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/ChickpeaDip_527x323.jpg?itok=7Mks7lvb",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/ChickpeaDip_527x323.jpg?itok=JVNE5QUF"
+   ]
+  },
+  {
+   "slug": "chickpeas-and-spinach-saute",
+   "title": "Chickpeas and Spinach Sauté",
+   "sourceUrl": "https://www.myplate.gov/recipes/chickpeas-and-spinach-saute",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/Chickpeas%20and%20Spinach%20Sautee_QuinoaMealProteinVegetables.png?itok=trSblBpS",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/Chickpeas%20and%20Spinach%20Sautee_QuinoaMealProteinVegetables.png?itok=EJsNwWHI",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/Chickpeas%20and%20Spinach%20Sautee_QuinoaMealProteinVegetables.png?itok=OSy8V26P"
+   ]
+  },
+  {
+   "slug": "chili-and-spice-seasoning",
+   "title": "Chili and Spice Seasoning",
+   "sourceUrl": "https://www.myplate.gov/recipes/chili-and-spice-seasoning",
+   "credit": "A Healthier You: Based on the Dietary Guidelines for Americans US Department of Health and Human Services Office of Disease Prevention and Health Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2025-09/Image-of-Chili-Spice-Seasoning.jpg?itok=vj0EVg2v",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2025-09/Image-of-Chili-Spice-Seasoning.jpg?itok=A9zgKf0X",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2025-09/Image-of-Chili-Spice-Seasoning.jpg?itok=82VgavNV"
+   ]
+  },
+  {
+   "slug": "chimichurri-sauce",
+   "title": "Chimichurri Sauce",
+   "sourceUrl": "https://www.myplate.gov/recipes/chimichurri-sauce",
+   "credit": "Adapted from Argentinian Chimichurri Sauce Delicious Heart-Healthy Latino Recipes/ Platillos Latinos Sabrosos y Saludables US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2025-09/Image-of-Chimichurri-Sauce-Recipe.png?itok=LvtUXLti",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2025-09/Image-of-Chimichurri-Sauce-Recipe.png?itok=C7NcTFsI",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2025-09/Image-of-Chimichurri-Sauce-Recipe.png?itok=43mIPQhu"
+   ]
+  },
+  {
+   "slug": "citrus-chicken",
+   "title": "Citrus Chicken",
+   "sourceUrl": "https://www.myplate.gov/recipes/citrus-chicken",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/Citrus%20Chicken_ProteinMeal.jpg?itok=O8X7GtN0",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/Citrus%20Chicken_ProteinMeal.jpg?itok=9pF4WVpc",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/Citrus%20Chicken_ProteinMeal.jpg?itok=ncuBz1BD"
+   ]
+  },
+  {
+   "slug": "citrus-tuna-melt",
+   "title": "Citrus Tuna Melt",
+   "sourceUrl": "https://www.myplate.gov/recipes/citrus-tuna-melt",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2023-09/Citrus%20Tuna%20Melt_fixed.png?itok=0IseyvmU",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2023-09/Citrus%20Tuna%20Melt_fixed.png?itok=uuq5_r2h",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2023-09/Citrus%20Tuna%20Melt_fixed.png?itok=M-Ibt-jX"
+   ]
+  },
+  {
+   "slug": "citrus-vegetables",
+   "title": "Citrus Vegetables",
+   "sourceUrl": "https://www.myplate.gov/recipes/citrus-vegetables",
+   "credit": "US Department of Health and Human Services National Cancer Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/CitrusVegetables.jpg?itok=TgmvdGnz",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/CitrusVegetables.jpg?itok=zlO9q0qc",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-11/CitrusVegetables.jpg?itok=RduGLbQG"
+   ]
+  },
+  {
+   "slug": "classic-honey-flan",
+   "title": "Classic Honey Flan",
+   "sourceUrl": "https://www.myplate.gov/recipes/classic-honey-flan",
+   "credit": "Delicious Heart Healthy Latino Recipes US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2025-08/Image-of-Classic-Flan-Recipe.jpg?itok=_MGvsxMs",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2025-08/Image-of-Classic-Flan-Recipe.jpg?itok=5JgjiBBF",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2025-08/Image-of-Classic-Flan-Recipe.jpg?itok=XwHtwxmG"
+   ]
+  },
+  {
+   "slug": "classic-macaroni-and-cheese",
+   "title": "Classic Macaroni and Cheese",
+   "sourceUrl": "https://www.myplate.gov/recipes/classic-macaroni-and-cheese",
+   "credit": "Heart Healthy Home Cooking: African American Style US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/ClassicMacaroniAndCheese_527x323.jpg?itok=rF5ucoxP",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/ClassicMacaroniAndCheese_527x323.jpg?itok=hcnQgv-0",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-11/ClassicMacaroniAndCheese_527x323.jpg?itok=WqwYCD3D"
+   ]
+  },
+  {
+   "slug": "collard-green-gumbo-ham-hock",
+   "title": "Collard Green Gumbo with Ham Hock",
+   "sourceUrl": "https://www.myplate.gov/recipes/collard-green-gumbo-ham-hock",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/CollardGreensWithHamhock_cropped.jpg?itok=TBC6WYh-",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/CollardGreensWithHamhock_cropped.jpg?itok=ZIxfHdKl",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/CollardGreensWithHamhock_cropped.jpg?itok=JcQRXVj7"
+   ]
+  },
+  {
+   "slug": "confetti-bean-salsa",
+   "title": "Confetti Bean Salsa",
+   "sourceUrl": "https://www.myplate.gov/recipes/confetti-bean-salsa",
+   "credit": "The Power of Choice USDA Food and Nutrition Service and US Department of Health and Human Services Food and Drug Administration (FDA)",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2025-01/Image-of-Confetti-Bean-Salsa-Recipe.png?itok=phL2IJhI",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2025-01/Image-of-Confetti-Bean-Salsa-Recipe.png?itok=hxEWndlh",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2025-01/Image-of-Confetti-Bean-Salsa-Recipe.png?itok=wgBEKH7E"
+   ]
+  },
+  {
+   "slug": "corn-and-bean-medley",
+   "title": "Corn and Bean Medley",
+   "sourceUrl": "https://www.myplate.gov/recipes/corn-and-bean-medley",
+   "credit": "USDA Food and Nutrition Service Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2025-06/Image-of-Corn-Bean-Medley-recipe.jpg?itok=FqKOLgqC",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2025-06/Image-of-Corn-Bean-Medley-recipe.jpg?itok=Qpj5h_fq",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2025-06/Image-of-Corn-Bean-Medley-recipe.jpg?itok=iE8sEB2r"
+   ]
+  },
+  {
+   "slug": "corn-casserole-0",
+   "title": "Corn Casserole",
+   "sourceUrl": "https://www.myplate.gov/recipes/corn-casserole-0",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Corn%20Casserole_fixed.png?itok=t373qm2m",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Corn%20Casserole_fixed.png?itok=wg4YNE-_",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Corn%20Casserole_fixed.png?itok=-V8cZMPQ"
+   ]
+  },
+  {
+   "slug": "corn-toasties",
+   "title": "Corn Toasties",
+   "sourceUrl": "https://www.myplate.gov/recipes/corn-toasties",
+   "credit": "Healthy Eating In Indian Country: Diabetes USDA Food and Nutrition Service Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2025-01/Image-of-Corn-Toasties-Recipe.png?itok=_NzG3MpL",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2025-01/Image-of-Corn-Toasties-Recipe.png?itok=yFtbn0TK",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2025-01/Image-of-Corn-Toasties-Recipe.png?itok=jZm4Em0T"
+   ]
+  },
+  {
+   "slug": "cornmeal-pancakes",
+   "title": "Cornmeal Pancakes",
+   "sourceUrl": "https://www.myplate.gov/recipes/cornmeal-pancakes",
+   "credit": "Smart Shopper Recipes USDA Consumer and Marketing Service Food Trades Staff",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2025-01/Image-of-Cornmeal-Pancakes-Recipe.jpg?itok=srpVG7Vr",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2025-01/Image-of-Cornmeal-Pancakes-Recipe.jpg?itok=-R06tzP3",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2025-01/Image-of-Cornmeal-Pancakes-Recipe.jpg?itok=vcyEcRz8"
+   ]
+  },
+  {
+   "slug": "creole-beans",
+   "title": "Creole Beans",
+   "sourceUrl": "https://www.myplate.gov/recipes/creole-beans",
+   "credit": "Healthy Eating In Indian Country: Do You Weigh Too Much? USDA Food and Nutrition Service Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/default_images/mpk-default-1000.png?itok=ng20lrXs",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/default_images/mpk-default-1000.png?itok=MHDkRduG",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/default_images/mpk-default-1000.png?itok=NEsYVvYw"
+   ]
+  },
+  {
+   "slug": "crispy-oven-fried-chicken",
+   "title": "Crispy Oven-Fried Chicken",
+   "sourceUrl": "https://www.myplate.gov/recipes/crispy-oven-fried-chicken",
+   "credit": "Heart Healthy Home Cooking: African American Style US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/CrispyOvenFriedChicken_527x323.jpg?itok=c9pqrY8g",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/CrispyOvenFriedChicken_527x323.jpg?itok=i9Nom70Y",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-11/CrispyOvenFriedChicken_527x323.jpg?itok=39eCKD9r"
+   ]
+  },
+  {
+   "slug": "cuban-salad",
+   "title": "Cuban Salad",
+   "sourceUrl": "https://www.myplate.gov/recipes/cuban-salad",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/CubanSalad.jpg?itok=mj_Obhu8",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/CubanSalad.jpg?itok=9ZL6C9Ug",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/CubanSalad.jpg?itok=sk122i_3"
+   ]
+  },
+  {
+   "slug": "cucumber-yogurt-and-herb-dip",
+   "title": "Cucumber, Yogurt and Herb Dip",
+   "sourceUrl": "https://www.myplate.gov/recipes/cucumber-yogurt-and-herb-dip",
+   "credit": "More Matters Recipes US Department of Health and Human Services Centers for Disease Control and Prevention (CDC)",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/YogurtDip1.jpg?itok=zBspoCoA",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/YogurtDip1.jpg?itok=eJbS9Ijk",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/YogurtDip1.jpg?itok=QxgHrVv3"
+   ]
+  },
+  {
+   "slug": "curried-quinoa-and-cauliflower",
+   "title": "Curried Quinoa and Cauliflower",
+   "sourceUrl": "https://www.myplate.gov/recipes/curried-quinoa-and-cauliflower",
+   "credit": "USDA Supplemental Nutrition Assistance Program (SNAP)",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2025-06/Image-of-Curried-Quinoa-Cauliflower-recipe.jpg?itok=DPK3Aly-",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2025-06/Image-of-Curried-Quinoa-Cauliflower-recipe.jpg?itok=ukk3jFeP"
+   ]
+  },
+  {
+   "slug": "curry-vegetable-dip",
+   "title": "Curry Vegetable Dip",
+   "sourceUrl": "https://www.myplate.gov/recipes/curry-vegetable-dip",
+   "credit": "Pyramid Snacks USDA Food and Nutrition Service Team Nutrition",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2025-07/Image-of-Curry-Vegetable-Dip-Recipe.jpg?itok=2yQS2_uE",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2025-07/Image-of-Curry-Vegetable-Dip-Recipe.jpg?itok=ZG7KfJbB",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2025-07/Image-of-Curry-Vegetable-Dip-Recipe.jpg?itok=vVMKaKNF"
+   ]
+  },
+  {
+   "slug": "curtido-salvadoreno-cabbage-salad",
+   "title": "Curtido Salvadoreño (Cabbage Salad)",
+   "sourceUrl": "https://www.myplate.gov/recipes/curtido-salvadoreno-cabbage-salad",
+   "credit": "Delicious Heart-Healthy Latino Recipes/ Platillos Latinos Sabrosos y Saludables US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2024-04/Curtido%20Salvadoreno.png?itok=MZ9qNRpQ",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2024-04/Curtido%20Salvadoreno.png?itok=9fJGVId9",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2024-04/Curtido%20Salvadoreno.png?itok=M1r1sRMp"
+   ]
+  },
+  {
+   "slug": "delicious-oven-french-fries",
+   "title": "Delicious Oven French Fries",
+   "sourceUrl": "https://www.myplate.gov/recipes/delicious-oven-french-fries",
+   "credit": "US Department of Health and Human Services",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-10/DeliciousOvenFrenchFries527x323.jpg?itok=iGAn3Mru",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-10/DeliciousOvenFrenchFries527x323.jpg?itok=Y4gg5zxD"
+   ]
+  },
+  {
+   "slug": "eagle-nest",
+   "title": "Eagle Nest",
+   "sourceUrl": "https://www.myplate.gov/recipes/eagle-nest",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations Chickasaw Nation, Get Fresh! Nutrition Education Program",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-09/eagles%20nest.jpg?itok=5KmECh8v",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-09/eagles%20nest.jpg?itok=R9ueteVL",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-09/eagles%20nest.jpg?itok=524gUmt8"
+   ]
+  },
+  {
+   "slug": "easy-beef-supper",
+   "title": "Easy Beef Supper",
+   "sourceUrl": "https://www.myplate.gov/recipes/easy-beef-supper",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations Adapted from a recipe by Phyllis Blackbear, Cheyenne Arapaho Tribes FDP",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Easy%20Beef%20Supper_fixed.png?itok=-ftH0E8a",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Easy%20Beef%20Supper_fixed.png?itok=vNCZZ6gt",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Easy%20Beef%20Supper_fixed.png?itok=sgChlHAP"
+   ]
+  },
+  {
+   "slug": "elaines-green-mash-potatoes",
+   "title": "Elaine’s Green-Mash Potatoes",
+   "sourceUrl": "https://www.myplate.gov/recipes/elaines-green-mash-potatoes",
+   "credit": "USDA Center for Nutrition Policy and Promotion Recipe submitted by Elaine, MyPlate Nutritionist",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2023-03/green-mash-potatoes.jpeg?itok=UPcgEPno",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2023-03/green-mash-potatoes.jpeg?itok=j0Nyt-l7",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2023-03/green-mash-potatoes.jpeg?itok=PKiE0Z97"
+   ]
+  },
+  {
+   "slug": "eves-tasty-turkey-tetrazzini",
+   "title": "Eve’s Tasty Turkey Tetrazzini",
+   "sourceUrl": "https://www.myplate.gov/recipes/eves-tasty-turkey-tetrazzini",
+   "credit": "USDA Center for Nutrition Policy and Promotion Recipe submitted by Eve, USDA Nutritionist",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Eve%27s-Turkey-Tetrazzini.jpg?itok=x999-Mi0",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Eve%27s-Turkey-Tetrazzini.jpg?itok=anz1ieZ0",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Eve%27s-Turkey-Tetrazzini.jpg?itok=i2Hx7muC"
+   ]
+  },
+  {
+   "slug": "feather-rolls",
+   "title": "Feather Rolls",
+   "sourceUrl": "https://www.myplate.gov/recipes/feather-rolls",
+   "credit": "USDA Supplemental Nutrition Assistance Program (SNAP)",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-10/FeatherRolls_527x323.jpg?itok=kdYWn0rN",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-10/FeatherRolls_527x323.jpg?itok=nBYPp2wr",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-10/FeatherRolls_527x323.jpg?itok=s2VadBZz"
+   ]
+  },
+  {
+   "slug": "fish-spinach",
+   "title": "Fish with Spinach",
+   "sourceUrl": "https://www.myplate.gov/recipes/fish-spinach",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/CodwithSpinach-13_FishVegetableProteinMeal.jpg?itok=72D8Yy8d",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/CodwithSpinach-13_FishVegetableProteinMeal.jpg?itok=8C5NSIDu"
+   ]
+  },
+  {
+   "slug": "french-spinach-frittata",
+   "title": "French Spinach Frittata",
+   "sourceUrl": "https://www.myplate.gov/recipes/french-spinach-frittata",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/French%20Spinach%20Frittata.jpg?itok=L_EKZPhP",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/French%20Spinach%20Frittata.jpg?itok=MbJVfyPq"
+   ]
+  },
+  {
+   "slug": "fresh-tomato-salsa",
+   "title": "Fresh Tomato Salsa",
+   "sourceUrl": "https://www.myplate.gov/recipes/fresh-tomato-salsa",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Fresh%20Tomato%20Salsa_fixed.png?itok=M17v2WYn",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Fresh%20Tomato%20Salsa_fixed.png?itok=fI94W8rB",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Fresh%20Tomato%20Salsa_fixed.png?itok=FWCB8CEm"
+   ]
+  },
+  {
+   "slug": "frosted-cake",
+   "title": "Frosted Cake",
+   "sourceUrl": "https://www.myplate.gov/recipes/frosted-cake",
+   "credit": "A Healthier You: Based on the Dietary Guidelines for Americans US Department of Health and Human Services Office of Disease Prevention and Health Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-04/FrostedCake310x200.jpg?itok=vh6KpY4U",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-04/FrostedCake310x200.jpg?itok=wGa81HNl",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-04/FrostedCake310x200.jpg?itok=sAtnYDwG"
+   ]
+  },
+  {
+   "slug": "frozen-fruit-pops",
+   "title": "Frozen Fruit Pops",
+   "sourceUrl": "https://www.myplate.gov/recipes/frozen-fruit-pops",
+   "credit": "The Power of Choice USDA Food and Nutrition Service and US Department of Health and Human Services Food and Drug Administration (FDA)",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-10/FrozenFruitPops_527x323.jpg?itok=SIg2cti3",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-10/FrozenFruitPops_527x323.jpg?itok=EQ7CU9y8",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-10/FrozenFruitPops_527x323.jpg?itok=h7qml4qt"
+   ]
+  },
+  {
+   "slug": "frozen-pear-pops",
+   "title": "Frozen Pear Pops",
+   "sourceUrl": "https://www.myplate.gov/recipes/frozen-pear-pops",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/frozenpearpops.jpg?itok=xAPZr_h3",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/frozenpearpops.jpg?itok=TnD9r55V",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/frozenpearpops.jpg?itok=Ggvub_bQ"
+   ]
+  },
+  {
+   "slug": "fruit-crisp",
+   "title": "Fruit Crisp",
+   "sourceUrl": "https://www.myplate.gov/recipes/fruit-crisp",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/Fruit%20Crisp.jpg?itok=tKEgtpFC",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/Fruit%20Crisp.jpg?itok=GXSymBuM",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/Fruit%20Crisp.jpg?itok=EBlpu8Xp"
+   ]
+  },
+  {
+   "slug": "fruit-dippers",
+   "title": "Fruit Dippers",
+   "sourceUrl": "https://www.myplate.gov/recipes/fruit-dippers",
+   "credit": "The Power of Choice USDA Food and Nutrition Service and US Department of Health and Human Services Food and Drug Administration (FDA)",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-11/Peanut%20fruit%20dip.jpg?itok=DEdabuL2",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-11/Peanut%20fruit%20dip.jpg?itok=IxZMOqzR",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-11/Peanut%20fruit%20dip.jpg?itok=EcG_Xe7_"
+   ]
+  },
+  {
+   "slug": "fruit-kabob",
+   "title": "Fruit Kabob",
+   "sourceUrl": "https://www.myplate.gov/recipes/fruit-kabob",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/Fruit%20Kabobs_1.jpg?itok=XOtEIRhc",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/Fruit%20Kabobs_1.jpg?itok=yjZ9_8xr",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/Fruit%20Kabobs_1.jpg?itok=yYZKYoeU"
+   ]
+  },
+  {
+   "slug": "fruit-salad-yogurt",
+   "title": "Fruit Salad with Yogurt",
+   "sourceUrl": "https://www.myplate.gov/recipes/fruit-salad-yogurt",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/Fruit%20Salad%20with%20Yogurt.jpg?itok=0ycyExXT",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/Fruit%20Salad%20with%20Yogurt.jpg?itok=vx24mO2T",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/Fruit%20Salad%20with%20Yogurt.jpg?itok=rXrMg5mh"
+   ]
+  },
+  {
+   "slug": "garden-pan-bread",
+   "title": "Garden Pan Bread",
+   "sourceUrl": "https://www.myplate.gov/recipes/garden-pan-bread",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations Adapted from a recipe submitted by Alicson Scott, Chickasaw Nation, Get Fresh! Nutrition Education Program",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Garden%20Pan%20Bread_fixed.png?itok=dtFkG6ws",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Garden%20Pan%20Bread_fixed.png?itok=rOukUfuR",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Garden%20Pan%20Bread_fixed.png?itok=WmdB9jfT"
+   ]
+  },
+  {
+   "slug": "garden-pasta-salad",
+   "title": "Garden Pasta Salad",
+   "sourceUrl": "https://www.myplate.gov/recipes/garden-pasta-salad",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Garden%20Pasta%20Salad_fixed.png?itok=REqY55uf",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Garden%20Pasta%20Salad_fixed.png?itok=c7jlKGYM",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Garden%20Pasta%20Salad_fixed.png?itok=cq16Qfxb"
+   ]
+  },
+  {
+   "slug": "great-northern-bean-soup",
+   "title": "Great Northern Bean Soup",
+   "sourceUrl": "https://www.myplate.gov/recipes/great-northern-bean-soup",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Great%20Northern%20Bean_fixed.png?itok=08Kg89av",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Great%20Northern%20Bean_fixed.png?itok=DSNdiA2b",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Great%20Northern%20Bean_fixed.png?itok=3sc1dr3S"
+   ]
+  },
+  {
+   "slug": "greek-pork-chops",
+   "title": "Greek Pork Chops",
+   "sourceUrl": "https://www.myplate.gov/recipes/greek-pork-chops",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/GreekPorkChops%20%28CNPP%29_MealStringBeansSweetPotatoes.jpg?itok=tMBzQn51",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/GreekPorkChops%20%28CNPP%29_MealStringBeansSweetPotatoes.jpg?itok=ihBsvmLd",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/GreekPorkChops%20%28CNPP%29_MealStringBeansSweetPotatoes.jpg?itok=O_rGHAA7"
+   ]
+  },
+  {
+   "slug": "greek-salad-chicken",
+   "title": "Greek Salad with Chicken",
+   "sourceUrl": "https://www.myplate.gov/recipes/greek-salad-chicken",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2024-01/GreekSaladChicken2_527x323.jpg?itok=uQvq2bAg",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2024-01/GreekSaladChicken2_527x323.jpg?itok=IrFNYgfv",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2024-01/GreekSaladChicken2_527x323.jpg?itok=M2TlL-66"
+   ]
+  },
+  {
+   "slug": "green-bean-and-rice-casserole",
+   "title": "Green Bean and Rice Casserole",
+   "sourceUrl": "https://www.myplate.gov/recipes/green-bean-and-rice-casserole",
+   "credit": "A Harvest of Recipes with USDA Foods Adapted from a recipe in Healthy Diabetes Recipes and More South Dakota Diabetes Control Program",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Green%20Bean%20Casserole_fixed.png?itok=276AoRk0",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Green%20Bean%20Casserole_fixed.png?itok=DmF8JY5R",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Green%20Bean%20Casserole_fixed.png?itok=ZJf4yebI"
+   ]
+  },
+  {
+   "slug": "green-onion-omelet",
+   "title": "Green Onion Omelet",
+   "sourceUrl": "https://www.myplate.gov/recipes/green-onion-omelet",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Green%20Onion%20Omelet_fixed.png?itok=XJ8SUT8i",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Green%20Onion%20Omelet_fixed.png?itok=s3VDyJG3",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Green%20Onion%20Omelet_fixed.png?itok=vys-_osx"
+   ]
+  },
+  {
+   "slug": "grilled-cheese-peaches",
+   "title": "Grilled Cheese with Peaches",
+   "sourceUrl": "https://www.myplate.gov/recipes/grilled-cheese-peaches",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Peach-grilledcheese.jpg?itok=ouRNzp5R",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Peach-grilledcheese.jpg?itok=bLsesH_g",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Peach-grilledcheese.jpg?itok=8OFVN8xF"
+   ]
+  },
+  {
+   "slug": "grilled-vegetables",
+   "title": "Grilled Vegetables",
+   "sourceUrl": "https://www.myplate.gov/recipes/grilled-vegetables",
+   "credit": "US Department of Health and Human Services Centers for Disease Control and Prevention (CDC)",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-07/GrilledVegetables.jpg?itok=NaD-9hEf",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-07/GrilledVegetables.jpg?itok=RWMkg8Ln",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-07/GrilledVegetables.jpg?itok=R0O9ju77"
+   ]
+  },
+  {
+   "slug": "harvest-vegetable-salad",
+   "title": "Harvest Vegetable Salad",
+   "sourceUrl": "https://www.myplate.gov/recipes/harvest-vegetable-salad",
+   "credit": "5 A Day: Eat 5 to 9 Fruits and Vegetables US Department of Health and Human Services Centers for Disease Control and Prevention (CDC) National Center for Chronic Disease Prevention and Health Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-09/HarvestVegetableSalad_527x323.jpg?itok=RUDSpnRZ",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-09/HarvestVegetableSalad_527x323.jpg?itok=XAwPHbo8",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-09/HarvestVegetableSalad_527x323.jpg?itok=cJw8lxdc"
+   ]
+  },
+  {
+   "slug": "hearty-beef-soup",
+   "title": "Hearty Beef Soup",
+   "sourceUrl": "https://www.myplate.gov/recipes/hearty-beef-soup",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Heary%20Beef%20Soup_fixed.png?itok=rEasMz5w",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Heary%20Beef%20Soup_fixed.png?itok=ZlHiKOvW",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Heary%20Beef%20Soup_fixed.png?itok=cW4XADQS"
+   ]
+  },
+  {
+   "slug": "homestyle-biscuits",
+   "title": "Homestyle Biscuits",
+   "sourceUrl": "https://www.myplate.gov/recipes/homestyle-biscuits",
+   "credit": "Heart Healthy Home Cooking: African American Style US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-09/HomestyleBiscuits_527x323.jpg?itok=oeKWNidH",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-09/HomestyleBiscuits_527x323.jpg?itok=I95sgYyZ",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-09/HomestyleBiscuits_527x323.jpg?itok=THrxYKCT"
+   ]
+  },
+  {
+   "slug": "hot-n-spicy-seasoning",
+   "title": "Hot 'N Spicy Seasoning",
+   "sourceUrl": "https://www.myplate.gov/recipes/hot-n-spicy-seasoning",
+   "credit": "A Healthier You: Based on the Dietary Guidelines for Americans US Department of Health and Human Services Office of Disease Prevention and Health Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-09/HotNSpicySeasoning_527x323.jpg?itok=605h8-mu",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-09/HotNSpicySeasoning_527x323.jpg?itok=H868GfdV",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-09/HotNSpicySeasoning_527x323.jpg?itok=PZbwhuVN"
+   ]
+  },
+  {
+   "slug": "huevos-motulenos",
+   "title": "Huevos Motuleños",
+   "sourceUrl": "https://www.myplate.gov/recipes/huevos-motulenos",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Huevos%20Motulenos_fixed.png?itok=BElAyrVh",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Huevos%20Motulenos_fixed.png?itok=M2nR1X2z",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Huevos%20Motulenos_fixed.png?itok=m8_IUn37"
+   ]
+  },
+  {
+   "slug": "jamaican-jerk-chicken",
+   "title": "Jamaican Jerk Chicken",
+   "sourceUrl": "https://www.myplate.gov/recipes/jamaican-jerk-chicken",
+   "credit": "Heart Healthy Home Cooking: African American Style US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2024-04/Jamaican%20Jerk%20Chicken.png?itok=pfj25VI7",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2024-04/Jamaican%20Jerk%20Chicken.png?itok=1d7xzPcH",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2024-04/Jamaican%20Jerk%20Chicken.png?itok=gda4mLsx"
+   ]
+  },
+  {
+   "slug": "jeans-banana-pudding-parfait",
+   "title": "Jean’s Banana Pudding Parfait",
+   "sourceUrl": "https://www.myplate.gov/recipes/jeans-banana-pudding-parfait",
+   "credit": "USDA Center for Nutrition Policy and Promotion Recipe submitted by Jean, USDA Nutritionist",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/jeansbananapuddingparfait.jpg?itok=ogUOVGS-",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/jeansbananapuddingparfait.jpg?itok=8hAZrDo0",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/jeansbananapuddingparfait.jpg?itok=lwrC7n80"
+   ]
+  },
+  {
+   "slug": "julias-sauteed-steamed-collards",
+   "title": "Julia’s Sautéed & Steamed Collards",
+   "sourceUrl": "https://www.myplate.gov/recipes/julias-sauteed-steamed-collards",
+   "credit": "USDA Center for Nutrition Policy and Promotion Recipe submitted by Julia",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/juliassauteedandsteamedcollards.jpg?itok=PYCgERuo",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/juliassauteedandsteamedcollards.jpg?itok=o3SA80nW",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/juliassauteedandsteamedcollards.jpg?itok=5fIdF8Jp"
+   ]
+  },
+  {
+   "slug": "kale-salad-yogurt-dressing",
+   "title": "Kale Salad with Yogurt Dressing",
+   "sourceUrl": "https://www.myplate.gov/recipes/kale-salad-yogurt-dressing",
+   "credit": "USDA Supplemental Nutrition Assistance Program (SNAP)",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2024-04/KaleSaladYogurtDressing_527x323.jpg?itok=tHN_VgMh",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2024-04/KaleSaladYogurtDressing_527x323.jpg?itok=df_l_J3e",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2024-04/KaleSaladYogurtDressing_527x323.jpg?itok=kO2fcvSZ"
+   ]
+  },
+  {
+   "slug": "lemon-potatoes",
+   "title": "Lemon Potatoes",
+   "sourceUrl": "https://www.myplate.gov/recipes/lemon-potatoes",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Lemonpotatoes.jpg?itok=6l2vXFZO",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Lemonpotatoes.jpg?itok=32lELr4o",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Lemonpotatoes.jpg?itok=SHkq5739"
+   ]
+  },
+  {
+   "slug": "lentil-barley-soup",
+   "title": "Lentil Barley Soup",
+   "sourceUrl": "https://www.myplate.gov/recipes/lentil-barley-soup",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2023-10/LentilBarleySoup_527x323.jpg?itok=S3P1GTqT",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2023-10/LentilBarleySoup_527x323.jpg?itok=_uWF83aF",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2023-10/LentilBarleySoup_527x323.jpg?itok=OXkuBaGq"
+   ]
+  },
+  {
+   "slug": "lentil-minestrone",
+   "title": "Lentil Minestrone",
+   "sourceUrl": "https://www.myplate.gov/recipes/lentil-minestrone",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/VegetableLentilSoup-8.jpg?itok=0fAC4oRh",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/VegetableLentilSoup-8.jpg?itok=DjVyV2Qq",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/VegetableLentilSoup-8.jpg?itok=bK7KQtuP"
+   ]
+  },
+  {
+   "slug": "low-fat-ranch-dip",
+   "title": "Low Fat Ranch Dip",
+   "sourceUrl": "https://www.myplate.gov/recipes/low-fat-ranch-dip",
+   "credit": "National Cancer Institute (NCI) 5 A Day for Better Health Program",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2023-09/LowFatRanchDip_527x323.jpg?itok=FrRlMEyp",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2023-09/LowFatRanchDip_527x323.jpg?itok=RFcCX5by",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2023-09/LowFatRanchDip_527x323.jpg?itok=MaccqIUW"
+   ]
+  },
+  {
+   "slug": "mango-shake",
+   "title": "Mango Shake",
+   "sourceUrl": "https://www.myplate.gov/recipes/mango-shake",
+   "credit": "Delicious Heart-Healthy Latino Recipes/ Platillos Latinos Sabrosos y Saludables US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/Mango%20Shake.jpg?itok=rL2mUkZ2",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/Mango%20Shake.jpg?itok=8mS8p8Vg",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/Mango%20Shake.jpg?itok=QxeoZUrt"
+   ]
+  },
+  {
+   "slug": "mashed-taters",
+   "title": "Mashed Taters",
+   "sourceUrl": "https://www.myplate.gov/recipes/mashed-taters",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations Adapted from a recipe submitted by Alicson Scott, Chickasaw Nation, Get Fresh! Nutrition Education Program",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Mash%20Potatoes_fixed.png?itok=bM4TA9qT",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Mash%20Potatoes_fixed.png?itok=h04Knfc1",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Mash%20Potatoes_fixed.png?itok=jXfqgeU_"
+   ]
+  },
+  {
+   "slug": "meatloaf",
+   "title": "Meatloaf",
+   "sourceUrl": "https://www.myplate.gov/recipes/meatloaf",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe_525_x_350_/public/recipe-images/Meatloaf_fixed.png?itok=l9LR8a3O",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Meatloaf_fixed.png?itok=OOkyIigl",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Meatloaf_fixed.png?itok=JS6zgl-M"
+   ]
+  },
+  {
+   "slug": "mediterranean-chicken-and-white-bean-salad",
+   "title": "Mediterranean Chicken and White Bean Salad",
+   "sourceUrl": "https://www.myplate.gov/recipes/mediterranean-chicken-and-white-bean-salad",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/MediterraneanChickenandWhiteBeanSalad.jpg?itok=L0PeodMw",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/MediterraneanChickenandWhiteBeanSalad.jpg?itok=mc4-y2kk",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/MediterraneanChickenandWhiteBeanSalad.jpg?itok=vy5as8ZS"
+   ]
+  },
+  {
+   "slug": "melissas-slow-cooker-stuffing",
+   "title": "Melissa’s Slow Cooker Stuffing",
+   "sourceUrl": "https://www.myplate.gov/recipes/melissas-slow-cooker-stuffing",
+   "credit": "USDA Center for Nutrition Policy and Promotion Recipe submitted by Melissa, USDA Nutritionist",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2024-01/Melissas%20Slow%20Cooker%20Stuffing.jpg?itok=sIctT-kD",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2024-01/Melissas%20Slow%20Cooker%20Stuffing.jpg?itok=9g0rlXx3",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2024-01/Melissas%20Slow%20Cooker%20Stuffing.jpg?itok=SgFT9gA0"
+   ]
+  },
+  {
+   "slug": "mock-southern-sweet-potato-pie",
+   "title": "Mock Southern Sweet Potato Pie",
+   "sourceUrl": "https://www.myplate.gov/recipes/mock-southern-sweet-potato-pie",
+   "credit": "Heart Healthy Home Cooking: African American Style US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2022-06/MockSouthernSweetPotatoPie.jpg?itok=EoMOH7oB",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2022-06/MockSouthernSweetPotatoPie.jpg?itok=bs7ArF6X",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2022-06/MockSouthernSweetPotatoPie.jpg?itok=I1Cqjybk"
+   ]
+  },
+  {
+   "slug": "mousse-la-banana",
+   "title": "Mousse a la Banana",
+   "sourceUrl": "https://www.myplate.gov/recipes/mousse-la-banana",
+   "credit": "A Healthier You: Based on the Dietary Guidelines for Americans US Department of Health and Human Services Office of Disease Prevention and Health Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2022-07/MousseALaBanana_527x323.jpg?itok=AgSvz1zw",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2022-07/MousseALaBanana_527x323.jpg?itok=9H2cq4fc",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2022-07/MousseALaBanana_527x323.jpg?itok=cbyqsRbu"
+   ]
+  },
+  {
+   "slug": "mouth-watering-oven-fried-fish",
+   "title": "Mouth-Watering Oven-Fried Fish",
+   "sourceUrl": "https://www.myplate.gov/recipes/mouth-watering-oven-fried-fish",
+   "credit": "Heart Healthy Home Cooking: African American Style US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2022-07/MouthWateringOvenFriedFish_527x323..jpg?itok=AqX4Io87",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2022-07/MouthWateringOvenFriedFish_527x323..jpg?itok=0iPmk1QY",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2022-07/MouthWateringOvenFriedFish_527x323..jpg?itok=jORxN2mN"
+   ]
+  },
+  {
+   "slug": "new-orleans-red-beans",
+   "title": "New Orleans Red Beans",
+   "sourceUrl": "https://www.myplate.gov/recipes/new-orleans-red-beans",
+   "credit": "Stay Young at Heart: Cooking the Heart-Healthy Way US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2022-08/NewOrleansRedBeans_527x323.jpg?itok=MigwfcH4",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2022-08/NewOrleansRedBeans_527x323.jpg?itok=42-PjgiD",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2022-08/NewOrleansRedBeans_527x323.jpg?itok=DwFVLgEj"
+   ]
+  },
+  {
+   "slug": "orange-delight-juice",
+   "title": "Orange Delight Juice",
+   "sourceUrl": "https://www.myplate.gov/recipes/orange-delight-juice",
+   "credit": "USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-09/orange%20delight%20juice.jpg?itok=_9RisNhA",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-09/orange%20delight%20juice.jpg?itok=ehfRNZwV",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-09/orange%20delight%20juice.jpg?itok=bqMzLl1k"
+   ]
+  },
+  {
+   "slug": "overnight-oatmeal-berries",
+   "title": "Overnight Oatmeal with Berries",
+   "sourceUrl": "https://www.myplate.gov/recipes/overnight-oatmeal-berries",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/OvernightOatmealwBerries.jpg?itok=sKxRWt-y",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/OvernightOatmealwBerries.jpg?itok=ufxkl6aq",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/OvernightOatmealwBerries.jpg?itok=xs3IGdPi"
+   ]
+  },
+  {
+   "slug": "pan-roasted-tilapia-tomatillo-salsa",
+   "title": "Pan Roasted Tilapia with Tomatillo Salsa",
+   "sourceUrl": "https://www.myplate.gov/recipes/pan-roasted-tilapia-tomatillo-salsa",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2024-04/Pan%20Roasted%20Tilapia%20With%20Tomatillo%20Salsa.png?itok=aVxeFfN8",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2024-04/Pan%20Roasted%20Tilapia%20With%20Tomatillo%20Salsa.png?itok=kWLiKW5Y",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2024-04/Pan%20Roasted%20Tilapia%20With%20Tomatillo%20Salsa.png?itok=pe2ounhX"
+   ]
+  },
+  {
+   "slug": "pasta-bolognese",
+   "title": "Pasta Bolognese",
+   "sourceUrl": "https://www.myplate.gov/recipes/pasta-bolognese",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/PastaBolognese.jpg?itok=2O1cBvab",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/PastaBolognese.jpg?itok=4QM9uott",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/PastaBolognese.jpg?itok=XJQi17wT"
+   ]
+  },
+  {
+   "slug": "pasta-chickpeas-tomato-and-spinach",
+   "title": "Pasta with Chickpeas, Tomato, and Spinach",
+   "sourceUrl": "https://www.myplate.gov/recipes/pasta-chickpeas-tomato-and-spinach",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/PastaWithChickpeasTomatoAndSpinach.jpg?itok=wN6K1jYM",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/PastaWithChickpeasTomatoAndSpinach.jpg?itok=xqOmRFDs",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/PastaWithChickpeasTomatoAndSpinach.jpg?itok=9mKUlv11"
+   ]
+  },
+  {
+   "slug": "peach-apple-crisp",
+   "title": "Peach Apple Crisp",
+   "sourceUrl": "https://www.myplate.gov/recipes/peach-apple-crisp",
+   "credit": "Recipes and Tips for Healthy, Thrifty Meals USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-10/PeachAppleCrisp_527x323.jpg?itok=UWahc5ua",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-10/PeachAppleCrisp_527x323.jpg?itok=TpMigu0x",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-10/PeachAppleCrisp_527x323.jpg?itok=VB1hOC-3"
+   ]
+  },
+  {
+   "slug": "peach-sauce",
+   "title": "Peach Sauce",
+   "sourceUrl": "https://www.myplate.gov/recipes/peach-sauce",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/PeachSauce.jpg?itok=XfGvtgHV",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/PeachSauce.jpg?itok=PVQAOhJT",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/PeachSauce.jpg?itok=lzt00uOd"
+   ]
+  },
+  {
+   "slug": "peanut-butter-banana-smoothie",
+   "title": "Peanut Butter Banana Smoothie",
+   "sourceUrl": "https://www.myplate.gov/recipes/peanut-butter-banana-smoothie",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/YogurtSmoothie4.jpg?itok=BdGzqMG1",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/YogurtSmoothie4.jpg?itok=7gHTgabT",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/YogurtSmoothie4.jpg?itok=PyEFa_ps"
+   ]
+  },
+  {
+   "slug": "peanut-butter-n-fruit-wich",
+   "title": "Peanut Butter 'n Fruit-wich",
+   "sourceUrl": "https://www.myplate.gov/recipes/peanut-butter-n-fruit-wich",
+   "credit": "The Power of Choice USDA Food and Nutrition Service and US Department of Health and Human Services Food and Drug Administration (FDA)",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-10/PeanutButterNFruitWich_527x323.jpg?itok=JvBxqA7R",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-10/PeanutButterNFruitWich_527x323.jpg?itok=BKFk2sel",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-10/PeanutButterNFruitWich_527x323.jpg?itok=QcGl1Kmb"
+   ]
+  },
+  {
+   "slug": "pear-orange-sauce",
+   "title": "Pear in Orange Sauce",
+   "sourceUrl": "https://www.myplate.gov/recipes/pear-orange-sauce",
+   "credit": "Delicious Heart-Healthy Latino Recipes/ Platillos Latinos Sabrosos y Saludables US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-10/PearInOrangeSauce_527x323.jpg?itok=QYFmLmUq",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-10/PearInOrangeSauce_527x323.jpg?itok=O9SbMRhB",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-10/PearInOrangeSauce_527x323.jpg?itok=43ytmVy5"
+   ]
+  },
+  {
+   "slug": "pear-quesadillas",
+   "title": "Pear Quesadillas",
+   "sourceUrl": "https://www.myplate.gov/recipes/pear-quesadillas",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/pearquesadillas.jpg?itok=SFAi8e-n",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/pearquesadillas.jpg?itok=nr9UpFIh",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/pearquesadillas.jpg?itok=9ltV6PrR"
+   ]
+  },
+  {
+   "slug": "pear-salad",
+   "title": "Pear Salad",
+   "sourceUrl": "https://www.myplate.gov/recipes/pear-salad",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/pearsalad.jpg?itok=VT1cxHf4",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/pearsalad.jpg?itok=UpOIsT9T"
+   ]
+  },
+  {
+   "slug": "picadillo-0",
+   "title": "Picadillo",
+   "sourceUrl": "https://www.myplate.gov/recipes/picadillo-0",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Picadillo-16.jpg?itok=GqXU1E79",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Picadillo-16.jpg?itok=wfqgKN5j",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Picadillo-16.jpg?itok=-r3zckZd"
+   ]
+  },
+  {
+   "slug": "pot-roasted-beef",
+   "title": "Pot Roasted Beef",
+   "sourceUrl": "https://www.myplate.gov/recipes/pot-roasted-beef",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Pot%20Roasted%20Beef_fixed.png?itok=prJh2OE9",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Pot%20Roasted%20Beef_fixed.png?itok=385JheBu",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Pot%20Roasted%20Beef_fixed.png?itok=5SjEaOKt"
+   ]
+  },
+  {
+   "slug": "potato-cakes",
+   "title": "Potato Cakes",
+   "sourceUrl": "https://www.myplate.gov/recipes/potato-cakes",
+   "credit": "USDA Food and Nutrition Service Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-10/PotatoCakes_527x323.jpg?itok=dd3F43zZ",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-10/PotatoCakes_527x323.jpg?itok=lHDr-n5k",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-10/PotatoCakes_527x323.jpg?itok=8wxXfkYG"
+   ]
+  },
+  {
+   "slug": "potato-salad-0",
+   "title": "Potato Salad",
+   "sourceUrl": "https://www.myplate.gov/recipes/potato-salad-0",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/potato%20salad.jpg?itok=ZzWAfbd6",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/potato%20salad.jpg?itok=GDQm7E2c",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/potato%20salad.jpg?itok=hNvXCDve"
+   ]
+  },
+  {
+   "slug": "potato-soup-0",
+   "title": "Potato Soup",
+   "sourceUrl": "https://www.myplate.gov/recipes/potato-soup-0",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Potato%20Soup_fixed.png?itok=ZK4SZEYG",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Potato%20Soup_fixed.png?itok=aoSR78Zd",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Potato%20Soup_fixed.png?itok=Q5FP47a-"
+   ]
+  },
+  {
+   "slug": "pulled-pork-sandwich-red-cabbage-and-carrot-slaw",
+   "title": "Pulled Pork Sandwich with Red Cabbage and Carrot Slaw",
+   "sourceUrl": "https://www.myplate.gov/recipes/pulled-pork-sandwich-red-cabbage-and-carrot-slaw",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/pulled%20pork.jpg?itok=9-ef0uk9",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/pulled%20pork.jpg?itok=Zc2WFFF7",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/pulled%20pork.jpg?itok=_gP948yR"
+   ]
+  },
+  {
+   "slug": "pumpkin-soup-0",
+   "title": "Pumpkin Soup",
+   "sourceUrl": "https://www.myplate.gov/recipes/pumpkin-soup-0",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Pumpkin%20Soup_fixed.png?itok=rEtq6Er1",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Pumpkin%20Soup_fixed.png?itok=pgKAUZaa",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Pumpkin%20Soup_fixed.png?itok=M3gMZdY8"
+   ]
+  },
+  {
+   "slug": "quinoa-and-black-bean-salad",
+   "title": "Quinoa and Black Bean Salad",
+   "sourceUrl": "https://www.myplate.gov/recipes/quinoa-and-black-bean-salad",
+   "credit": "Delicious Heart-Healthy Latino Recipes/ Platillos Latinos Sabrosos y Saludables US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2022-08/QuinoaAndBlackBeanSalad.jpg?itok=BGR2ErYE",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2022-08/QuinoaAndBlackBeanSalad.jpg?itok=ADBoCR0X",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2022-08/QuinoaAndBlackBeanSalad.jpg?itok=m1LGm_H7"
+   ]
+  },
+  {
+   "slug": "ratatouille-0",
+   "title": "Ratatouille",
+   "sourceUrl": "https://www.myplate.gov/recipes/ratatouille-0",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/Ratatouille-7.jpg?itok=Z2_V6MVN",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/Ratatouille-7.jpg?itok=kop8zUlL",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/Ratatouille-7.jpg?itok=j0xzUggz"
+   ]
+  },
+  {
+   "slug": "red-bean-quesadilla",
+   "title": "Red Bean Quesadilla",
+   "sourceUrl": "https://www.myplate.gov/recipes/red-bean-quesadilla",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/RedBeanQuesadilla-9.jpg?itok=fzG6venH",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/RedBeanQuesadilla-9.jpg?itok=MfwNKZmR",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/RedBeanQuesadilla-9.jpg?itok=WG89peV7"
+   ]
+  },
+  {
+   "slug": "red-beans-and-rice",
+   "title": "Red Beans and Rice",
+   "sourceUrl": "https://www.myplate.gov/recipes/red-beans-and-rice",
+   "credit": "Food and Drug Administration (FDA) US Department of Health and Human Services",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2024-04/Red%20Beans%20and%20Rice.png?itok=oWC2TP-u",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2024-04/Red%20Beans%20and%20Rice.png?itok=pVCjL-qa",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2024-04/Red%20Beans%20and%20Rice.png?itok=deKljhjO"
+   ]
+  },
+  {
+   "slug": "red-beans-and-rice-0",
+   "title": "Red Beans and Rice",
+   "sourceUrl": "https://www.myplate.gov/recipes/red-beans-and-rice-0",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/RedBeansandRice.jpg?itok=LHqwxnuS",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/RedBeansandRice.jpg?itok=IDhliVjc",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/RedBeansandRice.jpg?itok=R6Vlbaqm"
+   ]
+  },
+  {
+   "slug": "red-chile-stew",
+   "title": "Red Chile Stew",
+   "sourceUrl": "https://www.myplate.gov/recipes/red-chile-stew",
+   "credit": "A River of Recipes: Native American Recipes Using Commodity Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-11/RedChileStew_527x323.jpg?itok=ZlFxJE1J",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-11/RedChileStew_527x323.jpg?itok=UA0pqZd-",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-11/RedChileStew_527x323.jpg?itok=B-mpZMdE"
+   ]
+  },
+  {
+   "slug": "red-hot-fusilli",
+   "title": "Red Hot Fusilli",
+   "sourceUrl": "https://www.myplate.gov/recipes/red-hot-fusilli",
+   "credit": "Stay Young at Heart: Cooking the Heart-Healthy Way US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-11/RedHotFusilli_527x323.jpg?itok=zD8eq6fs",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-11/RedHotFusilli_527x323.jpg?itok=0ir39Gnx",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-11/RedHotFusilli_527x323.jpg?itok=x39pFwFA"
+   ]
+  },
+  {
+   "slug": "red-potato-salad",
+   "title": "Red Potato Salad",
+   "sourceUrl": "https://www.myplate.gov/recipes/red-potato-salad",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/PotatoSalad1.jpg?itok=42KxX_6K",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/PotatoSalad1.jpg?itok=juSleCRf",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/PotatoSalad1.jpg?itok=ao509H47"
+   ]
+  },
+  {
+   "slug": "rice-chicken-arroz-con-pollo",
+   "title": "Rice with Chicken | Arroz Con Pollo",
+   "sourceUrl": "https://www.myplate.gov/recipes/rice-chicken-arroz-con-pollo",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/ArrozConPollo%20%28CNPP%29_ChickenProteinMeal.jpg?itok=LQ5Kb9Ge",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/ArrozConPollo%20%28CNPP%29_ChickenProteinMeal.jpg?itok=P9N5XPgF",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/ArrozConPollo%20%28CNPP%29_ChickenProteinMeal.jpg?itok=UKu-lbWU"
+   ]
+  },
+  {
+   "slug": "rice-pudding",
+   "title": "Rice Pudding",
+   "sourceUrl": "https://www.myplate.gov/recipes/rice-pudding",
+   "credit": "Recipes and Tips for Healthy, Thrifty Meals USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-11/RicePudding_527x323.jpg?itok=I7tkXlBh",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-11/RicePudding_527x323.jpg?itok=7tX-YfXT",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-11/RicePudding_527x323.jpg?itok=oUaRNb_k"
+   ]
+  },
+  {
+   "slug": "roasted-chickpeas-garbanzo-beans",
+   "title": "Roasted Chickpeas (Garbanzo Beans)",
+   "sourceUrl": "https://www.myplate.gov/recipes/roasted-chickpeas-garbanzo-beans",
+   "credit": "USDA Supplemental Nutrition Assistance Program (SNAP)",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-11/RoastedChickpeas_527x323.jpg?itok=npxP3XUE",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-11/RoastedChickpeas_527x323.jpg?itok=zjhwnhrz",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-11/RoastedChickpeas_527x323.jpg?itok=QyAtiZrG"
+   ]
+  },
+  {
+   "slug": "roasted-potatoes",
+   "title": "Roasted Potatoes",
+   "sourceUrl": "https://www.myplate.gov/recipes/roasted-potatoes",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Roasted%20Potatoes_fixed.png?itok=Tl_jE2hE",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Roasted%20Potatoes_fixed.png?itok=jVjwVORQ",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Roasted%20Potatoes_fixed.png?itok=BK7VK_aA"
+   ]
+  },
+  {
+   "slug": "sarahs-green-bean-casserole",
+   "title": "Sarah’s Green Bean Casserole",
+   "sourceUrl": "https://www.myplate.gov/recipes/sarahs-green-bean-casserole",
+   "credit": "USDA Center for Nutrition Policy and Promotion Recipe submitted by Sarah, MyPlate Nutritionist",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/sarahsgreenbeancasserole.jpg?itok=ajjRPcLM",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/sarahsgreenbeancasserole.jpg?itok=_r7f169y",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/sarahsgreenbeancasserole.jpg?itok=R8pfTp4l"
+   ]
+  },
+  {
+   "slug": "sarahs-spicy-curry-turkey-soup",
+   "title": "Sarah’s Spicy Curry Turkey Soup",
+   "sourceUrl": "https://www.myplate.gov/recipes/sarahs-spicy-curry-turkey-soup",
+   "credit": "USDA Center for Nutrition Policy and Promotion Recipe submitted by Sarah, MyPlate Nutritionist",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/sarahsspicycurryturkeysoup.jpg?itok=P7eQYAIr",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/sarahsspicycurryturkeysoup.jpg?itok=mag7hNQh",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/sarahsspicycurryturkeysoup.jpg?itok=w3y2QnTT"
+   ]
+  },
+  {
+   "slug": "sardine-cucumber-and-tomato-sandwich",
+   "title": "Sardine, Cucumber, and Tomato Sandwich",
+   "sourceUrl": "https://www.myplate.gov/recipes/sardine-cucumber-and-tomato-sandwich",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/Sardine%20Sandwich.jpg?itok=ZKgBS1_T",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/Sardine%20Sandwich.jpg?itok=UiTXfZs5",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/Sardine%20Sandwich.jpg?itok=XfOmrbrX"
+   ]
+  },
+  {
+   "slug": "sauteed-cabbage-and-onion",
+   "title": "Sautéed Cabbage and Onion",
+   "sourceUrl": "https://www.myplate.gov/recipes/sauteed-cabbage-and-onion",
+   "credit": "\"Cabbage Comfort\" National Cancer Institute (NCI) 5 A Day for Better Health Program",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-03/CabbageComfort.jpg?itok=duENxvxL",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-03/CabbageComfort.jpg?itok=zAZuj3oS",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-03/CabbageComfort.jpg?itok=EHoFqG73"
+   ]
+  },
+  {
+   "slug": "savory-bread-pudding-kale-and-butternut-squash",
+   "title": "Savory Bread Pudding with Kale and Butternut Squash",
+   "sourceUrl": "https://www.myplate.gov/recipes/savory-bread-pudding-kale-and-butternut-squash",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/Savory%20Bread%20Pudding%20with%20Kale%20and%20Butternut%20Squash_Meal.jpg?itok=vr14P2mJ",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/Savory%20Bread%20Pudding%20with%20Kale%20and%20Butternut%20Squash_Meal.jpg?itok=iACFkZyp",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/Savory%20Bread%20Pudding%20with%20Kale%20and%20Butternut%20Squash_Meal.jpg?itok=PrYpXEap"
+   ]
+  },
+  {
+   "slug": "savory-spicy-ground-beef-succotash",
+   "title": "Savory and Spicy Ground Beef & Succotash",
+   "sourceUrl": "https://www.myplate.gov/recipes/savory-spicy-ground-beef-succotash",
+   "credit": "A River of Recipes: Native American Recipes Using Commodity Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2022-07/SavorySpicyGroundBeefSuccotash_527x323.jpg?itok=Rfn74Vsh",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2022-07/SavorySpicyGroundBeefSuccotash_527x323.jpg?itok=Bebv53r2",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2022-07/SavorySpicyGroundBeefSuccotash_527x323.jpg?itok=PaIg4k8g"
+   ]
+  },
+  {
+   "slug": "scallion-rice",
+   "title": "Scallion Rice",
+   "sourceUrl": "https://www.myplate.gov/recipes/scallion-rice",
+   "credit": "DASH Eating Plan: Lower Your Blood Pressure US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2025-06/Image-of-Scallion-Rice-Recipe.png?itok=yuJSK8AC",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2025-06/Image-of-Scallion-Rice-Recipe.png?itok=R3PHbtMW",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2025-06/Image-of-Scallion-Rice-Recipe.png?itok=kzQ__p2O"
+   ]
+  },
+  {
+   "slug": "scalloped-potatoes",
+   "title": "Scalloped Potatoes",
+   "sourceUrl": "https://www.myplate.gov/recipes/scalloped-potatoes",
+   "credit": "Recipes and Tips for Healthy, Thrifty Meals USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/ScallopedPotatoes_527x323.jpg?itok=mmN2VWSj",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/ScallopedPotatoes_527x323.jpg?itok=I0Wp56Fd",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-11/ScallopedPotatoes_527x323.jpg?itok=QM3xMWuN"
+   ]
+  },
+  {
+   "slug": "seared-greens",
+   "title": "Seared Greens",
+   "sourceUrl": "https://www.myplate.gov/recipes/seared-greens",
+   "credit": "USDA Food and Nutrition Service Team Nutrition",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-10/SearedGreens.jpg?itok=X98xCogt",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-10/SearedGreens.jpg?itok=yJ9CYdIp",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-10/SearedGreens.jpg?itok=r1krEFmA"
+   ]
+  },
+  {
+   "slug": "simple-fish-tacos",
+   "title": "Simple Fish Tacos",
+   "sourceUrl": "https://www.myplate.gov/recipes/simple-fish-tacos",
+   "credit": "US Department of Health and Human Services Centers for Disease Control and Prevention (CDC)",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-10/SimpleFishTacos.jpg?itok=caG7KGzT",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-10/SimpleFishTacos.jpg?itok=4LodgL6x",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-10/SimpleFishTacos.jpg?itok=R9tuz892"
+   ]
+  },
+  {
+   "slug": "skillet-catfish",
+   "title": "Skillet Catfish",
+   "sourceUrl": "https://www.myplate.gov/recipes/skillet-catfish",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/Skillet%20Catfish%20%28CNPP%29_MealProtein.png?itok=91VDi0Uu",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/Skillet%20Catfish%20%28CNPP%29_MealProtein.png?itok=sot3BKey",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/Skillet%20Catfish%20%28CNPP%29_MealProtein.png?itok=9Q3ex_FT"
+   ]
+  },
+  {
+   "slug": "smothered-greens",
+   "title": "Smothered Greens",
+   "sourceUrl": "https://www.myplate.gov/recipes/smothered-greens",
+   "credit": "Heart Healthy Home Cooking: African American Style US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2024-04/Smothered%20Greens.png?itok=ZwXOrARf",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2024-04/Smothered%20Greens.png?itok=VGA-Y647",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2024-04/Smothered%20Greens.png?itok=Uayt0hE5"
+   ]
+  },
+  {
+   "slug": "soft-chicken-taco",
+   "title": "Soft Chicken Taco",
+   "sourceUrl": "https://www.myplate.gov/recipes/soft-chicken-taco",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/ChickenTaco_fixed.png?itok=qU6EwPv4",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/ChickenTaco_fixed.png?itok=Yg2zpWRG",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/ChickenTaco_fixed.png?itok=V1VLuZTO"
+   ]
+  },
+  {
+   "slug": "southern-banana-pudding",
+   "title": "Southern Banana Pudding",
+   "sourceUrl": "https://www.myplate.gov/recipes/southern-banana-pudding",
+   "credit": "Heart Healthy Home Cooking: African American Style US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/SouthernBananaPudding_527x323.jpg?itok=L79QIQ6Y",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/SouthernBananaPudding_527x323.jpg?itok=Ka-TMwU6"
+   ]
+  },
+  {
+   "slug": "spanish-frittata",
+   "title": "Spanish Frittata",
+   "sourceUrl": "https://www.myplate.gov/recipes/spanish-frittata",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/SpanishFrittata.jpg?itok=m_KLBGou",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/SpanishFrittata.jpg?itok=qrnP4zDT",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/SpanishFrittata.jpg?itok=syUYWN-F"
+   ]
+  },
+  {
+   "slug": "spanish-omelet",
+   "title": "Spanish Omelet",
+   "sourceUrl": "https://www.myplate.gov/recipes/spanish-omelet",
+   "credit": "Control Your Diabetes for Life: Recipes and Meal Planner Guide US Department of Health and Human Services Centers for Disease Control and Prevention (CDC) National Diabetes Education Program",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/SpanishOmelet_527x323.jpg?itok=44jJxbyh",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/SpanishOmelet_527x323.jpg?itok=7YqF17fn",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-11/SpanishOmelet_527x323.jpg?itok=kkpcvvvR"
+   ]
+  },
+  {
+   "slug": "spanish-rice",
+   "title": "Spanish Rice",
+   "sourceUrl": "https://www.myplate.gov/recipes/spanish-rice",
+   "credit": "USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/SpanishRice_527x323.jpg?itok=O8MYoZEx",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/SpanishRice_527x323.jpg?itok=qP8APYDD",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-11/SpanishRice_527x323.jpg?itok=aTVGk5oN"
+   ]
+  },
+  {
+   "slug": "spicy-okra",
+   "title": "Spicy Okra",
+   "sourceUrl": "https://www.myplate.gov/recipes/spicy-okra",
+   "credit": "Heart Healthy Home Cooking: African American Style US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/SpicyOkra_527x323.jpg?itok=8a4fmUzr",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/SpicyOkra_527x323.jpg?itok=ioK9INYF",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-11/SpicyOkra_527x323.jpg?itok=4c_K_7CM"
+   ]
+  },
+  {
+   "slug": "spicy-oven-baked-chicken",
+   "title": "Spicy Oven-Baked Chicken",
+   "sourceUrl": "https://www.myplate.gov/recipes/spicy-oven-baked-chicken",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/baked%20chicken.png?itok=ZUX9vnm5",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/baked%20chicken.png?itok=yQCD59h0",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/baked%20chicken.png?itok=GQy9V7Zu"
+   ]
+  },
+  {
+   "slug": "spicy-southern-barbecued-chicken",
+   "title": "Spicy Southern Barbecued Chicken",
+   "sourceUrl": "https://www.myplate.gov/recipes/spicy-southern-barbecued-chicken",
+   "credit": "Heart Healthy Home Cooking: African American Style US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2024-10/SpicySouthernBarbequeChicken.jpg?itok=bxePaSxS",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2024-10/SpicySouthernBarbequeChicken.jpg?itok=RLT2q4SA",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2024-10/SpicySouthernBarbequeChicken.jpg?itok=ZWwBvhYq"
+   ]
+  },
+  {
+   "slug": "spinach-tomatoes-and-corn",
+   "title": "Spinach, Tomatoes, and Corn",
+   "sourceUrl": "https://www.myplate.gov/recipes/spinach-tomatoes-and-corn",
+   "credit": "Creative Recipes for Less Familiar USDA Commodities Used by Household Programs USDA Food and Nutrition Service Food Distribution Service",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2025-06/Image-of-Spinach-Tomatoes-Corn-Recipe.png?itok=nDLHfYW2",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2025-06/Image-of-Spinach-Tomatoes-Corn-Recipe.png?itok=oXpL7kOG",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2025-06/Image-of-Spinach-Tomatoes-Corn-Recipe.png?itok=uZvm19Ep"
+   ]
+  },
+  {
+   "slug": "split-pea-soup-0",
+   "title": "Split Pea Soup",
+   "sourceUrl": "https://www.myplate.gov/recipes/split-pea-soup-0",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-01/Split%20Pea%20Soup%20%28CNPP%29_SandwichMeal.png?itok=MoAmtCUh",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-01/Split%20Pea%20Soup%20%28CNPP%29_SandwichMeal.png?itok=gBew_BmR",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-01/Split%20Pea%20Soup%20%28CNPP%29_SandwichMeal.png?itok=UPEkKejU"
+   ]
+  },
+  {
+   "slug": "spring-vegetable-saute",
+   "title": "Spring Vegetable Sauté",
+   "sourceUrl": "https://www.myplate.gov/recipes/spring-vegetable-saute",
+   "credit": "US Department of Health and Human Services National Cancer Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/SpringVegetableSaute.jpg?itok=5WHcJkfC",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/SpringVegetableSaute.jpg?itok=Mvw5-aen"
+   ]
+  },
+  {
+   "slug": "springtime-cereal",
+   "title": "Springtime Cereal",
+   "sourceUrl": "https://www.myplate.gov/recipes/springtime-cereal",
+   "credit": "US Department of Health and Human Services",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-11/SpringtimeCereal_527x323.jpg?itok=YRO66FOa",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-11/SpringtimeCereal_527x323.jpg?itok=Jd-QI5hc",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-11/SpringtimeCereal_527x323.jpg?itok=Ls_XxkSq"
+   ]
+  },
+  {
+   "slug": "stir-fried-beef",
+   "title": "Stir Fried Beef",
+   "sourceUrl": "https://www.myplate.gov/recipes/stir-fried-beef",
+   "credit": "Delicious Heart-Healthy Latino Recipes/ Platillos Latinos Sabrosos y Saludables US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/StirFriedBeef.jpg?itok=EYY9eWcy",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/StirFriedBeef.jpg?itok=3r5SS_n1",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-11/StirFriedBeef.jpg?itok=NEfbnOCS"
+   ]
+  },
+  {
+   "slug": "strawberry-kiwi-yogurt-pops",
+   "title": "Strawberry Kiwi Yogurt Pops",
+   "sourceUrl": "https://www.myplate.gov/recipes/strawberry-kiwi-yogurt-pops",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Kiwi-pops.jpg?itok=lzcThj1r",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Kiwi-pops.jpg?itok=4LbbvKMP",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Kiwi-pops.jpg?itok=i4CwLUpq"
+   ]
+  },
+  {
+   "slug": "strawberry-yogurt-pops",
+   "title": "Strawberry Yogurt Pops",
+   "sourceUrl": "https://www.myplate.gov/recipes/strawberry-yogurt-pops",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/StrawberryYogurtPops.png?itok=z1ObeLNo",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/StrawberryYogurtPops.png?itok=gIEwava7"
+   ]
+  },
+  {
+   "slug": "stuffed-baked-potatoes",
+   "title": "Stuffed Baked Potatoes",
+   "sourceUrl": "https://www.myplate.gov/recipes/stuffed-baked-potatoes",
+   "credit": "Adapted from \"Wonderful Stuffed Potatoes\" A Healthier You: Based on the Dietary Guidelines for Americans US Department of Health and Human Services Office of Disease Prevention and Health Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2024-10/image-of-wonderful-stuffed-potatoes-recipe.jpg?itok=RUQTOFja",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2024-10/image-of-wonderful-stuffed-potatoes-recipe.jpg?itok=Ws_PqfiN",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2024-10/image-of-wonderful-stuffed-potatoes-recipe.jpg?itok=RSn-Cvge"
+   ]
+  },
+  {
+   "slug": "summer-breeze-smoothie",
+   "title": "Summer Breeze Smoothie",
+   "sourceUrl": "https://www.myplate.gov/recipes/summer-breeze-smoothie",
+   "credit": "Heart Healthy Home Cooking: African American Style US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/SummerBreezeSmoothies_527x323.jpg?itok=U4eu1zZB",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/SummerBreezeSmoothies_527x323.jpg?itok=20TA7d_E",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-11/SummerBreezeSmoothies_527x323.jpg?itok=WUpDzSDL"
+   ]
+  },
+  {
+   "slug": "summer-vegetable-spaghetti",
+   "title": "Summer Vegetable Spaghetti",
+   "sourceUrl": "https://www.myplate.gov/recipes/summer-vegetable-spaghetti",
+   "credit": "Stay Young at Heart: Cooking the Heart-Healthy Way US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2025-09/Image-of-Summer-Vegetable-Spaghetti-Recipe.jpg?itok=pczbQu0E",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2025-09/Image-of-Summer-Vegetable-Spaghetti-Recipe.jpg?itok=9Hx1918p",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2025-09/Image-of-Summer-Vegetable-Spaghetti-Recipe.jpg?itok=SDWKFro3"
+   ]
+  },
+  {
+   "slug": "sunshine-rice",
+   "title": "Sunshine Rice",
+   "sourceUrl": "https://www.myplate.gov/recipes/sunshine-rice",
+   "credit": "Stay Young at Heart: Cooking the Heart-Healthy Way US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/default_images/mpk-default-1000.png?itok=ng20lrXs",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/default_images/mpk-default-1000.png?itok=MHDkRduG",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/default_images/mpk-default-1000.png?itok=NEsYVvYw"
+   ]
+  },
+  {
+   "slug": "sunshine-salad",
+   "title": "Sunshine Salad",
+   "sourceUrl": "https://www.myplate.gov/recipes/sunshine-salad",
+   "credit": "US Department of Health and Human Services",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/SunshineSalad_0.jpg?itok=CQk6urUj",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/SunshineSalad_0.jpg?itok=aUl6DBV6",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-11/SunshineSalad_0.jpg?itok=HQPYNPzY"
+   ]
+  },
+  {
+   "slug": "sweet-potato-casserole-0",
+   "title": "Sweet Potato Casserole",
+   "sourceUrl": "https://www.myplate.gov/recipes/sweet-potato-casserole-0",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Sweet%20Potato%20Casserole_fixed.png?itok=98xaJDEg",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Sweet%20Potato%20Casserole_fixed.png?itok=ozqe6Uxc",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Sweet%20Potato%20Casserole_fixed.png?itok=MFFElE43"
+   ]
+  },
+  {
+   "slug": "sweet-potato-hash-egg",
+   "title": "Sweet Potato Hash with Egg",
+   "sourceUrl": "https://www.myplate.gov/recipes/sweet-potato-hash-egg",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/SweetPotatoHash.jpg?itok=E8e1Ura9",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/SweetPotatoHash.jpg?itok=UXcvFiTc",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/SweetPotatoHash.jpg?itok=JfhZ18mH"
+   ]
+  },
+  {
+   "slug": "sweet-potato-pancakes",
+   "title": "Sweet Potato Pancakes",
+   "sourceUrl": "https://www.myplate.gov/recipes/sweet-potato-pancakes",
+   "credit": "USDA Supplemental Nutrition Assistance Program (SNAP)",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-11/SweetPotatoPancakes_527x323.jpg?itok=mCXPES7B",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-11/SweetPotatoPancakes_527x323.jpg?itok=w6WVQnop",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-11/SweetPotatoPancakes_527x323.jpg?itok=gJRiflvw"
+   ]
+  },
+  {
+   "slug": "tasty-chicken-and-veggie-packets",
+   "title": "Tasty Chicken and Veggie Packets",
+   "sourceUrl": "https://www.myplate.gov/recipes/tasty-chicken-and-veggie-packets",
+   "credit": "USDA Food and Nutrition Information Center",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2024-04/chicken%20and%20vegetables.JPG?itok=g3BEXboh",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2024-04/chicken%20and%20vegetables.JPG?itok=7tlNAh7j"
+   ]
+  },
+  {
+   "slug": "tasty-fish-and-veggie-packets",
+   "title": "Tasty Fish and Veggie Packets",
+   "sourceUrl": "https://www.myplate.gov/recipes/tasty-fish-and-veggie-packets",
+   "credit": "USDA Food and Nutrition Information Center",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2024-10/Tasty-fish-and-veggies-527x323%20%281%29.jpg?itok=1Ju94S23",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2024-10/Tasty-fish-and-veggies-527x323%20%281%29.jpg?itok=Kb35Kz3E",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2024-10/Tasty-fish-and-veggies-527x323%20%281%29.jpg?itok=hN-0Lk9N"
+   ]
+  },
+  {
+   "slug": "three-sisters-stew",
+   "title": "Three Sisters Stew",
+   "sourceUrl": "https://www.myplate.gov/recipes/three-sisters-stew",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations Adapted from a recipe submitted by Alicson Scott, Chickasaw Nation, Get Fresh! Nutrition Education Program",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Three%20Sisters%20Stew_fixed.png?itok=q_18uCcy",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Three%20Sisters%20Stew_fixed.png?itok=4-Vff_4o",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Three%20Sisters%20Stew_fixed.png?itok=00UNJu4_"
+   ]
+  },
+  {
+   "slug": "tofu-broccoli",
+   "title": "Tofu with Broccoli",
+   "sourceUrl": "https://www.myplate.gov/recipes/tofu-broccoli",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/TofuBroccoli.jpg?itok=4MJE-0s-",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/TofuBroccoli.jpg?itok=q7oV0lqb",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/TofuBroccoli.jpg?itok=z5IZeNif"
+   ]
+  },
+  {
+   "slug": "tomato-basil-soup",
+   "title": "Tomato Basil Soup",
+   "sourceUrl": "https://www.myplate.gov/recipes/tomato-basil-soup",
+   "credit": "USDA’s Collection of Nonfat Dry Milk Recipes USDA Food and Nutrition Service Food Distribution Service",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2024-10/Tomato-basil-soup-527x323.jpg?itok=eCCk5iTD",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2024-10/Tomato-basil-soup-527x323.jpg?itok=3OjrTvEK",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2024-10/Tomato-basil-soup-527x323.jpg?itok=yXiUf1jn"
+   ]
+  },
+  {
+   "slug": "tropical-yogurt-pops",
+   "title": "Tropical Yogurt Pops",
+   "sourceUrl": "https://www.myplate.gov/recipes/tropical-yogurt-pops",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/TropicalYogurtPops.png?itok=zH3J15sd",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/TropicalYogurtPops.png?itok=qSQ1wjpM",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/TropicalYogurtPops.png?itok=REBrg15k"
+   ]
+  },
+  {
+   "slug": "turkey-meatloaf",
+   "title": "Turkey Meatloaf",
+   "sourceUrl": "https://www.myplate.gov/recipes/turkey-meatloaf",
+   "credit": "Delicious Heart-Healthy Latino Recipes/ Platillos Latinos Sabrosos y Saludables US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2024-10/image-of-turkey-meatloaf-recipe.jpg?itok=CRp1HwCU",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2024-10/image-of-turkey-meatloaf-recipe.jpg?itok=eojhYHca",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2024-10/image-of-turkey-meatloaf-recipe.jpg?itok=mW_1nTDz"
+   ]
+  },
+  {
+   "slug": "turkey-stuffed-cabbage",
+   "title": "Turkey Stuffed Cabbage",
+   "sourceUrl": "https://www.myplate.gov/recipes/turkey-stuffed-cabbage",
+   "credit": "A Healthier You: Based on the Dietary Guidelines for Americans US Department of Health and Human Services Office of Disease Prevention and Health Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2024-10/image-of-turkey-stuffed-cabbage-recipe.jpg?itok=g2m9Nn25",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2024-10/image-of-turkey-stuffed-cabbage-recipe.jpg?itok=-KmNarW2",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2024-10/image-of-turkey-stuffed-cabbage-recipe.jpg?itok=Y6l312LZ"
+   ]
+  },
+  {
+   "slug": "two-bean-chili",
+   "title": "Two Bean Chili",
+   "sourceUrl": "https://www.myplate.gov/recipes/two-bean-chili",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Two%20Bean%20Chili_fixed.png?itok=1EU9_-KE",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Two%20Bean%20Chili_fixed.png?itok=Oe4lHek4",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Two%20Bean%20Chili_fixed.png?itok=sIvhXl9p"
+   ]
+  },
+  {
+   "slug": "vegetable-chili",
+   "title": "Vegetable Chili",
+   "sourceUrl": "https://www.myplate.gov/recipes/vegetable-chili",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2020-12/VegetableChili_527x323.jpg?itok=nsUe4Oue",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2020-12/VegetableChili_527x323.jpg?itok=uBptYQyc",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2020-12/VegetableChili_527x323.jpg?itok=W41dpfVQ"
+   ]
+  },
+  {
+   "slug": "vegetable-soup-chicken",
+   "title": "Vegetable Soup with Chicken",
+   "sourceUrl": "https://www.myplate.gov/recipes/vegetable-soup-chicken",
+   "credit": "A Harvest of Recipes with USDA Foods Adapted from a recipe by Natalie Gibson, San Pasqual Reservation",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Vegetable%20Soup_fixed.png?itok=jiysbIxs",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Vegetable%20Soup_fixed.png?itok=7OT2wLf8",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Vegetable%20Soup_fixed.png?itok=sk3Yojdz"
+   ]
+  },
+  {
+   "slug": "vegetable-stew",
+   "title": "Vegetable Stew",
+   "sourceUrl": "https://www.myplate.gov/recipes/vegetable-stew",
+   "credit": "Heart Healthy Home Cooking: African American Style US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-09/VegetableStew.jpg?itok=3Av6-CEA",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-09/VegetableStew.jpg?itok=-LlNcrNW",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-09/VegetableStew.jpg?itok=p7UZlHNP"
+   ]
+  },
+  {
+   "slug": "vegetable-stroganoff",
+   "title": "Vegetable Stroganoff",
+   "sourceUrl": "https://www.myplate.gov/recipes/vegetable-stroganoff",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/VegetableStroganoff.jpg?itok=GYTZcppo",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/VegetableStroganoff.jpg?itok=Ag2HAD7m",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/VegetableStroganoff.jpg?itok=uHAdQ9aM"
+   ]
+  },
+  {
+   "slug": "vegetarian-spaghetti-sauce",
+   "title": "Vegetarian Spaghetti Sauce",
+   "sourceUrl": "https://www.myplate.gov/recipes/vegetarian-spaghetti-sauce",
+   "credit": "DASH Eating Plan: Lower Your Blood Pressure US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2022-08/VegetarianSpaghettiSauce_527x323.jpg?itok=6NpLTLSy",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2022-08/VegetarianSpaghettiSauce_527x323.jpg?itok=MuvuM3e_",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2022-08/VegetarianSpaghettiSauce_527x323.jpg?itok=PANArsrQ"
+   ]
+  },
+  {
+   "slug": "vegetarian-stuffed-peppers",
+   "title": "Vegetarian Stuffed Peppers",
+   "sourceUrl": "https://www.myplate.gov/recipes/vegetarian-stuffed-peppers",
+   "credit": "US Department of Health and Human Services Centers for Disease Control and Prevention (CDC)",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2021-11/Vegetarian%20Stuffed%20Peppers.jpg?itok=9IL4diU1",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2021-11/Vegetarian%20Stuffed%20Peppers.jpg?itok=lCTm-Y9E",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2021-11/Vegetarian%20Stuffed%20Peppers.jpg?itok=zbQiVmOd"
+   ]
+  },
+  {
+   "slug": "veggie-burgers",
+   "title": "Veggie Burgers",
+   "sourceUrl": "https://www.myplate.gov/recipes/veggie-burgers",
+   "credit": "A Harvest of Recipes with USDA Foods USDA Food Distribution Program on Indian Reservations",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/Veggie%20Burger_fixed.png?itok=-IGtjA_9",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/Veggie%20Burger_fixed.png?itok=joCIEvgR",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/Veggie%20Burger_fixed.png?itok=HLYwiQBm"
+   ]
+  },
+  {
+   "slug": "very-berry-smoothie",
+   "title": "Very Berry Smoothie",
+   "sourceUrl": "https://www.myplate.gov/recipes/very-berry-smoothie",
+   "credit": "USDA Center for Nutrition Policy and Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/recipe-images/VeryBerrySmoothie.jpg?itok=Of8KLeab",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/recipe-images/VeryBerrySmoothie.jpg?itok=eCiH_Cb1",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/recipe-images/VeryBerrySmoothie.jpg?itok=SQN1veun"
+   ]
+  },
+  {
+   "slug": "vinaigrette-salad-dressing",
+   "title": "Vinaigrette Salad Dressing",
+   "sourceUrl": "https://www.myplate.gov/recipes/vinaigrette-salad-dressing",
+   "credit": "USDA Supplemental Nutrition Assistance Program (SNAP)",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2022-08/VinaigretteSaladDressing_527x323.jpg?itok=lpmvnJ-A",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2022-08/VinaigretteSaladDressing_527x323.jpg?itok=ukxUooll",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2022-08/VinaigretteSaladDressing_527x323.jpg?itok=OIPiltJE"
+   ]
+  },
+  {
+   "slug": "winter-crisp",
+   "title": "Winter Crisp",
+   "sourceUrl": "https://www.myplate.gov/recipes/winter-crisp",
+   "credit": "Stay Young at Heart: Cooking the Heart-Healthy Way US Department of Health and Human Services National Heart, Lung, and Blood Institute",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2023-10/WinterCrisp.jpg?itok=J9YpErSe",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2023-10/WinterCrisp.jpg?itok=dMKjgnKl",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2023-10/WinterCrisp.jpg?itok=O4HZKbNs"
+   ]
+  },
+  {
+   "slug": "wonderful-stuffed-potatoes",
+   "title": "Wonderful Stuffed Potatoes",
+   "sourceUrl": "https://www.myplate.gov/recipes/wonderful-stuffed-potatoes",
+   "credit": "Adapted from \"Wonderful Stuffed Potatoes\" A Healthier You: Based on the Dietary Guidelines for Americans US Department of Health and Human Services Office of Disease Prevention and Health Promotion",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2024-10/image-of-wonderful-stuffed-potatoes-recipe.jpg?itok=RUQTOFja",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2024-10/image-of-wonderful-stuffed-potatoes-recipe.jpg?itok=Ws_PqfiN",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2024-10/image-of-wonderful-stuffed-potatoes-recipe.jpg?itok=RSn-Cvge"
+   ]
+  },
+  {
+   "slug": "yogurt-berry-parfait",
+   "title": "Yogurt Berry Parfait",
+   "sourceUrl": "https://www.myplate.gov/recipes/yogurt-berry-parfait",
+   "credit": "USDA Food and Nutrition Information Center",
+   "archivedImages": [
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/large/public/2023-05/Yogurt%20Parfait.jpg?itok=k1kUAAFz",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/medium/public/2023-05/Yogurt%20Parfait.jpg?itok=5RcxJYEc",
+    "https://web.archive.org/web/2025id_/https://myplate-prod.azureedge.us/sites/default/files/styles/recipe/public/2023-05/Yogurt%20Parfait.jpg?itok=bzN-iOTE"
+   ]
+  }
+ ]
+}

@@ -4,7 +4,7 @@ import { Icon } from "../icons";
 /**
  * Themed dropdown (trigger + popover) generalized from BrowseScreen's
  * SortDropdown. A native <select>'s OS popup can't be themed, so this is a
- * styled button + listbox on Modern Whimsy surfaces. Closes on outside-click
+ * styled button + listbox on the app's own surfaces. Closes on outside-click
  * or Escape. Reuses the existing .dropdown* CSS.
  */
 export interface DropdownOption<T extends string> {

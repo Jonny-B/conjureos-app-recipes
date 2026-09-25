@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { PantryItem, Recipe } from "../types";
-import { ingredientsFromPantry } from "../features/pantry";
-import { computeAvailability, computeCoverage, scaleRecipe } from "../features/scaling";
-import { parseIngredient } from "../features/nutrition";
+import type { Recipe } from "../types";
+import { scaleRecipe } from "../features/scaling";
 import { Icon } from "../icons";
+import { DifficultyMark } from "../components/RecipePlate";
+import { splitIngredient } from "../features/recipeLook";
 import { ChefChat } from "./ChefChat";
 import {
   clearCookSession,
@@ -15,7 +15,6 @@ import {
 
 interface Props {
   recipe: Recipe;
-  pantry: PantryItem[] | null;
   /** True when this recipe is already in the user's library (offer "mark as made"). */
   saved?: boolean;
   /** The library row's path, when there is one. Identifies the cook session. */
@@ -40,7 +39,7 @@ interface Props {
  * popover (never a visible row). An unobtrusive "Ask the chef" button floats in
  * the corner. Resting chrome = back + Adjust; everything else is the checklist.
  */
-export function GuidedCook({ recipe, pantry, saved, savedPath = null, onBack, onMade, onSave, onUnmade }: Props) {
+export function GuidedCook({ recipe, saved, savedPath = null, onBack, onMade, onSave, onUnmade }: Props) {
   /**
    * Identity of this cook, and whatever was left of it last time.
    *
@@ -69,15 +68,6 @@ export function GuidedCook({ recipe, pantry, saved, savedPath = null, onBack, on
   // stepper + scaling never divide by zero into NaN.
   const baseServings = recipe.servings > 0 ? recipe.servings : 1;
   const scaled = useMemo(() => (factor === 1 ? recipe : scaleRecipe(recipe, factor)), [recipe, factor]);
-
-  const pantryIng = useMemo(() => (pantry ? ingredientsFromPantry(pantry) : []), [pantry]);
-  const hasPantry = pantryIng.length > 0;
-  const cov = useMemo(
-    () => (hasPantry ? computeCoverage(scaled, pantryIng) : null),
-    [scaled, pantryIng, hasPantry],
-  );
-  const missingSet = useMemo(() => new Set(cov?.missingNames ?? []), [cov]);
-  const shortSet = useMemo(() => new Set(cov?.shortNames ?? []), [cov]);
 
   const totalSteps = scaled.instructions.length;
   const doneSteps = checkedStep.size;
@@ -132,12 +122,6 @@ export function GuidedCook({ recipe, pantry, saved, savedPath = null, onBack, on
     saveCookSession({ key: cookKey, recipe, savedPath, steps, ingredients, factor });
   }, [checkedStep, checkedIng, factor, madeDone, cookKey, recipe, savedPath]);
 
-  const scaleToPantry = () => {
-    const a = computeAvailability(recipe, pantryIng);
-    if (a.factor > 0) setFactor(a.factor);
-    setAdjustOpen(false);
-  };
-
   return (
     <div className="guided">
       <header className="guided-head">
@@ -174,11 +158,6 @@ export function GuidedCook({ recipe, pantry, saved, savedPath = null, onBack, on
                   <button className="icon-btn" onClick={() => setServings(servings + 1)} aria-label="More"><Icon name="plus" /></button>
                 </div>
               </div>
-              {hasPantry && (
-                <button className="btn ghost" onClick={scaleToPantry}>
-                  <Icon name="carrot" /> Scale to what I have
-                </button>
-              )}
             </div>
           )}
         </div>
@@ -186,10 +165,15 @@ export function GuidedCook({ recipe, pantry, saved, savedPath = null, onBack, on
 
       <h2 className="guided-title">{recipe.title}</h2>
       <div className="guided-meta">
-        <span className={`pill ${recipe.difficulty}`}>{recipe.difficulty}</span>
-        <span className="pill">{recipe.cookTime} min</span>
-        <span className="pill">{servings} serving{servings === 1 ? "" : "s"}</span>
-        {doneSteps > 0 && <span className="pill">{doneSteps}/{totalSteps} steps</span>}
+        <span className="guided-level">
+          <DifficultyMark recipe={recipe} decorative />
+          {recipe.difficulty}
+        </span>
+        {recipe.cookTime > 0 && <span>{recipe.cookTime} min</span>}
+        <span>{servings} serving{servings === 1 ? "" : "s"}</span>
+        <span>
+          {doneSteps}/{totalSteps} steps
+        </span>
       </div>
 
       <section className="guided-section">
@@ -200,9 +184,6 @@ export function GuidedCook({ recipe, pantry, saved, savedPath = null, onBack, on
         {!ingredientsCollapsed && (
           <ul className="check-list">
             {scaled.ingredients.map((ing, i) => {
-              const name = parseIngredient(ing)?.name;
-              const missing = hasPantry && !!name && missingSet.has(name);
-              const short = hasPantry && !!name && shortSet.has(name);
               const checked = checkedIng.has(i);
               return (
                 <li key={i}>
@@ -218,10 +199,10 @@ export function GuidedCook({ recipe, pantry, saved, savedPath = null, onBack, on
                     className={`check-row${checked ? " checked" : ""}`}
                     onClick={() => toggle(checkedIng, i, setCheckedIng)}
                   >
-                    <Icon name={checked ? "check" : "circle"} className="check-mark" />
-                    <span className="check-text">{ing}</span>
-                    {missing && <span className="ing-tag miss"><Icon name="basket-shopping" /> need</span>}
-                    {short && !missing && <span className="ing-tag low">low</span>}
+                    <span className="tick" aria-hidden="true">
+                      {checked && <Icon name="check" />}
+                    </span>
+                    <IngredientText line={ing} />
                   </button>
                 </li>
               );
@@ -245,7 +226,9 @@ export function GuidedCook({ recipe, pantry, saved, savedPath = null, onBack, on
                   className={`step-row${checked ? " checked" : ""}${isCurrent ? " current" : ""}`}
                   onClick={() => toggle(checkedStep, i, setCheckedStep)}
                 >
-                  <span className="step-num"><Icon name={checked ? "check" : "circle"} /></span>
+                  <span className="step-num" aria-hidden="true">
+                    {checked ? <Icon name="check" /> : i + 1}
+                  </span>
                   <span className="step-text">{step}</span>
                 </button>
               </li>
@@ -304,5 +287,17 @@ export function GuidedCook({ recipe, pantry, saved, savedPath = null, onBack, on
 
       <ChefChat recipe={scaled} open={chefOpen} onClose={() => setChefOpen(false)} />
     </div>
+  );
+}
+
+/** An ingredient line with its amount set in bold, so it reads at arm's length. */
+function IngredientText({ line }: { line: string }) {
+  const { qty, name, note } = splitIngredient(line);
+  return (
+    <span className="check-text">
+      {qty && <strong className="check-qty">{qty} </strong>}
+      {name}
+      {note && ` ${note}`}
+    </span>
   );
 }

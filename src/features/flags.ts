@@ -9,13 +9,27 @@
 /**
  * Recipe photography in the UI.
  *
- * OFF by owner decision (2026-09-04). The app committed to a typographic
- * visual language instead of a photo-led one, because the corpus can't
- * support the alternative: **0 of 3,190 live recipes carry an image_url**,
- * and only 18 carry a summary. A photo-led browse grid over that corpus is
- * 3,190 grey rectangles — worse than no photos at all, and it would make the
- * catalog's unresolved provenance question (issue #48) larger by adding
- * another 3,190 assets of uncertain origin.
+ * ON since 0.56.0, for the USDA-credited photos only (owner decision,
+ * 2026-09-23: "just use the USDA images").
+ *
+ * History: it was OFF by owner decision (2026-09-04) over the scraped
+ * AllRecipes corpus, where 0 of 3,190 rows carried an image_url and every
+ * photo would have added to its provenance question (issue #48). The corpus
+ * is USDA MyPlate now, and the Internet Archive's captures of the retired
+ * myplate.gov pages carry a photo per recipe — but most recipes credit a
+ * partner (a state university, a nonprofit, a company), and a partner may
+ * still own its photo. So only recipes whose page credits a FEDERAL source
+ * get one: `scripts/usda-photo-census.py` decides which and writes
+ * `scripts/usda-photos.json`, and `scripts/import-usda-photos.mjs` uploads
+ * exactly those and sets their image_url. Everything else keeps its plate.
+ * Do not import a partner-credited photo without that partner's permission.
+ *
+ * What it switches: every recipe surface has one picture slot
+ * (components/RecipePlate.tsx) — the feed tile, Tonight's pick, and the
+ * picture behind an open recipe. With this on, a row with an image_url shows
+ * its photo there; a row without one (or a photo that fails to load) shows
+ * the category plate. It also turns on the recipe-photo picker in the editor,
+ * so people can photograph their own recipes. The layout does not change.
  *
  * What this flag does NOT do:
  *   - It does not remove backend support. `recipes.image_url`, the
@@ -26,10 +40,5 @@
  *     whole point of the app. `.photo-tile`, `.photo-strip-img`,
  *     `.ing-screen .thumb` and the ImagePicker's own preview belong to that
  *     flow and are unaffected.
- *
- * Flipping this to `true` restores the browse thumbnail, the detail hero, and
- * the recipe-photo picker in the editor. Nothing else needs to change — but
- * check the typographic card system still holds with images in it before you
- * do, because it was designed on the assumption they're absent.
  */
-export const RECIPE_PHOTOS_ENABLED = false;
+export const RECIPE_PHOTOS_ENABLED = true;

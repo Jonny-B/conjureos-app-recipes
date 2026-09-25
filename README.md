@@ -1,43 +1,96 @@
-# Recipes for ConjureOS
+# Recipes
 
-A recipe app with four jobs: cook from what's in your fridge, browse a catalog of ~1,200 recipes, keep a pantry so suggestions rank by what you already have, and plan a week of meals that share one shopping list.
+**A recipe library you add to, browse and cook from.**
 
-The first Phase 12a anchor app for [ConjureOS](https://github.com/Jonny-B/ConjureOS). A pure React + TypeScript source project (no Vite). Developed locally with `conj-pack dev` and **published to the ConjureOS App Store from CI**, where it's built by ConjureOS `@bundle`: the exact same pipeline a user-published app goes through.
+Write a recipe, photograph one off a card or a cookbook page, or describe a dish
+and have the model write it — then cook it step by step with the ingredients and
+the steps ticked off as you go.
+
+> **This app used to carry a pantry.** For a while it was going to *become*
+> Conjure Pantry — a pantry app that happens to know recipes. That is reversed:
+> of 42 designed screens only six were ever about recipes, so the pantry, the
+> week planner, the shopping list, the grocery-store aisle layouts and the
+> shared families all moved to [**Conjure Pantry**](https://github.com/Jonny-B/conjureos-pantry),
+> a separate app with its own repo and store slug. The two share nothing — not a
+> table, not an edge function, not a VFS path.
+
+> **The store slug is `recipes` and the VFS path is `/home/Documents/Recipes/`.**
+> Neither can change: the slug is the dedupe key for every installed copy, and
+> the path holds every saved recipe on every device.
+
+An anchor app for [ConjureOS](https://github.com/Jonny-B/ConjureOS). A pure
+React + TypeScript source project (no Vite). Developed locally with
+`conj-pack dev` and **published to the ConjureOS App Store from CI**, where it is
+built by ConjureOS `@bundle`: the exact same pipeline a user-published app goes
+through.
 
 ## The app
 
-Six tabs, opening on Home:
+**One screen.** The library, with a segmented switch across the top for All /
+My recipes / Favorites, a search box, a category filter and a "+".
 
-- **Home**: the landing screen. A time-of-day greeting, a "Tonight's pick" recommendation scored against your pantry (favorites weighted, with a plain-language "why" and a reshuffle), at-a-glance stats (favorites / ready to cook / pantry size), your favorites, more ideas, and quick actions into the rest of the app.
-- **Cook**: three ways in. **Scan fridge**: snap or upload photos of your fridge, Claude identifies the ingredients, you confirm them, and a second call returns three recipes (easy / medium / hard) built around what you have. **Snap a recipe**: photograph an existing recipe (a card, cookbook page, handwritten note, or screenshot) and the AI transcribes it into a structured recipe you can edit and save. **Write your own**: paste or describe a recipe and the AI structures it.
-- **Recipes**: scroll a catalog of ~1,200 recipes (served from the `recipes-db` backend, with the bundled copy as an offline fallback). A "What can I make" toggle ranks them against your pantry, favorites first, then by how many ingredients you already have. Missing and running-low ingredients show as compact chips, so the further you scroll the more you'd need to buy.
-- **Favorites**: the recipes you've hearted (saved recipes and catalog recipes alike).
-- **Pantry**: a persistent list of what's on hand. Add items by hand or scan your fridge to fill it fast. The suggestions and Plan My Week rank against it.
-- **Plan**: Plan My Week. Say what you're in the mood for (pick ingredients, start from a recipe, or describe it), scan your pantry, and the app picks a week of meals chosen to use what you have AND overlap with each other, then hands you one consolidated shopping list where shared ingredients are bought once.
+- **Tonight's pick** heads the library when you are browsing rather than
+  searching — one suggestion, scored on your favourites, how quick a recipe is,
+  and what you have not cooked lately, with a daily seed so it changes. It hides
+  the moment you type a query: a suggestion is help when you are browsing and an
+  obstacle when you already know what you want.
+- **Three ways to add a recipe**, all behind the "+": write it (the model
+  structures free text into the schema, then every line is editable by hand),
+  snap a photo of a recipe card or cookbook page, or describe a dish and have
+  three written for you.
+- **The guided cook** opens as an overlay, not a tab, so Back leaves the library
+  exactly as you left it — including a search three screens deep. A cook you walk
+  away from is remembered for 12 hours and offered back at the top of the
+  library.
 
-As of 0.6.0 your **saved recipes** persist in your ConjureOS account, not on-device: they live in a Supabase table (the `recipes-db` backend), keyed to your user and reached through a minted identity token, so they follow you across devices and a recipe can later be made public or shared by link. Your **pantry**, **favorites index**, and **week plans** still live in the VFS under `/home/Documents/Recipes/` (plans as JSON plus a checkbox shopping list you can open while you shop), browseable in ConjureOS's Files app.
+**Studio** (chef authoring) and **Admin** appear as extra tabs by role, and the
+tab bar only exists when a role has earned one — for everyone else the library
+is the whole app. **Appearance** lives behind the header cog.
+
+### Where the AI is
+
+The design rule is that **AI is the verb inside the app, never a tab**, and
+**every AI output is editable in place** — because AI that cannot be corrected
+reads as a gimmick the first time it is wrong.
+
+| Surface | Where |
+|---|---|
+| Snap a recipe from a photo | `screens/SnapRecipeScreen.tsx` |
+| Write a recipe from free text | `features/customRecipe.ts`, `screens/CreateScreen.tsx` |
+| Describe a dish → three recipes | `features/recipes.ts`, `screens/DescribeScreen.tsx` |
+| Mid-cook Q&A | `screens/ChefChat.tsx` |
+
+### How other apps reach this one
+
+`listRecipes` and `getRecipe` are more than a convenience API: they are what
+**Conjure Pantry** discovers. Pantry declares the SHAPE it wants and the ConjureOS
+kernel matches it STRUCTURALLY against the `returns` schemas in this app's
+manifest — no app names, no allow-list, no coordination between the two.
+
+The consequence worth knowing: **changing one of those `returns` schemas can
+silently disconnect Pantry.** The matcher fails closed, so nothing errors
+anywhere; Pantry simply reports that nothing can suggest meals. Treat them as a
+published contract. See the header of `src/bridge/actions.ts`.
+
+Your **saved recipes** live in your ConjureOS account rather than on-device: a
+Supabase table (the `recipes-db` backend), keyed to your user and reached through
+a minted identity token, so they follow you across devices. Your **favourites
+index** and **blocked list** live in the VFS under `/home/Documents/Recipes/`,
+browseable in ConjureOS's Files app.
 
 ## Recipe catalog
 
-The catalog is built from a scraped [AllRecipes](https://www.allrecipes.com) dataset, normalized into the app's recipe shape (ingredients, steps, inferred difficulty, per-serving nutrition, canonical match tokens) and curated to a category-balanced subset. It ships inside the app bundle as an instant, offline fallback and is also seeded into the `recipes-db` catalog table, which is what the app reads at runtime (resolved per environment). Each recipe keeps its original AllRecipes URL for attribution, shown as a "Source" link on the recipe.
+The catalog is **USDA MyPlate** — 1,120 recipes of US federal government content, public domain. It lives in the `recipes` table (`provenance='usda-myplate'`) and is fetched from `recipes-db` at runtime. It is **not** bundled: 0.30.0 stopped shipping it on devices.
 
-Rebuild the bundled catalog with:
-
-```bash
-npx -y tsx scripts/build-catalog.ts --limit 1500
-```
-
-It downloads the source dump (cached under `scripts/.cache/`), then parses, normalizes, dedupes, and curates it into `src/data/catalog.ts` (a TS module, not JSON: the store bundler has no JSON loader). The committed module is the source of truth for the bundle; `scripts/gen-seed-sql.ts` turns it into the `recipes-db` catalog seed applied via the Supabase Management API.
-
-> Note: the catalog is scraped third-party content. It's fine for personal and development use, but get a licensing review before publishing this app publicly. The catalog is regenerable and swappable, and every recipe keeps its source URL.
+> **The scraped AllRecipes corpus is gone** (2026-09-17): 3,170 rows deleted from prod, 3,169 from dev. Do not regenerate it. `scripts/build-catalog.ts` and `scripts/rewrite-catalog.ts` remain in the repo as history and still point at the old cached dump under `scripts/.cache/`; running either would reintroduce exactly the content that was deliberately removed, and the licensing question that came with it. Reasoning in ConjureOS `DECISIONS.md` (2026-09-17). No licensing review is needed before a prod publish any more — that gate existed solely for the scraped corpus.
 
 ## Permissions
 
 Declared in `package.json` under `conjureos.permissions`:
 
-- `ai.complete`: multimodal vision, recipe generation, and mood interpretation
-- `vfs.read`: list saved recipes, pantry, favorites, and week plans
-- `vfs.write`: save recipes, pantry, favorites, plans, and cache nutrition lookups
+- `ai.complete`: reading a recipe off a photo, and writing one from a description
+- `vfs.read`: the favourites index, the blocked list, and a cook left running
+- `vfs.write`: the same, plus caching nutrition lookups
 
 ## Nutrition data (USDA FoodData Central)
 

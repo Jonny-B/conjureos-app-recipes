@@ -14,7 +14,8 @@
  * shapes so the screens barely change. A saved recipe's `path` is `db:<id>`
  * (the old VFS markdown path is gone); use recipeIdFromPath() to recover the id.
  */
-import type { CatalogRecipe, Difficulty, NutritionStrip, Recipe, SavedRecipe, WeekPlan } from "../types";
+import type { CatalogRecipe, Difficulty, NutritionStrip, Recipe, SavedRecipe } from "../types";
+import { ensureTermsAccepted } from "../features/terms";
 
 /** Dev project recipes-db, used when the host has not injected a URL (conj-pack dev). */
 const DEV_RECIPES_URL = "https://mqpvjlsywrptefgwuztn.supabase.co/functions/v1/recipes-db";
@@ -68,6 +69,8 @@ interface DbRecipe {
   summary: string | null;
   blog: string | null;
   imageUrl: string | null;
+  /** True when the photo is AI-generated (server-derived, migration 153). */
+  imageAi?: boolean;
   chefFeatured: boolean;
   favorite: boolean;
   tags: string[];
@@ -108,6 +111,7 @@ export function toCatalogRecipe(r: DbRecipe): CatalogRecipe {
     nutrition: toStrip(r.nutrition, r.ingredients.length),
     blog: r.blog ?? undefined,
     imageUrl: r.imageUrl ?? undefined,
+    imageAi: !!r.imageAi,
     chefFeatured: r.chefFeatured,
     tags: r.tags,
     sourceUrl: r.sourceUrl ?? "",
@@ -127,6 +131,7 @@ export function toSavedRecipe(r: DbRecipe): SavedRecipe {
     nutrition: toStrip(r.nutrition, r.ingredients.length),
     blog: r.blog ?? undefined,
     imageUrl: r.imageUrl ?? undefined,
+    imageAi: !!r.imageAi,
     chefFeatured: r.chefFeatured,
     path: `db:${r.id}`,
     slug: r.id,
@@ -279,47 +284,6 @@ export async function fetchCatalogFacets(): Promise<{
   return res.json();
 }
 
-/**
- * Run the week planner SERVER-side over the whole catalog. The optimizer needs
- * every candidate to pick a good week, so it lives in recipes-db now — the
- * client no longer has to hold the corpus. Returns the chosen recipes; the
- * caller still builds the shopping list from them locally.
- */
-export async function planWeekRemote(args: {
-  constraints: Record<string, unknown>;
-  onHand: string[];
-  excludeIds?: string[];
-  favoriteIds?: string[];
-  pinnedId?: string;
-  /** Picks to hold onto — the server fills only the remaining slots. */
-  pinnedIds?: string[];
-  /**
-   * The caller's OWN recipes, added to the server's pool for this run. The
-   * pool is the public catalog, so without these a saved recipe can never be
-   * picked — or pinned, which is how "plan around this recipe" silently
-   * ignored your own recipes. `tokens` is computed client-side because saved
-   * rows are stored with none. The server hydrates the picks from the DB and
-   * only ever returns rows the caller created, so these are hints, not data.
-   */
-  extraCandidates?: Array<{
-    id: string;
-    title: string;
-    category: string;
-    tags: string[];
-    tokens: string[];
-  }>;
-}): Promise<{ recipes: CatalogRecipe[]; warnings: string[]; shortfall: number }> {
-  const r = await invokeRaw<{ recipes?: DbRecipe[]; warnings?: string[]; shortfall?: number }>(
-    "planWeek",
-    args as unknown as Record<string, unknown>,
-  );
-  return {
-    recipes: (r.recipes ?? []).map(toCatalogRecipe),
-    warnings: r.warnings ?? [],
-    shortfall: r.shortfall ?? 0,
-  };
-}
-
 export async function fetchShared(shareToken: string): Promise<CatalogRecipe | null> {
   const res = await fetch(apiUrl(), {
     method: "POST",
@@ -348,16 +312,67 @@ export async function listMine(): Promise<SavedRecipe[]> {
   return (r.recipes ?? []).map(toSavedRecipe);
 }
 
+/** Writes that add content need the Recipes terms accepted — ask first. */
+async function beforeContentWrite(): Promise<void> {
+  if (isBackendAvailable()) await ensureTermsAccepted();
+}
+
 export async function addRecipe(
   recipe: Recipe & { category?: string; tags?: string[]; tokens?: string[]; sourceUrl?: string; visibility?: string },
 ): Promise<SavedRecipe> {
+  await beforeContentWrite();
   const r = await invoke("add", { recipe: toPayload(recipe) });
   if (!r.recipe) throw new Error("add failed");
   return toSavedRecipe(r.recipe);
 }
 
+/**
+ * The update payload: only what the caller actually has. recipes-db's `update`
+ * merges only the fields a payload mentions, but `toPayload` fills EVERY field
+ * with a default — `visibility: "private"`, `category: "Dinner"`, null blog /
+ * photo / source — so updating a public recipe (the macros backfill does) made
+ * it private and could wipe its category, blog and photo. Undefined fields are
+ * left out, so the server keeps what it has. Title, ingredients and
+ * instructions always go: the server requires them.
+ */
+function toUpdatePayload(recipe: Recipe & { category?: string; tags?: string[]; tokens?: string[]; sourceUrl?: string; visibility?: string }): Record<string, unknown> {
+  const full = toPayload(recipe);
+  const src = recipe as unknown as Record<string, unknown>;
+  const out: Record<string, unknown> = {
+    title: full.title,
+    ingredients: full.ingredients,
+    instructions: full.instructions,
+  };
+  for (const key of Object.keys(full)) {
+    if (key in out) continue;
+    if (src[key] !== undefined) out[key] = full[key];
+  }
+  return out;
+}
+
 export async function updateRecipe(id: string, recipe: Recipe): Promise<SavedRecipe> {
-  const r = await invoke("update", { id, recipe: toPayload(recipe) });
+  await beforeContentWrite();
+  const r = await invoke("update", { id, recipe: toUpdatePayload(recipe) });
+  if (!r.recipe) throw new Error("update failed");
+  return toSavedRecipe(r.recipe);
+}
+
+/**
+ * Change ONLY the photo on one of your own recipes. `update` merges only the
+ * fields a payload mentions, so this sends the three the server always needs
+ * plus `imageUrl` — never `toPayload`'s defaults, whose `visibility:
+ * "private"` would quietly unpublish a public recipe. Null clears the photo.
+ */
+export async function setOwnRecipeImage(
+  id: string,
+  recipe: Pick<Recipe, "title" | "ingredients" | "instructions">,
+  imageUrl: string | null,
+): Promise<SavedRecipe> {
+  await beforeContentWrite();
+  const r = await invoke("update", {
+    id,
+    recipe: { title: recipe.title, ingredients: recipe.ingredients, instructions: recipe.instructions, imageUrl },
+  });
   if (!r.recipe) throw new Error("update failed");
   return toSavedRecipe(r.recipe);
 }
@@ -406,6 +421,7 @@ export async function publishChefRecipe(
   recipe: Recipe & { category?: string; tags?: string[]; sourceUrl?: string; blog?: string },
   id?: string,
 ): Promise<SavedRecipe> {
+  await beforeContentWrite();
   const r = await invoke("chefUpsert", { ...(id ? { id } : {}), recipe: toPayload(recipe) });
   if (!r.recipe) throw new Error("publish failed");
   return toSavedRecipe(r.recipe);
@@ -438,9 +454,19 @@ export async function fetchChefLatest(limit = 12): Promise<CatalogRecipe[]> {
  * Under `npm run dev` (no backend) we echo a local data URL so the picker +
  * preview stay iterable without a live upload.
  */
-export async function uploadRecipeImage(mediaType: string, base64: string): Promise<string> {
+export async function uploadRecipeImage(
+  mediaType: string,
+  base64: string,
+  opts: { ai?: boolean } = {},
+): Promise<string> {
   if (!isBackendAvailable()) return `data:${mediaType};base64,${base64}`;
-  const r = await invokeRaw<{ url?: string }>("uploadImage", { image: { mediaType, data: base64 } });
+  await beforeContentWrite();
+  // `ai` files it under an `ai-` key, which is how the server marks a recipe's
+  // photo as AI-generated. The pixels already carry the stamp (aiPhoto.ts).
+  const r = await invokeRaw<{ url?: string }>("uploadImage", {
+    image: { mediaType, data: base64 },
+    ...(opts.ai ? { ai: true } : {}),
+  });
   if (!r.url) throw new Error("image upload failed");
   return r.url;
 }
@@ -456,6 +482,9 @@ export interface AppUser {
   role: AppRole;
   createdAt: string;
   lastSeenAt: string;
+  /** Set while banned from Recipes (Recipes only — not their ConjureOS account). */
+  bannedAt?: string | null;
+  banReason?: string | null;
 }
 
 /** Generic remote-action call for endpoints that don't return recipe shapes. */
@@ -471,15 +500,47 @@ async function invokeRaw<T>(action: string, params: Record<string, unknown> = {}
  * minted identity token in recipes-db, never trusted from the client.
  * Dev mock poses as admin so both gated surfaces are iterable under `npm run dev`.
  */
-export async function getMyRole(): Promise<{ role: AppRole; email: string | null; err: string | null }> {
-  if (!isBackendAvailable()) return { role: "admin", email: "dev@local", err: null };
+export interface MyRole {
+  role: AppRole;
+  email: string | null;
+  err: string | null;
+  /** Banned from Recipes by an admin. */
+  banned: boolean;
+  /** The Recipes terms version this user accepted, or null. */
+  termsVersion: string | null;
+}
+
+export async function getMyRole(): Promise<MyRole> {
+  if (!isBackendAvailable()) return { role: "admin", email: "dev@local", err: null, banned: false, termsVersion: null };
   try {
-    const r = await invokeRaw<{ role?: AppRole; email?: string | null }>("myRole");
-    return { role: r.role ?? "user", email: r.email ?? null, err: null };
+    const r = await invokeRaw<{ role?: AppRole; email?: string | null; banned?: boolean; termsVersion?: string | null }>(
+      "myRole",
+    );
+    return {
+      role: r.role ?? "user",
+      email: r.email ?? null,
+      err: null,
+      banned: !!r.banned,
+      termsVersion: r.termsVersion ?? null,
+    };
   } catch (e) {
     // Surface the reason (REQUIRES_AUTH / blocked consent / HTTP 4xx) so the
     // footer can show why the identity call didn't land, on-device.
-    return { role: "user", email: null, err: e instanceof Error ? e.message : String(e) };
+    return { role: "user", email: null, err: e instanceof Error ? e.message : String(e), banned: false, termsVersion: null };
+  }
+}
+
+/** Record acceptance of the Recipes terms (features/terms.ts). */
+export async function acceptTerms(version: string): Promise<void> {
+  if (!isBackendAvailable()) return;
+  try {
+    await invokeRaw("acceptTerms", { version });
+  } catch (e) {
+    // A recipes-db from before migration 153 doesn't know this action and
+    // doesn't gate writes either, so there is nothing to record yet. Letting
+    // it through means the app can ship ahead of the backend without every
+    // save stalling on a terms prompt that can't be answered.
+    if (!/unknown_action/.test(e instanceof Error ? e.message : String(e))) throw e;
   }
 }
 
@@ -508,268 +569,75 @@ const MOCK_USERS: AppUser[] = [
   { userId: "u-3", email: "tester@dev.local", displayName: "Tester", role: "user", createdAt: "2026-06-10T00:00:00Z", lastSeenAt: "2026-07-18T20:00:00Z" },
 ];
 
-// ── families + shared plans ────────────────────────────────────────────────
+// ── moderation (admin only; every call re-checked server-side) ───────────
 
-export interface AppFamily {
+export interface ModRecipe {
   id: string;
-  name: string;
-  role: "owner" | "member";
-  inviteCode: string;
-  channelToken: string;
-}
-
-export interface AppProfile {
-  /** The caller's user id — used to subscribe to their own realtime channel. */
-  userId: string | null;
-  role: AppRole;
-  email: string | null;
-  username: string | null;
-  /** Public anon key + project URL, so the app can open a Realtime websocket. */
-  anonKey: string;
-  realtimeUrl: string;
-  families: AppFamily[];
-}
-
-export interface FamilyMember {
-  userId: string;
-  role: string;
-  /** "active" or "pending" (an invited user who hasn't accepted yet). */
-  status: string;
-  joinedAt: string;
-  username: string | null;
-  displayName: string | null;
-  email: string | null;
-}
-
-/** A pending family invite awaiting the current user's accept/decline. */
-export interface FamilyInvite {
-  familyId: string;
-  name: string;
-  invitedBy: string | null; // inviter's @username
-}
-
-/** A stored week-plan row: the WeekPlan in `data`, plus its DB identity + scope. */
-export interface PlanRecord {
-  id: string;
-  ownerId: string;
-  /** null = personal ("My"); set = shared with that family. */
-  familyId: string | null;
-  title: string | null;
-  mine: boolean;
-  data: WeekPlan;
+  title: string;
+  category: string | null;
+  /** For an admin generating an AI photo from the list (the prompt names them). */
+  ingredients: string[];
+  creatorId: string;
+  creatorEmail: string | null;
+  visibility: string;
+  imageUrl: string | null;
+  imageAi: boolean;
+  chefFeatured: boolean;
   createdAt: string;
-  updatedAt: string;
-}
-
-// Dev mocks (no backend / `npm run dev`): an in-memory profile + plan store so
-// the family + plans UI is fully iterable standalone. Realtime is skipped in
-// dev (empty anonKey), but every CRUD path works.
-const devProfile: AppProfile = {
-  userId: "u-1",
-  role: "admin",
-  email: "dev@local",
-  username: null,
-  anonKey: "",
-  realtimeUrl: "",
-  families: [],
-};
-let devPlans: PlanRecord[] = [];
-let devSeq = 1;
-const nowIso = () => new Date().toISOString();
-// Seed one pending invite so the accept/decline UI is iterable in dev.
-let devInvites: FamilyInvite[] = [{ familyId: "fam-demo", name: "The Joneses", invitedBy: "grandma" }];
-
-export async function getMyProfile(): Promise<AppProfile> {
-  if (!isBackendAvailable()) return { ...devProfile, families: [...devProfile.families] };
-  return invokeRaw<AppProfile>("myProfile");
-}
-
-export async function setUsername(username: string): Promise<string> {
-  if (!isBackendAvailable()) {
-    devProfile.username = username.toLowerCase().replace(/^@/, "");
-    return devProfile.username;
-  }
-  const r = await invokeRaw<{ username?: string }>("setUsername", { username });
-  if (!r.username) throw new Error("username not set");
-  return r.username;
-}
-
-export async function createFamily(name: string): Promise<AppFamily> {
-  if (!isBackendAvailable()) {
-    const fam: AppFamily = {
-      id: `fam-${devSeq++}`,
-      name: name || "My family",
-      role: "owner",
-      inviteCode: "DEV" + Math.floor(Math.random() * 900 + 100),
-      channelToken: "devtoken",
-    };
-    devProfile.families.push(fam);
-    return fam;
-  }
-  const r = await invokeRaw<{ family?: AppFamily }>("createFamily", { name });
-  if (!r.family) throw new Error("create failed");
-  return r.family;
-}
-
-/** Rename a family (owner-only server-side). Duplicate names are allowed. */
-export async function renameFamily(familyId: string, name: string): Promise<AppFamily> {
-  if (!isBackendAvailable()) {
-    const fam = devProfile.families.find((f) => f.id === familyId);
-    if (fam) fam.name = name.trim() || fam.name;
-    return fam!;
-  }
-  const r = await invokeRaw<{ family?: AppFamily }>("renameFamily", { familyId, name });
-  if (!r.family) throw new Error("rename failed");
-  return r.family;
 }
 
 /**
- * Leave a family. `deletedFamily` is true when you were the last one out, in
- * which case the family is gone and its shared plans revert to personal plans
- * of whoever created them.
+ * Ban a user from Recipes (never their ConjureOS account), optionally deleting
+ * their recipes and/or their images in the same step.
  */
-export async function leaveFamily(familyId: string): Promise<{ deletedFamily: boolean }> {
-  if (!isBackendAvailable()) {
-    const i = devProfile.families.findIndex((f) => f.id === familyId);
-    if (i >= 0) devProfile.families.splice(i, 1);
-    devPlans.forEach((p) => {
-      if (p.familyId === familyId) p.familyId = null;
-    });
-    return { deletedFamily: true };
-  }
-  const r = await invokeRaw<{ deletedFamily?: boolean }>("leaveFamily", { familyId });
-  return { deletedFamily: !!r.deletedFamily };
+export async function adminBanUser(
+  userId: string,
+  opts: { reason?: string; deleteRecipes?: boolean; deleteImages?: boolean } = {},
+): Promise<{ user: AppUser; recipesDeleted: number; imagesRemoved: number }> {
+  const r = await invokeRaw<{ user?: AppUser; recipesDeleted?: number; imagesRemoved?: number }>("adminBanUser", {
+    userId,
+    ...opts,
+  });
+  if (!r.user) throw new Error("ban failed");
+  return { user: r.user, recipesDeleted: r.recipesDeleted ?? 0, imagesRemoved: r.imagesRemoved ?? 0 };
 }
 
-export async function joinFamily(inviteCode: string): Promise<AppFamily> {
-  if (!isBackendAvailable()) {
-    const fam: AppFamily = { id: `fam-${devSeq++}`, name: "Joined family", role: "member", inviteCode, channelToken: "devtoken" };
-    devProfile.families.push(fam);
-    return fam;
-  }
-  const r = await invokeRaw<{ family?: AppFamily }>("joinFamily", { inviteCode });
-  if (!r.family) throw new Error("join failed");
-  return r.family;
+export async function adminUnbanUser(userId: string): Promise<AppUser> {
+  const r = await invokeRaw<{ user?: AppUser }>("adminUnbanUser", { userId });
+  if (!r.user) throw new Error("unban failed");
+  return r.user;
 }
 
-/**
- * Mint a new invite code for a family, invalidating every link shared so far.
- * Owner-only (the backend re-checks). The only way to retire the six-character
- * codes issued before the code was widened.
- */
-export async function rotateInviteCode(familyId: string): Promise<AppFamily> {
-  if (!isBackendAvailable()) {
-    const fam = devProfile.families.find((f) => f.id === familyId);
-    if (!fam) throw new Error("family not found");
-    fam.inviteCode = "DEV" + Math.floor(Math.random() * 900 + 100);
-    return fam;
-  }
-  const r = await invokeRaw<{ family?: AppFamily }>("rotateInviteCode", { familyId });
-  if (!r.family) throw new Error("reset failed");
-  return r.family;
+/** Delete a user's recipes and/or images without banning them. */
+export async function adminPurgeUserContent(
+  userId: string,
+  what: { recipes?: boolean; images?: boolean },
+): Promise<{ recipesDeleted: number; imagesRemoved: number }> {
+  const r = await invokeRaw<{ recipesDeleted?: number; imagesRemoved?: number }>("adminPurgeUserContent", {
+    userId,
+    ...what,
+  });
+  return { recipesDeleted: r.recipesDeleted ?? 0, imagesRemoved: r.imagesRemoved ?? 0 };
 }
 
-export async function getFamilyInfo(familyId: string): Promise<{ family: AppFamily; members: FamilyMember[] }> {
-  if (!isBackendAvailable()) {
-    const fam = devProfile.families.find((f) => f.id === familyId)!;
-    return { family: fam, members: [{ userId: "u-1", role: fam?.role ?? "member", status: "active", joinedAt: nowIso(), username: devProfile.username, displayName: "You", email: "dev@local" }] };
-  }
-  return invokeRaw<{ family: AppFamily; members: FamilyMember[] }>("familyInfo", { familyId });
+/** Every user-added recipe (not the catalog), newest first; or one user's. */
+export async function adminListRecipes(
+  opts: { query?: string; userId?: string; onlyAi?: boolean; limit?: number; offset?: number } = {},
+): Promise<{ recipes: ModRecipe[]; total: number }> {
+  if (!isBackendAvailable()) return { recipes: [], total: 0 };
+  const r = await invokeRaw<{ recipes?: ModRecipe[]; total?: number }>("adminListRecipes", opts);
+  return { recipes: r.recipes ?? [], total: r.total ?? 0 };
 }
 
-/** Invite a user by @username. They must accept before they join. */
-export async function inviteFamilyMember(familyId: string, username: string): Promise<"invited" | "already_member" | "already_invited"> {
-  if (!isBackendAvailable()) return "invited";
-  const r = await invokeRaw<{ status?: string }>("addFamilyMember", { familyId, username });
-  return (r.status as "invited" | "already_member" | "already_invited") ?? "invited";
+export async function adminDeleteRecipe(id: string): Promise<void> {
+  await invokeRaw("adminDeleteRecipe", { id });
 }
 
-export async function myInvites(): Promise<FamilyInvite[]> {
-  if (!isBackendAvailable()) return [...devInvites];
-  const r = await invokeRaw<{ invites?: FamilyInvite[] }>("myInvites");
-  return r.invites ?? [];
+export async function adminRemoveRecipeImage(id: string): Promise<void> {
+  await invokeRaw("adminRemoveRecipeImage", { id });
 }
 
-export async function acceptInvite(familyId: string): Promise<void> {
-  if (!isBackendAvailable()) {
-    const inv = devInvites.find((i) => i.familyId === familyId);
-    if (inv) {
-      devProfile.families.push({ id: inv.familyId, name: inv.name, role: "member", inviteCode: "DEVJOIN", channelToken: "devtoken" });
-      devInvites = devInvites.filter((i) => i.familyId !== familyId);
-    }
-    return;
-  }
-  await invokeRaw<{ family?: AppFamily }>("acceptInvite", { familyId });
-}
-
-export async function declineInvite(familyId: string): Promise<void> {
-  if (!isBackendAvailable()) {
-    devInvites = devInvites.filter((i) => i.familyId !== familyId);
-    return;
-  }
-  await invokeRaw<{ ok?: boolean }>("declineInvite", { familyId });
-}
-
-export async function listPlans(): Promise<PlanRecord[]> {
-  if (!isBackendAvailable()) return [...devPlans];
-  const r = await invokeRaw<{ plans?: PlanRecord[] }>("listPlans");
-  return r.plans ?? [];
-}
-
-/**
- * Create or update a plan. `familyId` is sent only when explicitly setting the
- * scope (a new plan, or moving a plan to/from a family) — a routine data update
- * (a check-off toggle) omits it so the backend keeps the plan where it is.
- *
- * `expectedUpdatedAt` makes the write a compare-and-swap: the server refuses
- * (`conflict: true`, plus the row as it now stands) rather than overwriting a
- * change we hadn't seen. Callers that pass it must be able to re-apply their
- * change onto the returned row and retry — see features/planSync.ts. Omitting
- * it keeps the old blind last-write-wins behaviour, which is right for a create
- * or a deliberate whole-plan write (share / make private).
- */
-export async function savePlanRecord(args: {
-  id?: string;
-  plan: WeekPlan;
-  title?: string | null;
-  /** Present → set/change scope (null = personal). Absent → keep current scope. */
-  familyId?: string | null;
-  /** The `updatedAt` this write is based on. Absent → no concurrency check. */
-  expectedUpdatedAt?: string;
-}): Promise<{ plan: PlanRecord; conflict: boolean }> {
-  const setScope = "familyId" in args;
-  if (!isBackendAvailable()) {
-    if (args.id) {
-      const i = devPlans.findIndex((p) => p.id === args.id);
-      if (i >= 0) {
-        if (args.expectedUpdatedAt && devPlans[i]!.updatedAt !== args.expectedUpdatedAt) {
-          return { plan: devPlans[i]!, conflict: true };
-        }
-        devPlans[i] = { ...devPlans[i]!, data: args.plan, title: args.title ?? devPlans[i]!.title, updatedAt: nowIso(), ...(setScope ? { familyId: args.familyId ?? null } : {}) };
-        return { plan: devPlans[i]!, conflict: false };
-      }
-    }
-    const rec: PlanRecord = { id: `plan-${devSeq++}`, ownerId: "u-1", familyId: setScope ? args.familyId ?? null : null, title: args.title ?? null, mine: true, data: args.plan, createdAt: nowIso(), updatedAt: nowIso() };
-    devPlans.unshift(rec);
-    return { plan: rec, conflict: false };
-  }
-  // Send `title` only when the caller supplied one. A check-off toggle passes
-  // just the plan, and the server treats an absent title as "leave it alone" —
-  // it used to arrive as an explicit null and wipe the stored title.
-  const params: Record<string, unknown> = { plan: args.plan };
-  if ("title" in args || !args.id) params.title = args.title ?? null;
-  if (args.id) params.id = args.id;
-  if (setScope || !args.id) params.familyId = args.familyId ?? null; // always set scope on create
-  if (args.expectedUpdatedAt) params.expectedUpdatedAt = args.expectedUpdatedAt;
-  const r = await invokeRaw<{ plan?: PlanRecord; conflict?: boolean }>("savePlan", params);
-  if (!r.plan) throw new Error("save failed");
-  return { plan: r.plan, conflict: !!r.conflict };
-}
-
-export async function deletePlanRecord(id: string): Promise<void> {
-  if (!isBackendAvailable()) {
-    devPlans = devPlans.filter((p) => p.id !== id);
-    return;
-  }
-  await invokeRaw<{ ok?: boolean }>("deletePlan", { id });
+/** Put an image the admin just uploaded on ANY recipe, catalog rows included. */
+export async function adminSetRecipeImage(id: string, url: string): Promise<void> {
+  await invokeRaw("adminSetRecipeImage", { id, url });
 }

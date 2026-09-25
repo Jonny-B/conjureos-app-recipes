@@ -22,6 +22,12 @@ export interface Ingredient {
   quantity?: string;
   /** Optional free-form note ("looks past date", "fresh, opened"). */
   notes?: string;
+  /**
+   * A best-before / use-by date READ OFF THE PACKAGING, as `YYYY-MM-DD`.
+   * Present only when the model could actually read one — never inferred.
+   * A real printed date always beats the shelf-life estimate.
+   */
+  expiresAt?: string;
   /** True when the user has explicitly confirmed (or added) this item. */
   confirmed: boolean;
 }
@@ -74,6 +80,8 @@ export interface Recipe {
    * and returns this URL. Absent/empty means no image.
    */
   imageUrl?: string;
+  /** True when imageUrl is an AI-generated image (server-set; stamped on the pixels). */
+  imageAi?: boolean;
   /** True when this is a promoted "Chef Payson" recipe (server-set). */
   chefFeatured?: boolean;
 }
@@ -134,85 +142,6 @@ export interface CatalogRecipe extends Recipe {
 }
 
 /**
- * One persistent pantry/fridge item the user keeps on hand. Stored as JSON at
- * /home/Documents/Recipes/.pantry.json (see features/pantry.ts). Feeds the
- * match-ranking + Plan My Week features via ingredientsFromPantry().
- */
-export interface PantryItem {
-  /** Sanitized lowercase name, e.g. "sour cream". */
-  name: string;
-  /** Optional free-form amount on hand ("1 pint", "200g", "half a carton"). */
-  quantity?: string;
-  /** Optional free-form note ("opened", "use soon"). */
-  notes?: string;
-  /** ISO timestamp first added. */
-  addedAt: string;
-}
-
-/**
- * Plan My Week: the structured constraints derived from the user's "mood"
- * (picked ingredients, a seed recipe, or free text interpreted by the AI).
- */
-export interface MoodConstraints {
-  /** Ingredients the week should lean on (soft preference). */
-  includeIngredients: string[];
-  /** Cuisines/categories to favor (e.g. "italian", "dinner"). */
-  cuisines: string[];
-  /** Dietary rules, e.g. "vegetarian", "gluten-free". */
-  dietary: string[];
-  /** Ingredients to exclude entirely. */
-  avoid: string[];
-  /** How many meals to plan (1-7). */
-  mealCount: number;
-}
-
-/** One recipe chosen for the week, with its overlap/coverage breakdown. */
-export interface PlannedRecipe {
-  id: string;
-  title: string;
-  recipe: Recipe;
-  /** Canonical ingredient names already covered by the pantry. */
-  pantryCovered: string[];
-  /** Canonical names this pick first added to the shared shopping set. */
-  marginalNew: string[];
-  haveCount: number;
-  totalCount: number;
-}
-
-/** One consolidated, deduped shopping-list line covering 1+ recipes. */
-export interface ShoppingListItem {
-  /** Human-friendly display name. */
-  name: string;
-  /** Normalized key the merge grouped on. */
-  canonical: string;
-  /** Original amount when only one recipe needs it. */
-  quantity?: string;
-  /** "enough for N recipes" when many recipes share it. */
-  quantityNote?: string;
-  /** Which chosen recipes need this item. */
-  recipes: { id: string; title: string }[];
-  /** Coarse grocery aisle for grouping. */
-  aisle: string;
-}
-
-/** A saved week plan: the chosen recipes + the consolidated shopping list. */
-export interface WeekPlan {
-  picks: PlannedRecipe[];
-  shoppingList: ShoppingListItem[];
-  constraints: MoodConstraints;
-  /** mealCount minus picks found (0 when fully satisfied). */
-  shortfall: number;
-  warnings: string[];
-  createdAt: string;
-  /**
-   * Canonical keys (`ShoppingListItem.canonical`) the user has checked off
-   * while shopping. Persisted with the plan so the checklist survives closing
-   * the app. Absent/empty = nothing checked yet.
-   */
-  checked?: string[];
-}
-
-/**
  * A recipe as shown in the browse/favorites feed: either a bundled catalog
  * recipe or one the user saved. `favorite` is resolved at render time (catalog
  * favorites from the index, saved favorites from frontmatter).
@@ -224,9 +153,3 @@ export type FeedRecipe =
 /** Which slice the Recipes tab shows. Favorites is a filter here, not a tab. */
 export type RecipeSource = "all" | "mine" | "favorites";
 
-export type Screen =
-  | { kind: "capture" }
-  | { kind: "identifying"; photos: CapturedPhoto[] }
-  | { kind: "ingredients"; photos: CapturedPhoto[]; ingredients: Ingredient[] }
-  | { kind: "generating"; photos: CapturedPhoto[]; ingredients: Ingredient[] }
-  | { kind: "recipes"; photos: CapturedPhoto[]; ingredients: Ingredient[]; recipes: Recipe[] };

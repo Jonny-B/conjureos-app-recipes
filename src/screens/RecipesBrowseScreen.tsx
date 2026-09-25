@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { FeedRecipe, PantryItem, Recipe, RecipeSource, SavedRecipe } from "../types";
-import { getCatalog, categories, toRecipe, loadRecipeBody, withRecipeBody } from "../features/catalog";
+import type { CatalogRecipe, FeedRecipe, Recipe, RecipeSource, SavedRecipe } from "../types";
+import { getCatalog, categories, toRecipe, loadRecipeBody, withRecipeBody, patchCatalogRecipe } from "../features/catalog";
 import {
   listSavedRecipesResult,
   saveRecipe,
@@ -9,25 +9,32 @@ import {
   setSavedFavorite,
 } from "../features/storage";
 import { loadFavorites, toggleCatalogFavorite } from "../features/favorites";
-import { Dropdown, type DropdownOption } from "../components/Dropdown";
 import { RecipeRow } from "../components/RecipeRow";
+import { RecipePlate } from "../components/RecipePlate";
+import { RecipeStats } from "../components/RecipeStats";
+import { categoryOf, keyIngredients, lookFor } from "../features/recipeLook";
 import { RecipeDetail } from "./RecipeDetail";
 import { CreateScreen } from "./CreateScreen";
 import { SnapRecipeScreen } from "./SnapRecipeScreen";
-import { ingredientsFromPantry } from "../features/pantry";
-import { computeCoverage } from "../features/scaling";
+import { DescribeScreen } from "./DescribeScreen";
+import { CHEF_NAME } from "./StudioScreen";
+import { fetchChefLatest } from "../bridge/recipesApi";
+import { buildScored, daySeed, type Scored } from "../features/recommend";
 import { Icon } from "../icons";
 import { ErrorBanner, useActionError } from "../components/ErrorBanner";
+import { ResumeCook } from "../components/ResumeCook";
+import { loadCookSession, type CookSession } from "../features/cookSession";
 
 interface Props {
   /** Which slice to show: all recipes, just the user's saved ones, or favorites. */
   source: RecipeSource;
   onSourceChange: (s: RecipeSource) => void;
-  pantry: PantryItem[] | null;
   /** Enter the guided cook for a recipe (savedRecipe set when it's in the library). */
   onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
   /** Bumped by App when the catalog reloads from the DB, so the memos re-run. */
   catalogVersion?: number;
+  /** Admin: may give any recipe an AI photo or remove its photo. */
+  isAdmin?: boolean;
 }
 
 const SOURCE_TABS: { id: RecipeSource; label: string }[] = [
@@ -37,14 +44,30 @@ const SOURCE_TABS: { id: RecipeSource; label: string }[] = [
 ];
 
 const PAGE_SIZE = 60;
-type Mode = "list" | "write" | "snap";
+/**
+ * The three ways a recipe gets INTO the library, all behind the one "+" in the
+ * control bar. "Describe a dish" used to be a tile on the Home screen; Home is
+ * gone, and an AI that writes a recipe belongs beside the two other ways of
+ * adding one, not on a screen of its own. (Design rule: AI is the verb inside a
+ * pillar, never a tab.)
+ */
+type Mode = "list" | "write" | "snap" | "describe";
 
 function keyOf(fi: FeedRecipe): string {
   return fi.kind === "catalog" ? `c:${fi.id}` : `s:${fi.recipe.path}`;
 }
 
-export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, catalogVersion = 0 }: Props) {
+export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVersion = 0, isAdmin = false }: Props) {
   const [saved, setSaved] = useState<SavedRecipe[]>([]);
+  /**
+   * A cook left running, if there is one.
+   *
+   * The guided cook is an OVERLAY, not a tab, so a persisted session has no
+   * door of its own — without this banner it would survive its 12h TTL and be
+   * unreachable. It used to sit on the Pantry screen because that was home;
+   * this is home now.
+   */
+  const [resumable, setResumable] = useState<CookSession | null>(null);
   const [favs, setFavs] = useState<Set<string>>(new Set());
   const [loaded, setLoaded] = useState(false);
   const [query, setQuery] = useState("");
@@ -52,8 +75,10 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<FeedRecipe | null>(null);
   const [mode, setMode] = useState<Mode>("list");
-  const [filterOpen, setFilterOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  /** Re-rolls the top recommendation past its equal-scored ties. */
+  const [shuffle, setShuffle] = useState(0);
+  const [chefPick, setChefPick] = useState<CatalogRecipe | null>(null);
 
   const catalog = useMemo(() => getCatalog(), [catalogVersion]);
 
@@ -76,6 +101,15 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
   useEffect(() => {
     refresh();
   }, [refresh]);
+  useEffect(() => {
+    setResumable(loadCookSession());
+  }, []);
+  // Chef Payson's newest promoted recipe (best-effort; absent if none/offline).
+  useEffect(() => {
+    fetchChefLatest(1)
+      .then((list) => setChefPick(list[0] ?? null))
+      .catch(() => {});
+  }, []);
 
   const feedItems = useMemo<FeedRecipe[]>(() => {
     const savedItems: FeedRecipe[] = saved.map((r) => ({ kind: "saved", recipe: r, favorite: !!r.favorite }));
@@ -110,26 +144,32 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
 
   const visible = ranked.slice(0, page * PAGE_SIZE);
 
-  // Pantry coverage for the rows on screen. Home and Pantry already show these
-  // chips; the browse list didn't, so applying a category filter looked like it
-  // "lost" the have/short/missing counts. Slim catalog rows carry `tokens`,
-  // which is what computeCoverage matches on, so this works pre-body-fetch.
-  const pantryIng = useMemo(() => (pantry ? ingredientsFromPantry(pantry) : []), [pantry]);
-  const covFor = (fi: FeedRecipe) =>
-    pantryIng.length > 0 ? computeCoverage(fi.recipe, pantryIng) ?? undefined : undefined;
+  /**
+   * "Tonight's pick" — the library's one recommendation (see
+   * features/recommend.ts). It no longer scores against a pantry; what is left
+   * is favourites, quick recipes and what you have not cooked lately.
+   *
+   * Deliberately hidden the moment someone is searching or filtering: a
+   * suggestion is help when you are browsing and an obstacle when you already
+   * know what you are looking for.
+   */
+  const browsing = source === "all" && !query.trim() && category === "all";
+  const scored = useMemo(
+    () => (browsing ? buildScored(catalog, saved, favs, daySeed()) : []),
+    [browsing, catalog, saved, favs],
+  );
+  // Rotate through the top of the ranking rather than re-sorting: the ordering
+  // is already the answer, the shuffle just walks it.
+  const heroPool = scored.slice(0, 12);
+  const hero: Scored | null = heroPool.length ? heroPool[shuffle % heroPool.length]! : null;
 
-  const categoryOptions = useMemo<DropdownOption<string>[]>(
-    () => [
-      { value: "all", label: "All categories" },
-      ...categories().map((c) => ({ value: c.name, label: `${c.name} (${c.count})` })),
-    ],
+  // Biggest first, so the rail opens on Dinner (585) and ends on Snack (4).
+  const categoryList = useMemo(
+    () => categories().slice().sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
     [catalogVersion],
   );
 
   const resetPaging = () => setPage(1);
-  // Source now lives in the always-visible segmented switch, so it's no longer a
-  // hidden "filter"; only the category dropdown (All view) counts here.
-  const activeFilters = source === "all" && category !== "all" ? 1 : 0;
 
   // ── mutations ──────────────────────────────────────────────────────
   // All four go through `run` so a failure surfaces in the banner instead of
@@ -173,12 +213,15 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
     return { kind: "saved", recipe: s, favorite: !!s.favorite };
   }, [selected, favs, saved]);
 
-  // ── Add-a-recipe sub-views (by hand / by picture), hosted in Recipes ──
-  if (mode === "write" || mode === "snap") {
+  // ── Add-a-recipe sub-views (by hand / by picture / by description) ──
+  if (mode === "write" || mode === "snap" || mode === "describe") {
     const back = () => {
       setMode("list");
       refresh();
     };
+    if (mode === "describe") {
+      return <DescribeScreen onBack={back} onCook={onCook} />;
+    }
     return (
       <div className="browse-screen">
         <div className="detail-actions">
@@ -200,7 +243,6 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
         <ErrorBanner error={actionError} onDismiss={clearActionError} />
         <RecipeDetail
           feed={resolvedSelected}
-          pantry={pantry}
           inLibrary={inLibrary}
           onCook={onCook}
           onBack={() => setSelected(null)}
@@ -208,6 +250,15 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
           onSaveToLibrary={() => onSaveToLibrary(resolvedSelected)}
           onMade={() => onMade(resolvedSelected)}
           onDelete={() => onDelete(resolvedSelected)}
+          isAdmin={isAdmin}
+          onImageChanged={(patch) => {
+            if (resolvedSelected.kind === "catalog") {
+              patchCatalogRecipe(resolvedSelected.id, patch);
+              setSelected({ ...resolvedSelected, recipe: { ...resolvedSelected.recipe, ...patch } });
+            } else {
+              setSaved((prev) => prev.map((r) => (r.path === resolvedSelected.recipe.path ? { ...r, ...patch } : r)));
+            }
+          }}
         />
       </>
     );
@@ -216,6 +267,14 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
   return (
     <div className="browse-screen">
       <ErrorBanner error={actionError} onDismiss={clearActionError} />
+      {resumable && (
+        <ResumeCook
+          session={resumable}
+          saved={saved}
+          onResume={(r, sv) => onCook(r, sv)}
+          onForget={() => setResumable(null)}
+        />
+      )}
       {/* Ours vs. yours: the primary switch for the whole tab. */}
       <div className="seg" role="tablist" aria-label="Which recipes">
         {SOURCE_TABS.map((t) => (
@@ -226,7 +285,6 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
             className={`seg-btn${source === t.id ? " active" : ""}`}
             onClick={() => {
               onSourceChange(t.id);
-              setFilterOpen(false);
               resetPaging();
             }}
           >
@@ -235,7 +293,43 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
         ))}
       </div>
 
-      {/* One slim control bar: search + filter + add. Everything else is the list. */}
+      {/* Tonight's pick and the chef's newest come BEFORE the search row (#918):
+          they are what the tab opens on, and search is how you leave them.
+          Both vanish while a query is typed, so the row moves up then. */}
+      {browsing && hero && (
+        <HeroPick
+          scored={hero}
+          onView={() => run(async () => setSelected(await withRecipeBody(hero.fi)))}
+          onShuffle={() => setShuffle((n) => n + 1)}
+          canShuffle={heroPool.length > 1}
+        />
+      )}
+
+      {browsing && chefPick && (
+        <button
+          className="chef-promo"
+          onClick={() =>
+            run(async () =>
+              setSelected(
+                await withRecipeBody({
+                  kind: "catalog" as const,
+                  id: chefPick.id,
+                  recipe: chefPick,
+                  favorite: favs.has(chefPick.id),
+                }),
+              ),
+            )
+          }
+        >
+          <span className="chef-promo-eyebrow">
+            <Icon name="utensils" /> {CHEF_NAME}'s newest recipe
+          </span>
+          <span className="chef-promo-title">{chefPick.title}</span>
+          {chefPick.summary && <span className="chef-promo-sub">{chefPick.summary}</span>}
+        </button>
+      )}
+
+      {/* One slim control bar: search + add. The category rail sits under it. */}
       <div className="lib-header">
         <div className="browse-filter">
           <Icon name="magnifying-glass" />
@@ -249,25 +343,10 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
             }}
           />
         </div>
-        {source === "all" && (
-          <button
-            className={`icon-btn lib-icon${filterOpen || activeFilters ? " active" : ""}`}
-            onClick={() => {
-              setFilterOpen((v) => !v);
-              setAddOpen(false);
-            }}
-            aria-label="Filter"
-            title="Filter by category"
-          >
-            <Icon name="sliders" />
-            {activeFilters > 0 && <span className="lib-badge">{activeFilters}</span>}
-          </button>
-        )}
         <button
           className={`icon-btn lib-icon${addOpen ? " active" : ""}`}
           onClick={() => {
             setAddOpen((v) => !v);
-            setFilterOpen(false);
           }}
           aria-label="Add a recipe"
           title="Add a recipe"
@@ -275,21 +354,6 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
           <Icon name="plus" />
         </button>
       </div>
-
-      {filterOpen && source === "all" && (
-        <div className="lib-panel">
-          <div className="lib-panel-label">Category</div>
-          <Dropdown
-            options={categoryOptions}
-            value={category}
-            onChange={(v) => {
-              setCategory(v);
-              resetPaging();
-            }}
-            ariaLabel="Filter by category"
-          />
-        </div>
-      )}
 
       {addOpen && (
         <div className="lib-panel add-panel">
@@ -299,7 +363,55 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
           <button className="btn secondary" onClick={() => { setAddOpen(false); setMode("snap"); }}>
             <Icon name="camera" /> Snap a photo
           </button>
+          <button className="btn secondary" onClick={() => { setAddOpen(false); setMode("describe"); }}>
+            <Icon name="wand" /> Describe a dish
+          </button>
         </div>
+      )}
+
+      {/* Categories, out in the open. They used to sit behind a filter icon in
+          a dropdown, so the one way to browse 1,120 recipes by kind was two
+          clicks deep and looked like a settings menu. */}
+      {source === "all" && categoryList.length > 0 && (
+        <div className="cat-rail" role="group" aria-label="Category">
+          <button
+            type="button"
+            aria-pressed={category === "all"}
+            className={`cat-chip${category === "all" ? " active" : ""}`}
+            onClick={() => {
+              setCategory("all");
+              resetPaging();
+            }}
+          >
+            All
+          </button>
+          {categoryList.map((c) => {
+            const look = lookFor(c.name);
+            const on = category === c.name;
+            return (
+              <button
+                key={c.name}
+                type="button"
+                aria-pressed={on}
+                className={`cat-chip hue-${look.hue}${on ? " active" : ""}`}
+                onClick={() => {
+                  setCategory(on ? "all" : c.name);
+                  resetPaging();
+                }}
+              >
+                <Icon name={look.glyph} />
+                {c.name}
+                <span className="cat-count">{c.count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {loaded && ranked.length > 0 && (
+        <p className="lib-count">
+          {ranked.length.toLocaleString()} recipe{ranked.length === 1 ? "" : "s"}
+        </p>
       )}
 
       {!loaded ? (
@@ -313,7 +425,6 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
               <RecipeRow
                 key={keyOf(fi)}
                 fi={fi}
-                cov={covFor(fi)}
                 onOpen={() => run(async () => setSelected(await withRecipeBody(fi)))}
               />
             ))}
@@ -328,6 +439,51 @@ export function RecipesBrowseScreen({ source, onSourceChange, pantry, onCook, ca
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * The library's one recommendation. Lifted off the old Home screen; since
+ * 0.54.0 it is a poster (the recipe's plate, or its photo) beside the pitch,
+ * because a feature that looks exactly like a feed row is just a big row.
+ */
+function HeroPick({
+  scored,
+  onView,
+  onShuffle,
+  canShuffle,
+}: {
+  scored: Scored;
+  onView: () => void;
+  onShuffle: () => void;
+  canShuffle: boolean;
+}) {
+  const r = scored.fi.recipe;
+  const category = categoryOf(scored.fi);
+  const keys = keyIngredients(scored.fi, 5);
+  return (
+    <article className="hero-card">
+      <RecipePlate recipe={r} category={category} variant="poster" />
+      <div className="hero-body">
+        {canShuffle && (
+          <button className="hero-refresh" onClick={onShuffle} aria-label="Another idea" title="Another idea">
+            <Icon name="rotate" />
+          </button>
+        )}
+        <div className="hero-eyebrow">
+          <Icon name="wand" /> Tonight's pick
+        </div>
+        <h3 className="hero-title">{r.title}</h3>
+        {keys.length > 0 && <div className="hero-keys">{keys.join(" · ")}</div>}
+        <RecipeStats recipe={r} />
+        <div className="hero-foot">
+          <button className="btn" onClick={onView}>
+            View recipe
+          </button>
+          <span className="hero-why">{scored.reason}</span>
+        </div>
+      </div>
+    </article>
   );
 }
 

@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
-// ConjureOS "Modern Whimsy" design tokens + primitives. Imported first so the
+// ConjureOS design tokens + primitives. Imported first so the
 // --cui-* tokens are defined before styles.css re-points the app's own
 // variables at them. This is a VENDORED copy of @conjureos/ui's dist/ui.css
 // (a CSS-only package), imported by RELATIVE path on purpose: ConjureOS's
@@ -23,7 +23,7 @@ if (!container) throw new Error("#root not found");
 // trip and no flash; after this, pushes arrive by postMessage.
 initAppearance();
 
-// Activate the Modern Whimsy tokens. They're scoped to `.cui-ui`, and the whole
+// Activate the ConjureOS tokens. They are scoped to `.cui-ui`, and the whole
 // app's palette resolves through that class being on <body>. Local `conj-pack
 // dev` gets it from index.html, but ConjureOS @bundle generates its own HTML
 // shell and drops the body class — so set it at runtime so the bundled build

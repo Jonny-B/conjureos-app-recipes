@@ -1,138 +1,93 @@
 import { useEffect, useState } from "react";
-import type { PantryItem, Recipe, RecipeSource, SavedRecipe } from "./types";
-import { HomeScreen } from "./screens/HomeScreen";
+import type { Recipe, RecipeSource, SavedRecipe } from "./types";
 import { RecipesBrowseScreen } from "./screens/RecipesBrowseScreen";
 import { StudioScreen } from "./screens/StudioScreen";
 import { AdminScreen } from "./screens/AdminScreen";
-import { PantryScreen } from "./screens/PantryScreen";
-import { PlansScreen } from "./screens/PlansScreen";
 import { GuidedCook } from "./screens/GuidedCook";
-import { RecipesScreen } from "./screens/RecipesScreen";
-import { generateFromDescription } from "./features/recipes";
 import { registerActions } from "./bridge/actions";
-import { vfs } from "./bridge/vfs";
-import { joinFamily } from "./bridge/recipesApi";
 import { ensureCatalogLoaded, loadRecipeBody } from "./features/catalog";
-import { loadPantry, ingredientsFromPantry } from "./features/pantry";
 import { markMade, unmarkMade, saveRecipe } from "./features/storage";
 import { useWhoami } from "./hooks/useWhoami";
 import { useRole } from "./hooks/useRole";
 import { Icon } from "./icons";
 import type { IconName } from "./icons";
 import { AppearanceSheet } from "./components/AppearanceSheet";
+import { TermsSheet } from "./components/TermsSheet";
+import { Splash } from "./components/Splash";
+import { registerTermsOpener } from "./features/terms";
 import { APP_VERSION } from "./version";
 
-type Tab = "home" | "recipes" | "cook" | "plan" | "studio" | "admin";
-type CookMode = "kitchen" | "describe";
-/** A plans sub-screen to open from the header cog (available on any tab). */
-export type PlansIntent = "family" | "stores" | "new";
-/** An action a screen contributes to the header settings sheet. */
-export interface CogItem {
-  key: string;
-  label: string;
-  icon: IconName;
-  onClick: () => void;
-  danger?: boolean;
-}
+/**
+ * Recipes: a library you add to, browse, and cook from. That is the whole app.
+ *
+ * WHAT USED TO BE HERE AND IS NOW SOMEWHERE ELSE. This app briefly carried a
+ * pantry, a week planner, a shopping list, grocery-store aisle layouts and
+ * shared families. All of that is Conjure Pantry now — a separate app in its
+ * own repo (`conjureos-pantry`, store slug `pantry`), which owns those
+ * mechanics properly instead of bolting them onto a recipe library.
+ *
+ * The split is the point: Pantry does not author recipes and this app does not
+ * track what is in your fridge. Pantry finds recipes through ConjureOS's
+ * structural discovery — it declares the SHAPE it wants and the kernel matches
+ * it against this app's declared `returns`. So the way to serve Pantry better
+ * is to keep `listRecipes` and `getRecipe` honest, NOT to add a pantry back.
+ *
+ * ONE SCREEN, and a tab bar only when a role earns one. A normal user sees the
+ * library and nothing else, because a tab bar with one tab is furniture. Studio
+ * (chef authoring) and Admin appear for the roles that have them, and the
+ * server re-checks the role on every write. The guided cook is an overlay
+ * rather than a tab, so Back returns you to whatever you were looking at with
+ * its state intact.
+ */
+type Tab = "recipes" | "studio" | "admin";
 
-/** Where the ConjureOS shell drops an invite code for us (shell + native app). */
-const HANDOFF_PATH = "/home/Documents/Recipes/.family-invite.json";
-/** Older than this and the handoff is someone else's moment, not this one. */
-const HANDOFF_TTL_MS = 60 * 60 * 1000;
+/** The longest the opening screen waits for the catalog before stepping aside. */
+const SPLASH_MAX_MS = 6000;
 
 const TAB_TITLE: Record<Tab, string> = {
-  home: "Home",
   recipes: "Recipes",
-  cook: "Cook",
-  plan: "Plans",
   studio: "Studio",
   admin: "Admin",
 };
+
 /** What's loaded into the guided cook. `saved` set when it's a library recipe. */
 interface CookTarget {
   recipe: Recipe;
   saved: SavedRecipe | null;
 }
 
-// "cook" is no longer a bottom-bar tab — the two cooking entry points (from my
-// kitchen / describe a dish) live on Home now, and the guided cook is reached by
-// tapping a recipe. It stays a routable screen (below), just off the nav.
-const TABS: { id: Tab; label: string; icon: IconName }[] = [
-  { id: "home", label: "Home", icon: "house" },
-  { id: "recipes", label: "Recipes", icon: "utensils" },
-  { id: "plan", label: "Plans", icon: "calendar-days" },
-];
-
 export function App() {
   const who = useWhoami();
   // Role comes from recipes-db (derived from the minted identity token) — the
   // server is authoritative; these tabs are just the reveal (Studio for
   // chef/admin, Admin for admin). Every write re-checks the role server-side.
-  const { role, email: myEmail, loading: roleLoading, err: roleErr } = useRole();
-  const tabs = [...TABS];
-  // Studio (chef blog authoring) is open to chefs AND admins — admins see all
-  // role surfaces. The recipes-db chefUpsert re-verifies the role server-side.
-  if (role === "chef" || role === "admin")
-    tabs.push({ id: "studio" as Tab, label: "Studio", icon: "wand" as IconName });
-  if (role === "admin") tabs.push({ id: "admin" as Tab, label: "Admin", icon: "sliders" as IconName });
-  const [tab, setTab] = useState<Tab>("home");
-  const [recipeSource, setRecipeSource] = useState<RecipeSource>("all");
-  /** Bumped when a family is joined from the invite prompt — see PlansScreen. */
-  const [familyEpoch, setFamilyEpoch] = useState(0);
-  const [cookMode, setCookMode] = useState<CookMode>("kitchen");
-  const [cookTarget, setCookTarget] = useState<CookTarget | null>(null);
-  // The tab the guided cook was launched from, so Back returns there.
-  const [cookOrigin, setCookOrigin] = useState<Tab>("cook");
-  const [pantry, setPantry] = useState<PantryItem[] | null>(null);
-  const [catalogVersion, setCatalogVersion] = useState(0);
-  // A family invite code handed over by the ConjureOS shell (from a
-  // `?joinFamily=` link) via a VFS file → prompt to join.
-  const [pendingJoin, setPendingJoin] = useState<string | null>(null);
-  // Header settings cog: a sheet with Family + Stores (any tab), plus whatever
-  // plan actions the Plans screen contributes for the plan in view.
-  const [cogOpen, setCogOpen] = useState(false);
-  const [plansIntent, setPlansIntent] = useState<PlansIntent | null>(null);
-  const [cogExtras, setCogExtras] = useState<CogItem[]>([]);
-  // Appearance lives behind the cog rather than on a tab: it is set once and
-  // then almost never, so it should not cost a slot in a three-tab bar.
-  const [appearanceOpen, setAppearanceOpen] = useState(false);
-  const goPlans = (intent: PlansIntent) => {
-    setCookTarget(null);
-    setTab("plan");
-    setPlansIntent(intent);
-    setCogOpen(false);
-  };
+  const { role, email: myEmail, loading: roleLoading, err: roleErr, banned } = useRole();
+  const tabs: { id: Tab; label: string; icon: IconName }[] = [];
+  // Only worth drawing a bar when there is more than one thing in it.
+  if (role === "chef" || role === "admin") {
+    tabs.push({ id: "recipes", label: "Recipes", icon: "utensils" });
+    tabs.push({ id: "studio", label: "Studio", icon: "wand" });
+  }
+  if (role === "admin") tabs.push({ id: "admin", label: "Admin", icon: "sliders" });
 
+  const [tab, setTab] = useState<Tab>("recipes");
+  const [recipeSource, setRecipeSource] = useState<RecipeSource>("all");
+  const [cookTarget, setCookTarget] = useState<CookTarget | null>(null);
+  const [catalogVersion, setCatalogVersion] = useState(0);
+  const [cogOpen, setCogOpen] = useState(false);
+  // The opening screen, up until the catalog has loaded (or SPLASH_MAX_MS).
+  const [splash, setSplash] = useState<"up" | "leaving" | "gone">("up");
+  // Appearance lives behind the cog rather than on a tab: it is set once and
+  // then almost never.
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
+  /**
+   * The Recipes terms sheet. `resolve` is set when a save is waiting on the
+   * answer (features/terms.ts's gate); unset when it was opened to read.
+   */
+  const [terms, setTerms] = useState<null | { resolve?: (ok: boolean) => void }>(null);
   useEffect(() => {
-    const check = async () => {
-      try {
-        if (!(await vfs.exists(HANDOFF_PATH))) return;
-        const parsed = JSON.parse(await vfs.read(HANDOFF_PATH)) as { code?: string; ts?: number };
-        const code = (parsed.code ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-        // An invite the shell handed over hours ago isn't what the user is
-        // doing now — drop it rather than ambushing them with a stale prompt.
-        if (!code || (parsed.ts && Date.now() - parsed.ts > HANDOFF_TTL_MS)) {
-          await vfs.rm(HANDOFF_PATH).catch(() => {});
-          return;
-        }
-        setPendingJoin(code);
-      } catch {
-        /* no handoff / unreadable — nothing to redeem */
-      }
-    };
-    void check();
-    // Re-check when the app comes back to the foreground, in case it was
-    // already open (warm) when the shell wrote the handoff — in that case the
-    // app never remounts, so the mount check above has already been and gone.
-    // `focus` covers hosts where an offscreen→onscreen move doesn't fire
-    // visibilitychange (notably the native app's warm WebView pool).
-    const onVis = () => document.visibilityState === "visible" && void check();
-    document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("focus", onVis);
-    return () => {
-      document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("focus", onVis);
-    };
+    registerTermsOpener(() => new Promise<boolean>((resolve) => setTerms({ resolve })));
+    return () => registerTermsOpener(null);
   }, []);
 
   useEffect(() => {
@@ -140,43 +95,41 @@ export function App() {
       // eslint-disable-next-line no-console
       console.warn("[recipes] action registration failed:", err);
     });
-    loadPantry().then(setPantry).catch(() => setPantry([]));
     ensureCatalogLoaded()
       .then((changed) => changed && setCatalogVersion((v) => v + 1))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setSplash((s) => (s === "up" ? "leaving" : s)));
+    // Never hold the app hostage to a slow network: past this the browse
+    // screen's own loading state takes over.
+    const cap = setTimeout(() => setSplash((s) => (s === "up" ? "leaving" : s)), SPLASH_MAX_MS);
+    return () => clearTimeout(cap);
   }, []);
+  // Unmount once the fade (styles.css .splash, 0.35s) has played.
+  useEffect(() => {
+    if (splash !== "leaving") return;
+    const t = setTimeout(() => setSplash("gone"), 400);
+    return () => clearTimeout(t);
+  }, [splash]);
 
-  // Every "cook this" doorway routes here: load the recipe into the guided cook
-  // and switch to the Cook tab.
   /**
-   * Every "open this recipe" path lands here, so the body is filled in HERE
-   * rather than at each call site. A catalog row is slim (no ingredients, no
-   * steps) until it is fetched, and each screen that forgot to fetch it opened
-   * a cook with "Ingredients 0/0" and no steps (ConjureOS #643). loadRecipeBody
-   * is a no-op for a recipe that already carries its body.
+   * Every "cook this" doorway routes here. The guided cook is an OVERLAY: the
+   * screen underneath stays mounted and merely hidden, so a search three
+   * screens into the library is exactly where you left it.
    */
   const startCook = async (recipe: Recipe, saved: SavedRecipe | null = null) => {
-    const origin = tab;
+    // A catalog row is slim (no ingredients, no steps) until its body is
+    // fetched; filling it HERE, where every open lands, means no doorway can
+    // open a cook with "Ingredients 0/0" (ConjureOS #643). A no-op for a
+    // recipe that already carries its body.
     const full = await loadRecipeBody(recipe as Recipe & { id?: string });
-    setCookOrigin(origin);
     setCookTarget({ recipe: full, saved });
-    setTab("cook");
   };
-  const endCook = () => {
-    setCookTarget(null);
-    setTab(cookOrigin);
-  };
-  const openKitchen = () => {
-    setCookMode("kitchen");
-    setTab("cook");
-  };
-  const openDescribe = () => {
-    setCookMode("describe");
-    setTab("cook");
-  };
+  const endCook = () => setCookTarget(null);
+
+  const cooking = !!cookTarget;
 
   return (
-    <div className="app">
+    <div className={`app${tabs.length > 1 ? " app--rail" : ""}`}>
       <header className="topbar">
         <span className="brand-mark">
           <Icon name="utensils" />
@@ -187,104 +140,79 @@ export function App() {
         </button>
       </header>
       <main className="app-body">
-        {tab === "home" && (
-          <HomeScreen
-            pantry={pantry}
-            onNavigate={setTab}
-            onViewFavorites={() => {
-              setRecipeSource("favorites");
-              setTab("recipes");
-            }}
-            onOpenKitchen={openKitchen}
-            onDescribe={openDescribe}
-            onCook={startCook}
-            catalogVersion={catalogVersion}
-          />
-        )}
-        {tab === "recipes" && (
-          <RecipesBrowseScreen
-            source={recipeSource}
-            onSourceChange={setRecipeSource}
-            pantry={pantry}
-            onCook={startCook}
-            catalogVersion={catalogVersion}
-          />
-        )}
-        {tab === "cook" && (
-          <>
-            {/* CookTab stays mounted (just hidden) under the guided cook so the
-                describe results / choose search / scan progress survive the
-                "pick → cook → back to pick another" detour. */}
-            <div hidden={!!cookTarget}>
-              <CookTab
-                mode={cookMode}
-                pantry={pantry}
-                onPantryChange={setPantry}
-                onCook={startCook}
-                onExit={() => setTab("home")}
-                catalogVersion={catalogVersion}
-              />
+        {banned && (
+          // Server-side every action already refuses; this says so instead of
+          // letting each screen fail on its own.
+          <div className="empty-state banned-notice">
+            <Icon name="circle-info" className="empty-icon" />
+            <h2>Your access to Recipes has been removed</h2>
+            <div>
+              An administrator removed your access to Recipes. Your ConjureOS account and your other apps are not
+              affected.
             </div>
-            {cookTarget && (
-              <GuidedCook
-                // `key` remounts the cook when the recipe changes, so its
-                // lazy state initializers re-read the stored session instead
-                // of carrying the previous recipe's ticks into this one.
-                key={cookTarget.saved?.path ?? cookTarget.recipe.title}
-                recipe={cookTarget.recipe}
-                pantry={pantry}
-                saved={!!cookTarget.saved}
-                savedPath={cookTarget.saved?.path ?? null}
-                onBack={endCook}
-                onMade={() => (cookTarget.saved ? markMade(cookTarget.saved).then(() => {}) : Promise.resolve())}
-                // `cookTarget.saved` is the row as it was BEFORE the mark (we
-                // never refresh it here), so its lastMadeAt is exactly the
-                // value the undo needs to restore.
-                onUnmade={
-                  cookTarget.saved
-                    ? () => unmarkMade(cookTarget.saved!).then(() => {})
-                    : undefined
-                }
-                onSave={(r) => saveRecipe(r).then(() => {})}
-              />
-            )}
-          </>
+          </div>
         )}
-        {tab === "plan" && (
-          <PlansScreen
-            pantry={pantry}
-            catalogVersion={catalogVersion}
-            intent={plansIntent}
-            onIntentConsumed={() => setPlansIntent(null)}
-            onCogItems={setCogExtras}
-            familyEpoch={familyEpoch}
-            onCook={(r) => void startCook(r)}
+        {/* Hidden, not unmounted, while the guided cook is open — see startCook. */}
+        <div hidden={cooking || banned}>
+          {tab === "recipes" && (
+            <RecipesBrowseScreen
+              source={recipeSource}
+              onSourceChange={setRecipeSource}
+              onCook={startCook}
+              catalogVersion={catalogVersion}
+              isAdmin={role === "admin"}
+            />
+          )}
+          {tab === "studio" && <StudioScreen />}
+          {tab === "admin" && <AdminScreen myEmail={myEmail} />}
+        </div>
+        {cookTarget && (
+          <GuidedCook
+            // `key` remounts the cook when the recipe changes, so its lazy state
+            // initializers re-read the stored session instead of carrying the
+            // previous recipe's ticks into this one.
+            key={cookTarget.saved?.path ?? cookTarget.recipe.title}
+            recipe={cookTarget.recipe}
+            saved={!!cookTarget.saved}
+            savedPath={cookTarget.saved?.path ?? null}
+            onBack={endCook}
+            onMade={() =>
+              cookTarget.saved ? markMade(cookTarget.saved).then(() => {}) : Promise.resolve()
+            }
+            // `cookTarget.saved` is the row as it was BEFORE the mark (we never
+            // refresh it here), so its lastMadeAt is exactly the value the undo
+            // needs to restore.
+            onUnmade={
+              cookTarget.saved ? () => unmarkMade(cookTarget.saved!).then(() => {}) : undefined
+            }
+            onSave={(r) => saveRecipe(r).then(() => {})}
           />
         )}
-        {tab === "studio" && <StudioScreen />}
-        {tab === "admin" && <AdminScreen myEmail={myEmail} />}
       </main>
-      <nav className="tabbar">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            className={`tab${tab === t.id ? " active" : ""}`}
-            aria-label={t.label}
-            aria-current={tab === t.id ? "page" : undefined}
-            onClick={() => {
-              // Leaving a guided cook via the nav always returns to a real
-              // tab view (the launcher / last pane), never a stale recipe.
-              setCookTarget(null);
-              setTab(t.id);
-            }}
-          >
-            <span className="tab-icon">
-              <Icon name={t.icon} />
-            </span>
-            <span className="tab-label">{t.label}</span>
-          </button>
-        ))}
-      </nav>
+      {tabs.length > 1 && (
+        <nav className="tabbar">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              className={`tab${tab === t.id ? " active" : ""}`}
+              aria-label={t.label}
+              aria-current={tab === t.id ? "page" : undefined}
+              onClick={() => {
+                // Leaving a guided cook via the nav always returns to a real
+                // view, never a stale recipe.
+                setCookTarget(null);
+                setTab(t.id);
+              }}
+            >
+              <span className="tab-icon">
+                <Icon name={t.icon} />
+              </span>
+              <span className="tab-label">{t.label}</span>
+            </button>
+          ))}
+        </nav>
+      )}
+      {splash !== "gone" && <Splash leaving={splash === "leaving"} />}
       <footer className="app-version">
         v{APP_VERSION}
         {!roleLoading &&
@@ -296,14 +224,13 @@ export function App() {
       </footer>
       {cogOpen && (
         <div className="sheet-overlay" onClick={() => setCogOpen(false)}>
-          <div className="settings-sheet" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="settings-sheet"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="sheet-handle" />
-            <button className="sheet-item" onClick={() => goPlans("family")}>
-              <Icon name="user" /> Family
-            </button>
-            <button className="sheet-item" onClick={() => goPlans("stores")}>
-              <Icon name="store" /> Grocery stores
-            </button>
             <button
               className="sheet-item"
               onClick={() => {
@@ -313,19 +240,15 @@ export function App() {
             >
               <Icon name="palette" /> Appearance
             </button>
-            {cogExtras.length > 0 && <div className="sheet-sep" />}
-            {cogExtras.map((it) => (
-              <button
-                key={it.key}
-                className={`sheet-item${it.danger ? " danger" : ""}`}
-                onClick={() => {
-                  it.onClick();
-                  setCogOpen(false);
-                }}
-              >
-                <Icon name={it.icon} /> {it.label}
-              </button>
-            ))}
+            <button
+              className="sheet-item"
+              onClick={() => {
+                setCogOpen(false);
+                setTerms({});
+              }}
+            >
+              <Icon name="circle-info" /> Recipe terms
+            </button>
             <button className="sheet-item sheet-cancel" onClick={() => setCogOpen(false)}>
               Close
             </button>
@@ -333,235 +256,15 @@ export function App() {
         </div>
       )}
       {appearanceOpen && <AppearanceSheet onClose={() => setAppearanceOpen(false)} />}
-      {pendingJoin && (
-        <FamilyJoinPrompt
-          code={pendingJoin}
-          // Declining consumes the invite; a failed attempt does NOT (the
-          // handoff file survives, so the next launch offers it again rather
-          // than making them ask for a fresh link over a dropped connection).
-          onClose={() => {
-            void vfs.rm(HANDOFF_PATH).catch(() => {});
-            setPendingJoin(null);
-          }}
-          onJoined={() => {
-            void vfs.rm(HANDOFF_PATH).catch(() => {});
-            setPendingJoin(null);
-            setCookTarget(null);
-            setTab("plan");
-            // setTab alone is a no-op when Plans is already the open tab, so the
-            // new family's plans wouldn't appear until the user navigated away
-            // and back. Bump the epoch so PlansScreen reloads either way.
-            setFamilyEpoch((n) => n + 1);
+      {terms && (
+        <TermsSheet
+          asking={!!terms.resolve}
+          onClose={(ok) => {
+            terms.resolve?.(ok);
+            setTerms(null);
           }}
         />
       )}
     </div>
   );
 }
-
-/**
- * Shown when the shell hands over a family invite code (from a `?joinFamily=`
- * link). Confirm → join → land on the Plans tab with the new family.
- */
-function FamilyJoinPrompt({
-  code,
-  onClose,
-  onJoined,
-}: {
-  code: string;
-  onClose: () => void;
-  onJoined: () => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [joinedName, setJoinedName] = useState<string | null>(null);
-
-  const join = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const fam = await joinFamily(code);
-      setJoinedName(fam.name);
-      setTimeout(onJoined, 1100);
-    } catch (e) {
-      const m = e instanceof Error ? e.message : String(e);
-      setError(
-        /family_limit/i.test(m)
-          ? "You're already in 3 families — the max."
-          : /not_found/i.test(m)
-            ? "That invite link isn't valid anymore."
-            : "Couldn't join. Try again.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="join-overlay" role="dialog" aria-modal="true">
-      <div className="join-card">
-        {joinedName ? (
-          <>
-            <span className="join-badge"><Icon name="check" /></span>
-            <h3>Joined {joinedName}!</h3>
-            <p className="muted">Opening your family plans…</p>
-          </>
-        ) : (
-          <>
-            <span className="join-badge"><Icon name="user" /></span>
-            <h3>Join a family?</h3>
-            <p className="muted">
-              You've been invited. Join to share plans and shopping lists that sync live.
-            </p>
-            {error && <div className="fam-error" style={{ textAlign: "center" }}>{error}</div>}
-            <div className="join-actions">
-              <button className="btn ghost" onClick={onClose} disabled={busy}>Not now</button>
-              <button className="btn" onClick={join} disabled={busy}>{busy ? "Joining…" : "Join"}</button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/**
- * The two cooking flows, launched from Home: cook from your kitchen (scan /
- * pantry loop) or describe a dish for the AI. Back exits to Home. The guided,
- * step-by-step cook is layered over this by App when a recipe is chosen.
- */
-function CookTab({
-  mode,
-  pantry,
-  onPantryChange,
-  onCook,
-  onExit,
-  catalogVersion,
-}: {
-  mode: CookMode;
-  pantry: PantryItem[] | null;
-  onPantryChange: (items: PantryItem[]) => void;
-  onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
-  onExit: () => void;
-  catalogVersion: number;
-}) {
-  if (mode === "describe") return <DescribePane pantry={pantry} onBack={onExit} onCook={onCook} />;
-  return (
-    <PantryScreen
-      pantry={pantry}
-      onChange={onPantryChange}
-      onBack={onExit}
-      onCook={onCook}
-      catalogVersion={catalogVersion}
-    />
-  );
-}
-
-/** Describe a dish → AI writes recipes → pick one → guided cook. */
-function DescribePane({
-  pantry,
-  onBack,
-  onCook,
-}: {
-  pantry: PantryItem[] | null;
-  onBack: () => void;
-  onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
-}) {
-  const [text, setText] = useState("");
-  const [useHave, setUseHave] = useState(false);
-  const [state, setState] = useState<
-    { kind: "input" } | { kind: "generating" } | { kind: "recipes"; recipes: Recipe[] }
-  >({ kind: "input" });
-  const [error, setError] = useState<string | null>(null);
-
-  const hasPantry = !!(pantry && pantry.length);
-  const seed = () => (useHave && hasPantry ? ingredientsFromPantry(pantry ?? []) : undefined);
-
-  const go = async () => {
-    if (!text.trim()) return;
-    setError(null);
-    setState({ kind: "generating" });
-    try {
-      const recipes = await generateFromDescription(text, seed());
-      setState({ kind: "recipes", recipes });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setState({ kind: "input" });
-    }
-  };
-
-  if (state.kind === "generating")
-    return <FullscreenSpinner label="Writing your recipe…" sub="Three takes on your idea. ~10 seconds." />;
-
-  if (state.kind === "recipes")
-    return (
-      <div className="browse-screen">
-        <BackBar label="Describe again" onBack={() => setState({ kind: "input" })} />
-        <RecipesScreen
-          recipes={state.recipes}
-          ingredients={seed() ?? []}
-          onEditIngredients={() => setState({ kind: "input" })}
-          onRestart={() => setState({ kind: "input" })}
-          onCook={(r) => onCook(r, null)}
-        />
-      </div>
-    );
-
-  return (
-    <div className="describe-pane">
-      <BackBar label="Home" onBack={onBack} />
-      <h2>Describe a dish</h2>
-      <p className="muted" style={{ marginTop: 0 }}>
-        What are you in the mood for? An ingredient, a cuisine, a craving — I'll write a recipe for it.
-      </p>
-      <textarea
-        className="describe-input"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="e.g. something cozy with chicken and rice, ready in 30 minutes"
-        maxLength={400}
-        rows={3}
-      />
-      <label className={`describe-toggle${hasPantry ? "" : " disabled"}`}>
-        <input
-          type="checkbox"
-          checked={useHave && hasPantry}
-          disabled={!hasPantry}
-          onChange={(e) => setUseHave(e.target.checked)}
-        />
-        Use what's in my kitchen
-        {!hasPantry && <span className="faint"> — scan or add items first</span>}
-      </label>
-      {error && (
-        <div className="status-banner error">
-          <Icon name="triangle-exclamation" />
-          <span>{error}</span>
-        </div>
-      )}
-      <button className="btn" disabled={!text.trim()} onClick={go}>
-        <Icon name="wand" /> Create recipe
-      </button>
-    </div>
-  );
-}
-
-function FullscreenSpinner({ label, sub }: { label: string; sub?: string }) {
-  return (
-    <div className="center-spinner">
-      <div className="spinner" />
-      <div style={{ fontWeight: 500 }}>{label}</div>
-      {sub && <div className="muted" style={{ fontSize: 13 }}>{sub}</div>}
-    </div>
-  );
-}
-
-function BackBar({ label, onBack }: { label: string; onBack: () => void }) {
-  return (
-    <div className="detail-actions">
-      <button className="btn ghost" onClick={onBack}>
-        <Icon name="chevron-down" className="back-caret" /> {label}
-      </button>
-    </div>
-  );
-}
-
