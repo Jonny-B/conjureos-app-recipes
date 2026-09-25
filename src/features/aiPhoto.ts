@@ -1,5 +1,6 @@
 /**
- * AI photos for recipes: generate, stamp, upload.
+ * AI photos for recipes: generate one from scratch, or ENHANCE a real photo
+ * (ConjureOS `ai.image.edit`, 0.141+) — then stamp, upload.
  *
  *   1. ConjureOS makes the image (`ai.image.generate`, the `ai.image`
  *      permission). It is billed to the signed-in user's credits — an admin
@@ -19,6 +20,7 @@ import { uploadRecipeImage } from "../bridge/recipesApi";
 import { vfs } from "../bridge/vfs";
 import { ensureTermsAccepted } from "./terms";
 import { splitIngredient } from "./recipeLook";
+import { preparePhoto } from "./capture";
 
 /**
  * The quality tier asked of ConjureOS (owner decision, 2026-09-24). The
@@ -47,7 +49,10 @@ interface CapabilityInfo {
 }
 interface AiImageBridge {
   capabilities?: () => Promise<CapabilityInfo[]>;
-  image?: { generate?: (opts: { prompt: string; option?: string }) => Promise<GeneratedImage> };
+  image?: {
+    generate?: (opts: { prompt: string; option?: string }) => Promise<GeneratedImage>;
+    edit?: (opts: { image: string; mediaType: string; prompt: string; option?: string }) => Promise<GeneratedImage>;
+  };
 }
 
 const bridge = (): AiImageBridge | undefined =>
@@ -57,11 +62,16 @@ export function isAiPhotoAvailable(): boolean {
   return typeof bridge()?.image?.generate === "function";
 }
 
+/** True when this ConjureOS can edit an existing photo (0.141+, desktop). */
+export function isAiEnhanceAvailable(): boolean {
+  return typeof bridge()?.image?.edit === "function";
+}
+
 /** What one image costs in credits right now, or null if it can't be said. */
-export async function aiPhotoCost(): Promise<number | null> {
+export async function aiPhotoCost(capability: "image.generate" | "image.edit" = "image.generate"): Promise<number | null> {
   try {
     const caps = (await bridge()?.capabilities?.()) ?? [];
-    const cap = caps.find((c) => c.capability === "image.generate");
+    const cap = caps.find((c) => c.capability === capability);
     if (!cap || !cap.available) return null;
     const opt = cap.options.find((o) => o.id === AI_PHOTO_OPTION);
     return opt && opt.credits > 0 ? opt.credits : null;
@@ -111,6 +121,24 @@ export function recipePhotoPrompt(recipe: Pick<Recipe, "title" | "ingredients">,
 
 const LONGEST_EDGE = 1024;
 export const AI_MARK_TEXT = "AI-generated";
+/** A real photo the AI retouched: still AI-altered, so still marked. */
+export const AI_ENHANCED_MARK_TEXT = "AI-enhanced";
+
+/**
+ * The prompt for enhancing a real photo. The hard rule is fidelity: the
+ * person photographed THEIR dish, so the model may change the light, the
+ * surface and the styling around it, never the food — no new garnish, no
+ * burnt edge quietly fixed, no extra portion.
+ */
+export function recipeEnhancePrompt(recipe: Pick<Recipe, "title">): string {
+  const what = recipe.title.trim() ? ` of ${recipe.title.trim()}` : "";
+  return [
+    `Retouch this photo${what} into a professional food photograph.`,
+    "Keep the exact same food: the same dish, ingredients, portions, shapes and plate. Do not add, remove or change any food or garnish.",
+    "Improve only the photography: soft natural window light, true-to-life colour, sharp focus on the food, a clean wooden or stone table surface and a softly blurred kitchen background in place of clutter.",
+    "Photorealistic, editorial cookbook style. No text, no labels, no logos, no watermarks, no people, no hands.",
+  ].join(" ");
+}
 
 /**
  * Draw the image onto a canvas (at most 1024px on the long edge) with the
@@ -118,7 +146,7 @@ export const AI_MARK_TEXT = "AI-generated";
  * as bare base64. The mark scales with the image so it reads the same at any
  * size: a faint dark box and soft white text, about 1.7% of the width tall.
  */
-export async function stampAiMark(dataUrl: string): Promise<string> {
+export async function stampAiMark(dataUrl: string, markText: string = AI_MARK_TEXT): Promise<string> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const i = new Image();
     i.onload = () => resolve(i);
@@ -145,7 +173,7 @@ export async function stampAiMark(dataUrl: string): Promise<string> {
   // text — present and legible, not a banner across the food.
   const fontPx = Math.max(11, Math.round(w * 0.017));
   ctx.font = `500 ${fontPx}px system-ui, -apple-system, "Segoe UI", sans-serif`;
-  const textW = Math.ceil(ctx.measureText(AI_MARK_TEXT).width);
+  const textW = Math.ceil(ctx.measureText(markText).width);
   const padX = Math.round(fontPx * 0.6);
   const boxW = textW + padX * 2;
   const boxH = Math.round(fontPx * 1.7);
@@ -161,7 +189,7 @@ export async function stampAiMark(dataUrl: string): Promise<string> {
   ctx.fillRect(x, y, boxW, boxH);
   ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
   ctx.textBaseline = "middle";
-  ctx.fillText(AI_MARK_TEXT, x + padX, y + boxH / 2 + 1);
+  ctx.fillText(markText, x + padX, y + boxH / 2 + 1);
 
   const out = canvas.toDataURL("image/jpeg", 0.88);
   return out.slice(out.indexOf(",") + 1);
@@ -187,6 +215,49 @@ export async function generateRecipePhoto(
   const url = await uploadRecipeImage("image/jpeg", stamped, { ai: true });
   // The generated original sits in this app's own folder; the stamped copy is
   // the one we keep, so the unmarked file goes.
+  vfs.rm(image.path).catch(() => {});
+  return { url, credits: image.credits };
+}
+
+/** A photo already on a recipe, fetched and downscaled so it can be enhanced. */
+export async function photoFromUrl(url: string): Promise<{ mediaType: string; base64: string }> {
+  let blob: Blob;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(String(res.status));
+    blob = await res.blob();
+  } catch {
+    throw new Error("Couldn't load the current photo to enhance it.");
+  }
+  const p = await preparePhoto(blob);
+  return { mediaType: p.mediaType, base64: p.base64 };
+}
+
+/**
+ * Enhance a real photo: send it to ConjureOS's image EDIT with the fidelity
+ * prompt, stamp the result "AI-enhanced", and upload it flagged `ai` (it is
+ * AI-altered, so the recipe gets the "AI image" pill too). Returns the URL.
+ *
+ * The photo should already be downscaled (`preparePhoto`: 1280px JPEG),
+ * which keeps the input — and so the input side of the price — small.
+ */
+export async function enhanceRecipePhoto(
+  photo: { mediaType: string; base64: string },
+  recipe: Pick<Recipe, "title">,
+): Promise<{ url: string; credits: number | null }> {
+  const edit = bridge()?.image?.edit;
+  if (!edit) throw new Error("Enhancing photos needs a newer ConjureOS (desktop, 0.141 or later).");
+  // Terms BEFORE the spend, as for generating.
+  await ensureTermsAccepted();
+  const image = await edit({
+    image: photo.base64,
+    mediaType: photo.mediaType,
+    prompt: recipeEnhancePrompt(recipe),
+    option: AI_PHOTO_OPTION,
+  });
+  const b64 = (await vfs.read(image.path)).replace(/^data:[^,]*,/, "");
+  const stamped = await stampAiMark(`data:${image.mediaType};base64,${b64}`, AI_ENHANCED_MARK_TEXT);
+  const url = await uploadRecipeImage("image/jpeg", stamped, { ai: true });
   vfs.rm(image.path).catch(() => {});
   return { url, credits: image.credits };
 }

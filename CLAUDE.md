@@ -176,6 +176,26 @@ Backend half lives in ConjureOS `recipes-db` + migration `153_recipes_moderation
   Terms are checked BEFORE generating, so nobody pays for an image they can't
   save.
 
+## Recipe photos: upload, enhance, generate (0.57.0)
+
+Every place a recipe photo is set — the editor's `ImagePicker`, the open
+recipe's ••• menu, and each row of Admin → Recipes — goes through ONE hook,
+`src/hooks/usePhotoActions.tsx`, and offers the same choices:
+
+- **Upload** a photo as it is.
+- **Upload & enhance with AI** / **Enhance this photo**: ConjureOS
+  `ai.image.edit` (ConjureOS 0.141+, desktop) retouches the photo with a
+  fidelity prompt (`recipeEnhancePrompt`: the same food, only the light, the
+  surface and the styling change), stamped **"AI-enhanced"** in the pixels and
+  uploaded `ai: true`, so the recipe carries the "AI image" pill. The original
+  is uploaded FIRST and kept: "Use my original" is one tap away, because an
+  edit model can change the food and the person photographed their own dinner.
+- **Generate with AI** from scratch, stamped "AI-generated" (unchanged).
+
+An edit is quoted as a CEILING ("up to N credits") and charged what the input
+actually cost, never more. The enhance options hide themselves on a ConjureOS
+without `ai.image.edit`. Don't add a photo path that bypasses the hook.
+
 ## Visual language
 
 Squared-off angles, hairline borders, and nothing else carrying structure. The
