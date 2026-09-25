@@ -195,30 +195,66 @@ function toPayload(
 const CATALOG_PAGE = 500;
 const CATALOG_MAX_PAGES = 100; // hard stop (50k) so a misbehaving server can't spin us
 
+const CATALOG_PAGE_ATTEMPTS = 3;
+
+/**
+ * All or nothing (ConjureOS #535). A page that failed used to end the loop and
+ * return what had arrived so far, which the caller then latched as "the
+ * catalog is loaded" for the rest of the session. The list is sorted by title,
+ * so what the user saw was the top of the alphabet: the recipes starting with a
+ * number or "A", and nothing after. Each page gets a few tries; if one still
+ * fails, this throws, and the caller keeps whatever it already had and retries
+ * later rather than presenting a slice as the whole thing.
+ */
 export async function fetchCatalog(): Promise<CatalogRecipe[]> {
-  const out: DbRecipe[] = [];
+  let rows = await fetchCatalogPass();
+  // The server orders by title, and titles repeat, so a row can in principle
+  // slip between two pages. If the pass came back short of the server's own
+  // count, one more pass; after that, take what arrived, since every page did.
+  if (rows.total !== null && rows.recipes.length < rows.total) {
+    const again = await fetchCatalogPass();
+    if (again.recipes.length > rows.recipes.length) rows = again;
+  }
+  return rows.recipes.map(toCatalogRecipe);
+}
+
+async function fetchCatalogPass(): Promise<{ recipes: DbRecipe[]; total: number | null }> {
+  const byId = new Map<string, DbRecipe>();
+  let total: number | null = null;
   let offset = 0;
   // The server's effective page size — it may clamp our `limit` down, so we
   // learn it from the first full page rather than assuming CATALOG_PAGE.
   let pageSize = 0;
   for (let page = 0; page < CATALOG_MAX_PAGES; page++) {
-    const res = await fetch(apiUrl(), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "catalog", limit: CATALOG_PAGE, offset }),
-    });
-    if (!res.ok) {
-      if (out.length > 0) break; // keep whatever we already paged in
-      throw new Error(`catalog ${res.status}`);
-    }
-    const batch = ((await res.json()) as { recipes?: DbRecipe[] }).recipes ?? [];
-    out.push(...batch);
+    const j = await fetchCatalogPage(offset);
+    const batch = j.recipes ?? [];
+    if (typeof j.total === "number") total = j.total;
+    for (const r of batch) byId.set(r.id, r);
     if (batch.length === 0) break;
     pageSize = Math.max(pageSize, batch.length);
     if (batch.length < pageSize) break; // short page = last page
     offset += batch.length;
   }
-  return out.map(toCatalogRecipe);
+  return { recipes: [...byId.values()], total };
+}
+
+async function fetchCatalogPage(offset: number): Promise<{ recipes?: DbRecipe[]; total?: number }> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < CATALOG_PAGE_ATTEMPTS; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 400 * attempt));
+    try {
+      const res = await fetch(apiUrl(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "catalog", limit: CATALOG_PAGE, offset }),
+      });
+      if (res.ok) return (await res.json()) as { recipes?: DbRecipe[]; total?: number };
+      lastError = new Error(`catalog ${res.status}`);
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("catalog fetch failed");
 }
 
 /** One full catalog recipe (ingredients + instructions), fetched when opened. */

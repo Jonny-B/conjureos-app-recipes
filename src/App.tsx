@@ -5,7 +5,7 @@ import { StudioScreen } from "./screens/StudioScreen";
 import { AdminScreen } from "./screens/AdminScreen";
 import { GuidedCook } from "./screens/GuidedCook";
 import { registerActions } from "./bridge/actions";
-import { ensureCatalogLoaded } from "./features/catalog";
+import { ensureCatalogLoaded, loadRecipeBody } from "./features/catalog";
 import { markMade, unmarkMade, saveRecipe } from "./features/storage";
 import { useWhoami } from "./hooks/useWhoami";
 import { useRole } from "./hooks/useRole";
@@ -116,8 +116,14 @@ export function App() {
    * screen underneath stays mounted and merely hidden, so a search three
    * screens into the library is exactly where you left it.
    */
-  const startCook = (recipe: Recipe, saved: SavedRecipe | null = null) =>
-    setCookTarget({ recipe, saved });
+  const startCook = async (recipe: Recipe, saved: SavedRecipe | null = null) => {
+    // A catalog row is slim (no ingredients, no steps) until its body is
+    // fetched; filling it HERE, where every open lands, means no doorway can
+    // open a cook with "Ingredients 0/0" (ConjureOS #643). A no-op for a
+    // recipe that already carries its body.
+    const full = await loadRecipeBody(recipe as Recipe & { id?: string });
+    setCookTarget({ recipe: full, saved });
+  };
   const endCook = () => setCookTarget(null);
 
   const cooking = !!cookTarget;

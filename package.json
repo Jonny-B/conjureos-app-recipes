@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.56.5",
+  "version": "0.56.6",
   "description": "Recipes for ConjureOS: a library you add to, browse and cook from. Write a recipe, photograph one, or describe a dish and have one written; then cook it step by step.",
   "type": "module",
   "license": "MIT",
@@ -632,7 +632,7 @@
     "dev": "conj-pack dev",
     "build": "npx -y tsx scripts/build-bundle.mjs",
     "typecheck": "tsc -b --noEmit",
-    "test": "npx -y tsx scripts/theme.test.ts"
+    "test": "npx -y tsx scripts/theme.test.ts && npx -y tsx scripts/catalog.test.ts"
   },
   "dependencies": {
     "react": "^18.3.1",
