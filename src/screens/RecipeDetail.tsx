@@ -45,7 +45,7 @@ interface Props {
   /** Admins can give ANY recipe (catalog included) an AI photo, or take a photo off. */
   isAdmin?: boolean;
   /** The recipe's photo changed on the server; patch it into the screen's state. */
-  onImageChanged?: (patch: { imageUrl?: string; imageAi?: boolean }) => void;
+  onImageChanged?: (patch: { imageUrl?: string; imageAi?: boolean; imageCredit?: string }) => void;
 }
 
 /**
@@ -109,12 +109,13 @@ export function RecipeDetail({
       if (url === null) {
         if (feed.kind === "saved") await setOwnRecipeImage(recipeDbId, recipe, null);
         else await adminRemoveRecipeImage(recipeDbId);
-        onImageChanged?.({ imageUrl: undefined, imageAi: false });
+        onImageChanged?.({ imageUrl: undefined, imageAi: false, imageCredit: undefined });
         return;
       }
       if (feed.kind === "saved") await setOwnRecipeImage(recipeDbId, recipe, url);
       else await adminSetRecipeImage(recipeDbId, url);
-      onImageChanged?.({ imageUrl: url, imageAi: ai });
+      // A credit belongs to the photo it came with; a new photo has none.
+      onImageChanged?.({ imageUrl: url, imageAi: ai, imageCredit: undefined });
     },
   });
   const photoBusy = photo.busy;

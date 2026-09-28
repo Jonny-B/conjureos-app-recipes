@@ -18,13 +18,19 @@ import { Icon } from "../icons";
  *
  * A photo that fails to load falls back to the plate rather than leaving a
  * broken-image icon in the feed.
+ *
+ * A credited photo (migration 190) names its source in the top-right corner:
+ * the same corner, and the same quiet treatment, as the "AI-generated" stamp
+ * burned into an AI image, so that one slot always says where a picture came
+ * from. An AI image already carries its stamp in the pixels, so it gets no
+ * second label. Poster and cover only: a feed tile is too small to read it.
  */
 export function RecipePlate({
   recipe,
   category,
   variant,
 }: {
-  recipe: Pick<Recipe, "imageUrl" | "title">;
+  recipe: Pick<Recipe, "imageUrl" | "title" | "imageAi" | "imageCredit">;
   category: string | null | undefined;
   /**
    * "tile": the square in a feed row. "poster": Tonight's pick. "cover": the
@@ -41,6 +47,9 @@ export function RecipePlate({
     return (
       <div className={`plate plate--${variant} plate--photo`}>
         <img src={photo} alt="" loading="lazy" onError={() => setBroken(true)} />
+        {variant !== "tile" && recipe.imageCredit && !recipe.imageAi && (
+          <span className="plate-credit">Photo: {recipe.imageCredit}</span>
+        )}
       </div>
     );
   }

@@ -2509,6 +2509,29 @@ button.step-row { display: flex; }
    image in the wide cover, the phone band, Tonight's pick), the crop comes
    off the bottom and the top-right "AI-generated" stamp always survives. */
 .plate--photo img { width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; }
+/* A credited photo's source, in the corner an AI image carries its burned-in
+   "AI-generated" stamp (components/RecipePlate.tsx). Fixed colours, and
+   deliberately so, like the cover scrim: it sits on a photograph, not on the
+   theme, so it must read the same in both flavours, and it copies the stamp's
+   own pixel values (a 30% black box, 78% white text) so the two look like one
+   thing. */
+.plate-credit {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  max-width: calc(100% - 16px);
+  padding: 2px 7px;
+  border-radius: var(--r-0);
+  background: rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: var(--t-micro);
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
 
 /* The category word in a feed row's meta line. */
 .meta-cat {

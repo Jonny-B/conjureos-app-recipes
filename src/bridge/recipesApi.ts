@@ -69,8 +69,10 @@ interface DbRecipe {
   summary: string | null;
   blog: string | null;
   imageUrl: string | null;
-  /** True when the photo is AI-generated (server-derived, migration 153). */
+  /** True when the photo is AI-generated (server-derived, migration 157). */
   imageAi?: boolean;
+  /** Who the photo is credited to (server-derived, migration 190). */
+  imageCredit?: string | null;
   chefFeatured: boolean;
   favorite: boolean;
   tags: string[];
@@ -112,6 +114,7 @@ export function toCatalogRecipe(r: DbRecipe): CatalogRecipe {
     blog: r.blog ?? undefined,
     imageUrl: r.imageUrl ?? undefined,
     imageAi: !!r.imageAi,
+    imageCredit: r.imageCredit ?? undefined,
     chefFeatured: r.chefFeatured,
     tags: r.tags,
     sourceUrl: r.sourceUrl ?? "",
@@ -132,6 +135,7 @@ export function toSavedRecipe(r: DbRecipe): SavedRecipe {
     blog: r.blog ?? undefined,
     imageUrl: r.imageUrl ?? undefined,
     imageAi: !!r.imageAi,
+    imageCredit: r.imageCredit ?? undefined,
     chefFeatured: r.chefFeatured,
     path: `db:${r.id}`,
     slug: r.id,
@@ -582,6 +586,7 @@ export interface ModRecipe {
   visibility: string;
   imageUrl: string | null;
   imageAi: boolean;
+  imageCredit?: string | null;
   chefFeatured: boolean;
   createdAt: string;
 }
