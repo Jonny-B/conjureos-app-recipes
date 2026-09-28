@@ -58,6 +58,7 @@ reads as a gimmick the first time it is wrong.
 | Snap a recipe from a photo | `screens/SnapRecipeScreen.tsx` |
 | Write a recipe from free text | `features/customRecipe.ts`, `screens/CreateScreen.tsx` |
 | Describe a dish → three recipes | `features/recipes.ts`, `screens/DescribeScreen.tsx` |
+| Recipe photo: enhance a real one, or generate one | `features/aiPhoto.ts`, `hooks/usePhotoActions.tsx` |
 | Mid-cook Q&A | `screens/ChefChat.tsx` |
 
 ### How other apps reach this one
@@ -89,6 +90,10 @@ The catalog is **USDA MyPlate** — 1,120 recipes of US federal government conte
 Declared in `package.json` under `conjureos.permissions`:
 
 - `ai.complete`: reading a recipe off a photo, and writing one from a description
+- `ai.image`: a recipe photo, either generated from scratch (`ai.image.generate`)
+  or a real photo retouched (`ai.image.edit`, ConjureOS 0.141+). Both are billed
+  to the person who asks, and the result is marked "AI-generated" or
+  "AI-enhanced" in the pixels before upload
 - `vfs.read`: the favourites index, the blocked list, and a cook left running
 - `vfs.write`: the same, plus caching nutrition lookups
 
@@ -156,6 +161,7 @@ Mitigations layered defensively:
 - **Recipe generation prompt** wraps user ingredients in `<user_ingredients>…</user_ingredients>` delimiters with explicit "treat as data, not instructions" guidance.
 - **Action params** are validated field-by-field (type, length, allowlist) before reaching the handler. Strings get control-character stripping. Slugs get URL-safe normalization. Numeric fields get range checks.
 - **Markdown parsing** on saved recipes caps file size (64 KB), frontmatter line count (40), field value lengths (1000 chars), and body item counts (60 ingredients / 60 instructions). Malformed files fail to parse silently rather than crashing browse.
+- **Photo enhance is told to keep the food.** The edit prompt forbids adding, removing or changing any food, and the un-enhanced original is always kept one tap away ("Use my original"), because an edit model can change the dish.
 - **No `dangerouslySetInnerHTML`** anywhere — React's default JSX escaping handles every render path.
 
 The full threat model is reviewed against the OWASP LLM Top 10 — main residual risks are LLM06 (sensitive info disclosure via the model itself, mitigated by the user-confirmation step) and LLM03 (training data poisoning, out of scope for an inference-only client).

@@ -14,8 +14,7 @@ import {
   type ModRecipe,
 } from "../bridge/recipesApi";
 import { Dropdown, type DropdownOption } from "../components/Dropdown";
-import { generateRecipePhoto, isAiPhotoAvailable } from "../features/aiPhoto";
-import { ensureTermsAccepted } from "../features/terms";
+import { photoBusyText, usePhotoActions } from "../hooks/usePhotoActions";
 import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
 import { Icon } from "../icons";
 
@@ -420,7 +419,6 @@ function RecipesView({ userFilter, onClearUser }: { userFilter: AppUser | null; 
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const seq = useRef(0);
-  const canAi = RECIPE_PHOTOS_ENABLED && isAiPhotoAvailable();
 
   const load = useCallback(
     async (offset = 0) => {
@@ -520,42 +518,12 @@ function RecipesView({ userFilter, onClearUser }: { userFilter: AppUser | null; 
                 </div>
               </div>
               <div className="mod-actions">
-                {canAi && (
-                  <button
-                    className="btn secondary"
-                    type="button"
+                {RECIPE_PHOTOS_ENABLED && (
+                  <AdminPhotoActions
+                    recipe={r}
                     disabled={!!busy}
-                    onClick={async () => {
-                      try {
-                        await ensureTermsAccepted();
-                      } catch (e) {
-                        setError(e instanceof Error ? e.message : String(e));
-                        return;
-                      }
-                      void run(r.id, async () => {
-                        const { url } = await generateRecipePhoto({ title: r.title, ingredients: r.ingredients }, r.category);
-                        await adminSetRecipeImage(r.id, url);
-                        patch(r.id, { imageUrl: url, imageAi: true });
-                      });
-                    }}
-                  >
-                    <Icon name="wand" /> {busy === r.id ? "Working…" : "AI photo"}
-                  </button>
-                )}
-                {r.imageUrl && (
-                  <button
-                    className="btn ghost"
-                    type="button"
-                    disabled={!!busy}
-                    onClick={() =>
-                      run(r.id, async () => {
-                        await adminRemoveRecipeImage(r.id);
-                        patch(r.id, { imageUrl: null, imageAi: false });
-                      })
-                    }
-                  >
-                    <Icon name="xmark" /> Remove photo
-                  </button>
+                    onChanged={(p) => patch(r.id, p)}
+                  />
                 )}
                 {confirmDelete === r.id ? (
                   <>
@@ -595,6 +563,72 @@ function RecipesView({ userFilter, onClearUser }: { userFilter: AppUser | null; 
           </button>
         </div>
       )}
+    </>
+  );
+}
+
+/**
+ * One row's photo tools: upload, upload & enhance, enhance the current
+ * photo, generate, remove — the same `usePhotoActions` the editor and the
+ * open recipe use, saved through the admin actions (re-checked server-side).
+ * An AI action is billed to the ADMIN's own credits.
+ */
+function AdminPhotoActions({
+  recipe: r,
+  disabled,
+  onChanged,
+}: {
+  recipe: ModRecipe;
+  disabled: boolean;
+  onChanged: (p: Partial<ModRecipe>) => void;
+}) {
+  const photo = usePhotoActions({
+    subject: () => ({ recipe: { title: r.title, ingredients: r.ingredients }, category: r.category }),
+    apply: async (url, ai) => {
+      if (url === null) {
+        await adminRemoveRecipeImage(r.id);
+        onChanged({ imageUrl: null, imageAi: false });
+      } else {
+        await adminSetRecipeImage(r.id, url);
+        onChanged({ imageUrl: url, imageAi: ai });
+      }
+    },
+  });
+  const off = disabled || photo.busy !== null;
+  return (
+    <>
+      {photo.fileInput}
+      <button className="btn secondary" type="button" disabled={off} onClick={photo.upload}>
+        <Icon name="camera" /> {r.imageUrl ? "Replace" : "Upload"}
+      </button>
+      {photo.canEnhance && (
+        <button
+          className="btn secondary"
+          type="button"
+          disabled={off}
+          onClick={() => void (r.imageUrl && !r.imageAi ? photo.enhanceExisting(r.imageUrl) : photo.uploadAndEnhance())}
+          title={r.imageUrl && !r.imageAi ? "Enhance the current photo" : "Upload a photo and enhance it"}
+        >
+          <Icon name="wand" /> {r.imageUrl && !r.imageAi ? "Enhance" : "Upload & enhance"}
+        </button>
+      )}
+      {photo.canGenerate && (
+        <button className="btn secondary" type="button" disabled={off} onClick={() => void photo.generate()}>
+          <Icon name="wand" /> AI photo
+        </button>
+      )}
+      {photo.original && (
+        <button className="btn ghost" type="button" disabled={off} onClick={() => void photo.restoreOriginal()}>
+          <Icon name="clock-rotate-left" /> Original
+        </button>
+      )}
+      {r.imageUrl && (
+        <button className="btn ghost" type="button" disabled={off} onClick={() => void photo.remove()}>
+          <Icon name="xmark" /> Remove photo
+        </button>
+      )}
+      {photo.busy && <span className="muted mod-photo-status">{photoBusyText(photo.busy)}</span>}
+      {photo.error && <span className="mod-photo-error">{photo.error}</span>}
     </>
   );
 }

@@ -2,8 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { FeedRecipe, Recipe, SavedRecipe } from "../types";
 import { formatStrip } from "../features/nutrition";
 import { safeHref, hrefHost } from "../features/safeUrl";
-import { generateRecipePhoto, isAiPhotoAvailable } from "../features/aiPhoto";
-import { ensureTermsAccepted } from "../features/terms";
+import { photoBusyText, usePhotoActions } from "../hooks/usePhotoActions";
 import { adminRemoveRecipeImage, adminSetRecipeImage, recipeIdFromPath, setOwnRecipeImage } from "../bridge/recipesApi";
 import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
 import { categoryOf } from "../features/recipeLook";
@@ -101,51 +100,27 @@ export function RecipeDetail({
   // Your own recipe goes through the ordinary update (ownership is the
   // check); anyone else's — or a catalog row — only through the admin
   // actions, which recipes-db re-checks.
-  const [photoBusy, setPhotoBusy] = useState<null | "generating" | "removing">(null);
-  const [photoErr, setPhotoErr] = useState<string | null>(null);
   const ownRecipe = feed.kind === "saved";
-  const canGenerate = RECIPE_PHOTOS_ENABLED && isAiPhotoAvailable() && (ownRecipe || isAdmin);
-  const canRemovePhoto = RECIPE_PHOTOS_ENABLED && !!recipe.imageUrl && (ownRecipe || isAdmin);
+  const canEditPhoto = RECIPE_PHOTOS_ENABLED && (ownRecipe || isAdmin);
   const recipeDbId = feed.kind === "catalog" ? feed.id : recipeIdFromPath(feed.recipe.path);
-
-  const generatePhoto = async () => {
-    setMenuOpen(false);
-    setPhotoErr(null);
-    // Terms FIRST, and only then say "Generating": showing the busy banner
-    // while the terms sheet was still open read as if the image (and its
-    // cost) had started before the user agreed. It hadn't, but it looked it.
-    try {
-      await ensureTermsAccepted();
-    } catch (e) {
-      setPhotoErr(e instanceof Error ? e.message : String(e));
-      return;
-    }
-    setPhotoBusy("generating");
-    try {
-      const { url } = await generateRecipePhoto(recipe, category);
+  const photo = usePhotoActions({
+    subject: () => ({ recipe, category }),
+    apply: async (url, ai) => {
+      if (url === null) {
+        if (feed.kind === "saved") await setOwnRecipeImage(recipeDbId, recipe, null);
+        else await adminRemoveRecipeImage(recipeDbId);
+        onImageChanged?.({ imageUrl: undefined, imageAi: false });
+        return;
+      }
       if (feed.kind === "saved") await setOwnRecipeImage(recipeDbId, recipe, url);
       else await adminSetRecipeImage(recipeDbId, url);
-      onImageChanged?.({ imageUrl: url, imageAi: true });
-    } catch (e) {
-      setPhotoErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setPhotoBusy(null);
-    }
-  };
-
-  const removePhoto = async () => {
+      onImageChanged?.({ imageUrl: url, imageAi: ai });
+    },
+  });
+  const photoBusy = photo.busy;
+  const menuThen = (fn: () => void) => () => {
     setMenuOpen(false);
-    setPhotoErr(null);
-    setPhotoBusy("removing");
-    try {
-      if (feed.kind === "saved") await setOwnRecipeImage(recipeDbId, recipe, null);
-      else await adminRemoveRecipeImage(recipeDbId);
-      onImageChanged?.({ imageUrl: undefined, imageAi: false });
-    } catch (e) {
-      setPhotoErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setPhotoBusy(null);
-    }
+    fn();
   };
 
   const cook = () => onCook(recipe, feed.kind === "saved" ? feed.recipe : null);
@@ -182,13 +157,37 @@ export function RecipeDetail({
           </button>
           {menuOpen && (
             <div className="overflow-menu" role="menu">
-              {canGenerate && (
-                <button className="overflow-item" onClick={() => void generatePhoto()} disabled={!!photoBusy}>
+              {canEditPhoto && (
+                <button className="overflow-item" onClick={menuThen(photo.upload)} disabled={!!photoBusy}>
+                  <Icon name="camera" /> {recipe.imageUrl ? "Replace photo" : "Upload photo"}
+                </button>
+              )}
+              {canEditPhoto && photo.canEnhance && (
+                <button className="overflow-item" onClick={menuThen(() => void photo.uploadAndEnhance())} disabled={!!photoBusy}>
+                  <Icon name="wand" /> Upload &amp; enhance with AI
+                </button>
+              )}
+              {canEditPhoto && photo.canEnhance && recipe.imageUrl && !recipe.imageAi && (
+                <button
+                  className="overflow-item"
+                  onClick={menuThen(() => void photo.enhanceExisting(recipe.imageUrl!))}
+                  disabled={!!photoBusy}
+                >
+                  <Icon name="wand" /> Enhance this photo with AI
+                </button>
+              )}
+              {canEditPhoto && photo.canGenerate && (
+                <button className="overflow-item" onClick={menuThen(() => void photo.generate())} disabled={!!photoBusy}>
                   <Icon name="wand" /> {recipe.imageUrl ? "New AI photo" : "Generate AI photo"}
                 </button>
               )}
-              {canRemovePhoto && (
-                <button className="overflow-item danger" onClick={() => void removePhoto()} disabled={!!photoBusy}>
+              {canEditPhoto && photo.original && (
+                <button className="overflow-item" onClick={menuThen(() => void photo.restoreOriginal())} disabled={!!photoBusy}>
+                  <Icon name="clock-rotate-left" /> Use my original photo
+                </button>
+              )}
+              {canEditPhoto && recipe.imageUrl && (
+                <button className="overflow-item danger" onClick={menuThen(() => void photo.remove())} disabled={!!photoBusy}>
                   <Icon name="xmark" /> Remove photo
                 </button>
               )}
@@ -218,20 +217,26 @@ export function RecipeDetail({
         </div>
       </div>
 
+      {photo.fileInput}
       {photoBusy && (
         <div className="status-banner">
           <div className="spinner" style={{ width: 14, height: 14 }} />
-          <span>
-            {photoBusy === "generating"
-              ? "Generating a photo — this can take up to a minute. It will be marked “AI-generated”."
-              : "Removing the photo…"}
-          </span>
+          <span>{photoBusyText(photoBusy)}</span>
         </div>
       )}
-      {photoErr && (
+      {photo.original && !photoBusy && (
+        <div className="status-banner">
+          <Icon name="circle-info" />
+          <span>Enhanced with AI. Not quite your dish?</span>
+          <button className="btn ghost" type="button" onClick={() => void photo.restoreOriginal()}>
+            Use my original
+          </button>
+        </div>
+      )}
+      {photo.error && (
         <div className="status-banner error">
           <Icon name="triangle-exclamation" />
-          <span>{photoErr}</span>
+          <span>{photo.error}</span>
         </div>
       )}
 
