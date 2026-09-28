@@ -1477,7 +1477,10 @@ select {
  * widening it flips to this one, which is the behaviour you'd want. */
 @media (min-width: 860px) and (pointer: fine) {
   .app {
-    max-width: 1600px;
+    /* Fill the window. Capping the whole shell at 1600px left an extra-large
+       window with dead bands either side of a floating app (ConjureOS #996);
+       the reading measure lives on the content instead. */
+    max-width: none;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
@@ -1613,8 +1616,15 @@ select {
 /* Above ~1500px the two-column recipe grid leaves rows uncomfortably long;
    let it find a third column instead of stretching. */
 @media (min-width: 1500px) and (pointer: fine) {
-  .browse-screen,
-  .home-screen { max-width: 1360px; }
+  .browse-screen { max-width: 1360px; }
+}
+
+/* Extra-large windows (ConjureOS #996): widen the library so a fourth column
+   fits rather than leaving half the screen empty. The open recipe keeps its
+   own 960px reading measure (.detail-screen, the owner's mockup). */
+@media (min-width: 1800px) and (pointer: fine) {
+  .browse-screen:not(.detail-screen) { max-width: 1640px; }
+  .app-body { padding-left: 56px; padding-right: 56px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
