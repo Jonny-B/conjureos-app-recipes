@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.58.0",
+  "version": "0.59.0",
   "description": "Recipes for ConjureOS: a library you add to, browse and cook from. Write a recipe, photograph one, or describe a dish and have one written; then cook it step by step.",
   "type": "module",
   "license": "MIT",
@@ -35,6 +35,15 @@
               "minimum": 0,
               "maximum": 500,
               "description": "Max recipes to return (default 50)."
+            },
+            "favoritesOnly": {
+              "type": "boolean",
+              "description": "Only the recipes the user has marked favourite."
+            },
+            "cookedSince": {
+              "type": "string",
+              "maxLength": 40,
+              "description": "ISO date or timestamp. Only recipes whose most recent cook (lastMadeAt) is on or after it, most recent first. A recipe cooked twice in the window counts once."
             }
           }
         },
@@ -131,6 +140,10 @@
                       "total",
                       "est"
                     ]
+                  },
+                  "favorite": {
+                    "type": "boolean",
+                    "description": "Marked favourite by the user."
                   }
                 },
                 "required": [
@@ -374,6 +387,13 @@
             "lastMadeAt": {
               "type": "string",
               "description": "ISO timestamp of this cook."
+            },
+            "previousLastMadeAt": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "lastMadeAt before this cook. Pass it to unmarkCooked to undo exactly."
             }
           },
           "required": [
@@ -518,7 +538,7 @@
       },
       "setBlocked": {
         "permission": "actions.write",
-        "description": "Stop (or resume) the week planner suggesting a catalog recipe. Affects RECOMMENDATIONS only \u2014 the recipe stays searchable, openable and cookable. Reversible.",
+        "description": "Stop (or resume) the week planner suggesting a catalog recipe. Affects RECOMMENDATIONS only — the recipe stays searchable, openable and cookable. Reversible.",
         "params": {
           "type": "object",
           "properties": {
@@ -609,9 +629,405 @@
             },
             "saved": {
               "type": "boolean",
-              "description": "Always false \u2014 this action never persists."
+              "description": "Always false — this action never persists."
             }
           }
+        }
+      },
+      "unmarkCooked": {
+        "permission": "actions.write",
+        "description": "Undo one markCooked on a saved recipe: madeCount goes down by one. Pass markCooked's previousLastMadeAt to restore lastMadeAt exactly; without it the latest timestamp is kept. Fails if the recipe has never been cooked.",
+        "params": {
+          "type": "object",
+          "properties": {
+            "slug": {
+              "type": "string",
+              "maxLength": 80,
+              "description": "URL-safe recipe id (lowercase letters, digits, hyphens), as listRecipes returns it."
+            },
+            "previousLastMadeAt": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 40,
+              "description": "The previousLastMadeAt markCooked returned."
+            }
+          },
+          "required": [
+            "slug"
+          ]
+        },
+        "returns": {
+          "type": "object",
+          "properties": {
+            "madeCount": {
+              "type": "integer"
+            },
+            "lastMadeAt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "madeCount",
+            "lastMadeAt"
+          ]
+        }
+      },
+      "getCatalogRecipe": {
+        "permission": "actions.read",
+        "description": "Fetch one catalog recipe in full by the id searchRecipes returned: ingredient lines, instructions, nutrition, photo and its credit. searchRecipes carries only canonical ingredient names; use this to show or cook the recipe.",
+        "params": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "maxLength": 64,
+              "description": "Catalog recipe id from searchRecipes or listChefPicks."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        "returns": {
+          "type": "object",
+          "properties": {
+            "recipe": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "description": "The full recipe (id, title, summary, category, tags, difficulty, cookTime, servings, ingredients as lines, instructions, tokens as canonical ingredient names, nutrition, imageUrl, imageAi, imageCredit, sourceUrl), or null if there is no such recipe."
+            }
+          },
+          "required": [
+            "recipe"
+          ]
+        }
+      },
+      "getSharedRecipe": {
+        "permission": "actions.read",
+        "description": "Fetch a recipe someone shared by link, by the share token in the link. Only public and unlisted recipes resolve; a private or revoked one returns null.",
+        "params": {
+          "type": "object",
+          "properties": {
+            "shareToken": {
+              "type": "string",
+              "maxLength": 64,
+              "description": "The hex token from a Recipes share link."
+            }
+          },
+          "required": [
+            "shareToken"
+          ]
+        },
+        "returns": {
+          "type": "object",
+          "properties": {
+            "recipe": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "description": "The full recipe (id, title, summary, category, tags, difficulty, cookTime, servings, ingredients as lines, instructions, tokens as canonical ingredient names, nutrition, imageUrl, imageAi, imageCredit, sourceUrl), or null if there is no such recipe."
+            }
+          },
+          "required": [
+            "recipe"
+          ]
+        }
+      },
+      "listChefPicks": {
+        "permission": "actions.read",
+        "description": "The featured chef recipes, newest first (the app's own featured shelf). Summaries only; getCatalogRecipe with an id gives the full recipe.",
+        "params": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "description": "Max recipes (default 12)."
+            }
+          }
+        },
+        "returns": {
+          "type": "object",
+          "properties": {
+            "recipes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  },
+                  "category": {
+                    "type": "string"
+                  },
+                  "difficulty": {
+                    "type": "string"
+                  },
+                  "cookTime": {
+                    "type": "integer"
+                  },
+                  "servings": {
+                    "type": "integer"
+                  },
+                  "ingredients": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Canonical ingredient names."
+                  },
+                  "imageUrl": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "title"
+                ]
+              }
+            }
+          },
+          "required": [
+            "recipes"
+          ]
+        }
+      },
+      "parseIngredients": {
+        "permission": "actions.read",
+        "description": "Split ingredient lines into quantity, unit and food name, with a rough weight in grams (volume converts at about the density of water, so a cup of oats reads 240 g). Pure: reads and writes nothing. Fields a line doesn't state are null, never guessed.",
+        "params": {
+          "type": "object",
+          "properties": {
+            "lines": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "minItems": 1,
+              "maxItems": 60,
+              "description": "Ingredient lines, e.g. \"1 1/2 cups rolled oats\"."
+            }
+          },
+          "required": [
+            "lines"
+          ]
+        },
+        "returns": {
+          "type": "object",
+          "properties": {
+            "ingredients": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "line": {
+                    "type": "string"
+                  },
+                  "quantity": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "unit": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "grams": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "line",
+                  "quantity",
+                  "unit",
+                  "name",
+                  "grams"
+                ]
+              }
+            }
+          },
+          "required": [
+            "ingredients"
+          ]
+        }
+      },
+      "estimateNutrition": {
+        "permission": "actions.read",
+        "description": "Estimate per-serving calories, protein, fat and carbs for any list of ingredient lines, by USDA FoodData Central lookup (the same estimate the app shows). An estimate: matched/total says how much of the list it read. The lookup is rate-limited; rateLimited: true means the figure is short for that reason and worth retrying later.",
+        "params": {
+          "type": "object",
+          "properties": {
+            "ingredients": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "minItems": 1,
+              "maxItems": 60,
+              "description": "Ingredient lines with quantities."
+            },
+            "servings": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64,
+              "description": "Servings the lines make (default 1)."
+            }
+          },
+          "required": [
+            "ingredients"
+          ]
+        },
+        "returns": {
+          "type": "object",
+          "properties": {
+            "nutrition": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "description": "Per-serving estimate: calories, protein, fat, carbs (rounded), matched/total ingredients read, est: true."
+            },
+            "rateLimited": {
+              "type": "boolean"
+            },
+            "missedDueToRateLimit": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "nutrition",
+            "rateLimited",
+            "missedDueToRateLimit"
+          ]
+        }
+      },
+      "scaleRecipe": {
+        "permission": "actions.read",
+        "description": "Rescale any recipe to a serving count: a saved one (slug), a catalog one (id), or one you pass in (recipe). Returns cook-readable quantities (\"1 1/2 cups\"); lines without a quantity come back unchanged. Never saves anything.",
+        "params": {
+          "type": "object",
+          "properties": {
+            "slug": {
+              "type": "string",
+              "maxLength": 80,
+              "description": "URL-safe recipe id (lowercase letters, digits, hyphens), as listRecipes returns it."
+            },
+            "id": {
+              "type": "string",
+              "maxLength": 64,
+              "description": "Catalog recipe id."
+            },
+            "recipe": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                "servings": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 64
+                },
+                "ingredients": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "minItems": 1,
+                  "maxItems": 60,
+                  "description": "Ingredient lines."
+                },
+                "nutrition": {
+                  "type": "object"
+                }
+              },
+              "required": [
+                "servings",
+                "ingredients"
+              ]
+            },
+            "servings": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64,
+              "description": "Target servings."
+            }
+          },
+          "required": [
+            "servings"
+          ],
+          "description": "Pass exactly one of slug, id or recipe."
+        },
+        "returns": {
+          "type": "object",
+          "properties": {
+            "slug": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "servings": {
+              "type": "integer"
+            },
+            "ingredients": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "nutrition": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "description": "Per-serving estimate: calories, protein, fat, carbs (rounded), matched/total ingredients read, est: true."
+            },
+            "saved": {
+              "type": "boolean",
+              "description": "Always false."
+            }
+          },
+          "required": [
+            "title",
+            "servings",
+            "ingredients",
+            "saved"
+          ]
         }
       }
     },

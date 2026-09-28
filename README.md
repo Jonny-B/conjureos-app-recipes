@@ -133,16 +133,45 @@ Installed users see the new version as an update. Full mechanics, secrets, and t
 
 ## Cross-app integration
 
-The app registers four actions via ConjureOS's [Phase 13a action bridge](https://github.com/Jonny-B/ConjureOS) so other installed apps (calorie trackers, meal planners, shopping lists, etc.) can read from and write to the user's recipe library:
+The app registers eighteen actions via ConjureOS's [action bridge](https://github.com/Jonny-B/ConjureOS) so other installed apps (calorie trackers, meal planners, shopping lists, the Chat orchestrator) can use the recipe library. Each is declared in `package.json` → `conjureos.actions` with a JSON schema for its params and its result, and implemented in `src/bridge/actions.ts`.
+
+**The user's library** (saved recipes; `slug` is the id `listRecipes` returns)
 
 | Action | Scope | What it does |
 |---|---|---|
-| `listRecipes({ filter?, limit? })` | read | List saved recipes; filter is a title/ingredient substring |
-| `getRecipe({ slug })` | read | Fetch one recipe with full ingredients + instructions + nutrition |
-| `addRecipe({ recipe })` | write | Save a recipe (meal-planner push, etc.) — prompts user on first invocation |
-| `markCooked({ slug })` | write | Bump made-counter + lastMadeAt — prompts user on first invocation |
+| `listRecipes({ filter?, limit?, favoritesOnly?, cookedSince? })` | read | Saved recipes. `filter` is a title/summary/ingredient substring; `cookedSince` (ISO date) keeps the ones last cooked on or after it, newest first |
+| `getRecipe({ slug })` | read | One saved recipe in full: ingredients, instructions, nutrition |
+| `scaleSavedRecipe({ slug, servings })` | read | A saved recipe rescaled; the stored copy is untouched |
+| `addRecipe({ recipe })` | write | Save a recipe |
+| `importRecipeFromImage({ images })` | write | Transcribe a photographed recipe and save it (no review step) |
+| `markCooked({ slug })` | write | Bump the made-counter and `lastMadeAt`; returns `previousLastMadeAt` for an exact undo |
+| `unmarkCooked({ slug, previousLastMadeAt? })` | write | Undo one `markCooked` |
+| `setFavorite({ slug, favorite })` | write | Mark or unmark a favourite |
 
-Reads (`actions.read`) never prompt — they're side-effect-free. Writes (`actions.write`) trigger ConjureOS's one-time grant dialog; the user picks Allow once / Always / Block per caller-app, per-action.
+**The catalog** (1,240 public recipes; `id` is the id `searchRecipes` returns)
+
+| Action | Scope | What it does |
+|---|---|---|
+| `searchRecipes({ query?, category?, limit? })` | read | Search the catalog. `ingredients` are canonical names ("chicken breasts"), not lines |
+| `getCatalogRecipe({ id })` | read | One catalog recipe in full: ingredient lines, instructions, nutrition, photo and its credit |
+| `listCategories()` | read | The category taxonomy with counts |
+| `listChefPicks({ limit? })` | read | The featured chef recipes, newest first |
+| `getSharedRecipe({ shareToken })` | read | A recipe from a share link (public or unlisted only) |
+| `setBlocked({ id, blocked })` / `getBlocked()` | write / read | Stop (or resume) a catalog recipe being suggested; it stays searchable |
+
+**Recipe tools** (pure: they read and write nothing of the user's)
+
+| Action | Scope | What it does |
+|---|---|---|
+| `parseIngredients({ lines })` | read | Each line split into `quantity`, `unit`, `name` and a rough `grams`; anything a line doesn't state is null |
+| `estimateNutrition({ ingredients, servings? })` | read | Per-serving calories/protein/fat/carbs by USDA lookup, the estimate this app shows. `rateLimited: true` means retry later |
+| `scaleRecipe({ slug \| id \| recipe, servings })` | read | Rescale a saved recipe, a catalog recipe, or lines you pass in. Never saves |
+
+Reads (`actions.read`) never prompt: they're side-effect-free. Writes (`actions.write`) trigger ConjureOS's one-time grant dialog when another app calls them; the user picks Allow once / Always / Block per caller app, per action. The orchestrator (Chat) is trusted shell code and is not prompted, which is why deleting a recipe, publishing one, and every admin function are deliberately **not** actions (see the header of `src/bridge/actions.ts`).
+
+Every param is validated strictly (types, lengths, id formats); a bad one is rejected with a message, never repaired into a different request. A read that can't reach the backend fails rather than answering empty, because "no recipes" and "couldn't look" lead a caller to different decisions.
+
+`listRecipes`, `searchRecipes` and `getRecipe` are Conjure Pantry's contract (see [How other apps reach this one](#how-other-apps-reach-this-one)); `getCatalogRecipe` and `getSharedRecipe` also satisfy its `recipe` shape. Check `conjureos-pantry/scripts/needs.test.ts` before changing any `returns` schema.
 
 ## Security posture
 
@@ -150,7 +179,7 @@ This app accepts untrusted input from three sources:
 
 1. **Photos** (vision call) — an adversarial image with embedded text could try to redirect the model.
 2. **User-typed ingredient names** — a user can type anything; threat is mostly self-attack.
-3. **Cross-app action params** — another installed app could pass malicious payloads to `addRecipe` / `markCooked`.
+3. **Cross-app action params** — another installed app could pass malicious payloads to any action (`addRecipe`, `markCooked`, `scaleRecipe`, …).
 
 Mitigations layered defensively:
 

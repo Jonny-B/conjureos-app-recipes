@@ -268,7 +268,11 @@ export async function fetchCatalogRecipe(id: string): Promise<CatalogRecipe | nu
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "catalogGet", id }),
   });
-  if (!res.ok) return null;
+  // Only a 404 means "no such recipe". Anything else is the backend being
+  // unreachable, and answering null would tell a cross-app caller (the
+  // getCatalogRecipe action) that the recipe doesn't exist.
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`catalogGet ${res.status}`);
   const j = (await res.json()) as { recipe?: DbRecipe };
   return j.recipe ? toCatalogRecipe(j.recipe) : null;
 }
