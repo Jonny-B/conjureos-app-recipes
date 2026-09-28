@@ -82,6 +82,11 @@ export interface Recipe {
   imageUrl?: string;
   /** True when imageUrl is an AI-generated image (server-set; stamped on the pixels). */
   imageAi?: boolean;
+  /**
+   * Who the photo is credited to (server-set, migration 189), shown in the
+   * picture's top-right corner, the slot an AI image's stamp uses.
+   */
+  imageCredit?: string;
   /** True when this is a promoted "Chef Payson" recipe (server-set). */
   chefFeatured?: boolean;
 }

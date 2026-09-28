@@ -29,6 +29,7 @@
  *     node scripts/import-usda-photos.mjs --dry-run     # show what it would do
  *   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
  *     node scripts/import-usda-photos.mjs               # do it
+ *   ... node scripts/import-usda-photos.mjs --credit-only  # only set image_credit
  *
  * Undo (SQL editor, per project) — clears only what this script set:
  *   update public.recipes set image_url = null
@@ -46,6 +47,11 @@ const BUCKET = "recipe-images";
 const PREFIX = "usda-myplate";
 
 const DRY = process.argv.includes("--dry-run");
+// --credit-only: set image_credit on rows that already have their USDA photo,
+// without fetching or uploading anything (migration 189 came after the first
+// import on both projects).
+const CREDIT_ONLY = process.argv.includes("--credit-only");
+const CREDIT = "USDA MyPlate";
 const URL_BASE = (process.env.SUPABASE_URL || "").replace(/\/+$/, "");
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 if (!URL_BASE || !KEY) {
@@ -104,10 +110,25 @@ async function setImageUrl(entry, publicUrl) {
   const res = await fetch(`${URL_BASE}/rest/v1/recipes?${q}`, {
     method: "PATCH",
     headers: { ...auth, "Content-Type": "application/json", Prefer: "return=representation" },
-    body: JSON.stringify({ image_url: publicUrl }),
+    body: JSON.stringify({ image_url: publicUrl, image_credit: CREDIT }),
   });
   if (!res.ok) throw new Error(`update ${res.status}: ${await res.text()}`);
   return (await res.json()).length;
+}
+
+if (CREDIT_ONLY) {
+  const q = new URLSearchParams({ provenance: "eq.usda-myplate", image_url: "like.*/recipe-images/usda-myplate/*" });
+  const res = await fetch(`${URL_BASE}/rest/v1/recipes?${q}`, {
+    method: "PATCH",
+    headers: { ...auth, "Content-Type": "application/json", Prefer: "return=representation" },
+    body: JSON.stringify({ image_credit: CREDIT }),
+  });
+  if (!res.ok) {
+    console.error(`credit update ${res.status}: ${await res.text()}`);
+    process.exit(1);
+  }
+  console.log(`credited ${(await res.json()).length} USDA photos "${CREDIT}"`);
+  process.exit(0);
 }
 
 const manifest = JSON.parse(readFileSync(MANIFEST, "utf8"));

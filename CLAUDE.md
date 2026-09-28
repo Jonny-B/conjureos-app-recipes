@@ -150,6 +150,26 @@ that list to the `recipe-images` bucket and sets `image_url` (needs the
 project's service-role key, run once per project). Never widen that list to
 partner-credited photos without the partner's permission.
 
+**NHLBI "Keep the Beat" recipes** (0.58.0, owner decision 2026-09-28): 120
+more recipes from the National Heart, Lung, and Blood Institute (NIH, federal),
+`provenance='nhlbi'`. `scripts/nhlbi-census.py` reads NHLBI's live recipe pages
+(clean text, no photos) and two cookbook PDFs still hosted on nhlbi.nih.gov
+(photos embedded), parses the PDFs by position, pairs photos with recipes by
+page layout, dedupes against the catalog, and writes `scripts/nhlbi-recipes.json`;
+`scripts/import-nhlbi.mjs` imports exactly that list (idempotent, per project,
+service-role key). The photo pairing was checked by eye on a contact sheet;
+`NOT_THE_DISH` in the census names the ones rejected.
+
+**Photo credits** (owner decision, 2026-09-28): photos published free for reuse
+alongside free recipes are used without chasing each photo's rights, and any
+stated credit is SHOWN. `recipes.image_credit` (ConjureOS migration 189) is
+shown by `RecipePlate` in the picture's top-right corner, the same slot and
+look as the AI stamp, on the poster and the open recipe (a tile is too small).
+Only the import scripts write it; recipes-db derives it for every other write
+from the catalog row with the same `image_url`, so it is never client text.
+NHLBI photos: "Ben Fink Photography / NHLBI" (the cookbooks' own credit).
+MyPlate photos: "USDA MyPlate" (`import-usda-photos.mjs --credit-only`).
+
 ## Moderation, bans, terms and AI photos (0.56.0)
 
 Backend half lives in ConjureOS `recipes-db` + migration `157_recipes_moderation`.

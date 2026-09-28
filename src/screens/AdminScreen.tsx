@@ -587,10 +587,10 @@ function AdminPhotoActions({
     apply: async (url, ai) => {
       if (url === null) {
         await adminRemoveRecipeImage(r.id);
-        onChanged({ imageUrl: null, imageAi: false });
+        onChanged({ imageUrl: null, imageAi: false, imageCredit: null });
       } else {
         await adminSetRecipeImage(r.id, url);
-        onChanged({ imageUrl: url, imageAi: ai });
+        onChanged({ imageUrl: url, imageAi: ai, imageCredit: null });
       }
     },
   });
