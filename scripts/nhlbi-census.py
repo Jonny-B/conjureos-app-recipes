@@ -94,6 +94,8 @@ HEAD_CATEGORY = [
     (r"pancakes?|waffles?|toast|fritters|oatmeal|omelet|frittata|granola", "Breakfast"),
     (r"salsa|dressing|sauce|gravy", "Sauce"),
     (r"dip|hummus|bruschetta|mix|pinwheels|roll-ups", "Snack"),
+    (r"beans|medley|greens", "Side"),
+    (r"rolls|lumpia|eggrolls", "Appetizer"),
 ]
 
 
