@@ -83,7 +83,7 @@ export interface Recipe {
   /** True when imageUrl is an AI-generated image (server-set; stamped on the pixels). */
   imageAi?: boolean;
   /**
-   * Who the photo is credited to (server-set, migration 189), shown in the
+   * Who the photo is credited to (server-set, migration 190), shown in the
    * picture's top-right corner, the slot an AI image's stamp uses.
    */
   imageCredit?: string;

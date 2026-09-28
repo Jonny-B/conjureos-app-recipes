@@ -19,7 +19,7 @@ import { Icon } from "../icons";
  * A photo that fails to load falls back to the plate rather than leaving a
  * broken-image icon in the feed.
  *
- * A credited photo (migration 189) names its source in the top-right corner:
+ * A credited photo (migration 190) names its source in the top-right corner:
  * the same corner, and the same quiet treatment, as the "AI-generated" stamp
  * burned into an AI image, so that one slot always says where a picture came
  * from. An AI image already carries its stamp in the pixels, so it gets no

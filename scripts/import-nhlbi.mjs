@@ -15,7 +15,7 @@
  *      provenance exists, update it in place. Never touches any other row.
  * Idempotent: running it twice leaves the same end state.
  *
- * Needs migration 189 (`recipes.image_credit`) applied, and the project's
+ * Needs migration 190 (`recipes.image_credit`) applied, and the project's
  * SERVICE ROLE key in the environment; never commit it or paste it anywhere.
  *
  *   SUPABASE_URL=https://<ref>.supabase.co SUPABASE_SERVICE_ROLE_KEY=... \
@@ -65,12 +65,12 @@ async function uploadPhoto(slug, file) {
   return `${URL_BASE}/storage/v1/object/public/${BUCKET}/${PREFIX}/${slug}.jpg`;
 }
 
-// Refuse to run against a project without migration 189, rather than failing
+// Refuse to run against a project without migration 190, rather than failing
 // on every row.
 try {
   await rest("recipes?select=image_credit&limit=1");
 } catch (e) {
-  console.error("recipes.image_credit is missing: apply ConjureOS migration 189 first.\n" + e.message);
+  console.error("recipes.image_credit is missing: apply ConjureOS migration 190 first.\n" + e.message);
   process.exit(1);
 }
 

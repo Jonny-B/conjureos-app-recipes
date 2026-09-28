@@ -71,7 +71,7 @@ interface DbRecipe {
   imageUrl: string | null;
   /** True when the photo is AI-generated (server-derived, migration 157). */
   imageAi?: boolean;
-  /** Who the photo is credited to (server-derived, migration 189). */
+  /** Who the photo is credited to (server-derived, migration 190). */
   imageCredit?: string | null;
   chefFeatured: boolean;
   favorite: boolean;

@@ -162,7 +162,7 @@ service-role key). The photo pairing was checked by eye on a contact sheet;
 
 **Photo credits** (owner decision, 2026-09-28): photos published free for reuse
 alongside free recipes are used without chasing each photo's rights, and any
-stated credit is SHOWN. `recipes.image_credit` (ConjureOS migration 189) is
+stated credit is SHOWN. `recipes.image_credit` (ConjureOS migration 190) is
 shown by `RecipePlate` in the picture's top-right corner, the same slot and
 look as the AI stamp, on the poster and the open recipe (a tile is too small).
 Only the import scripts write it; recipes-db derives it for every other write

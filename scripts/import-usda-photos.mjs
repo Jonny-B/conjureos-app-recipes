@@ -48,7 +48,7 @@ const PREFIX = "usda-myplate";
 
 const DRY = process.argv.includes("--dry-run");
 // --credit-only: set image_credit on rows that already have their USDA photo,
-// without fetching or uploading anything (migration 189 came after the first
+// without fetching or uploading anything (migration 190 came after the first
 // import on both projects).
 const CREDIT_ONLY = process.argv.includes("--credit-only");
 const CREDIT = "USDA MyPlate";
