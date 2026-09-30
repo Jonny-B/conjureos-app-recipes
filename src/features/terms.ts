@@ -14,19 +14,21 @@
  * write instead of letting the write fail.
  */
 
-export const TERMS_VERSION = "2026-09-23";
+export const TERMS_VERSION = "2026-09-30";
 
 export const TERMS_TITLE = "Recipes terms for your content";
 
 /** Paragraphs, rendered in order. Plain text only. */
 export const TERMS_BODY: string[] = [
-  "These terms cover anything you add to Recipes — recipes you write, photograph, describe or edit, their text, and any photo or image attached to them (\"your content\"). They sit alongside the ConjureOS terms of service.",
-  "You keep ownership of your content. By adding it to Recipes you grant ConjureOS LLC a worldwide, perpetual, irrevocable, royalty-free, non-exclusive licence to host, store, copy, use, adapt, edit, translate, publish, display and distribute it, and to create derivative works from it, in any media, and to sublicense these rights to others — including to operate, promote and improve ConjureOS and its apps. This licence continues after you delete your content or your account, for copies already made or shared.",
-  "You confirm that you have the right to grant this licence: the content is yours, or you have permission to share it, and it doesn't infringe anyone else's rights. Don't upload recipes or photos copied from cookbooks, websites or other people unless you're allowed to.",
+  "These terms cover anything you add to Recipes: recipes you write, photograph, describe or edit, their text, and any photo or image attached to them (\"your content\"). They sit alongside the ConjureOS Terms of Service and Privacy Policy (www.conjureos.com/terms.html and www.conjureos.com/privacy.html).",
+  "You keep ownership of your content. By adding it to Recipes you grant ConjureOS LLC a worldwide, perpetual, irrevocable, royalty-free, non-exclusive licence to host, store, copy, use, adapt, edit, translate, publish, display and distribute it, and to create derivative works from it, in any media, and to sublicense these rights to others, including to operate, promote and improve ConjureOS and its apps. This licence continues after you delete your content or your account, for copies already made or shared.",
+  "You confirm that you have the right to grant this licence: the content is yours, or you have permission to share it, and it doesn't infringe anyone else's rights. Don't upload recipes or photos copied from cookbooks, websites or other people unless you're allowed to. That includes a recipe you import by photographing a page: keep it private unless it is yours to share.",
   "AI-generated images are marked \"AI-generated\" on the image itself. Don't remove or hide that mark, and don't present an AI image as a real photograph of your cooking.",
   "Don't add anything unlawful, hateful, harassing, sexually explicit, dangerous (including unsafe food-handling advice), or that impersonates someone else.",
   "ConjureOS LLC may review, edit, hide or remove any content, and may suspend or remove your access to Recipes, at any time and for any reason, including a breach of these terms. Removing your access to Recipes does not affect the rest of your ConjureOS account.",
-  "Recipes and nutrition information are provided for general information only. Check ingredients for allergies and cook food safely; ConjureOS LLC is not responsible for the outcome of any recipe.",
+  "When you use an AI feature (turning text or photos into a recipe, checking a recipe, or making or improving a photo), what you give it is sent through ConjureOS to Anthropic, our AI provider, or to your own AI provider if you have added a key in ConjureOS Settings. Anthropic does not train its models on it.",
+  "Recipes and nutrition information are provided for general information only, and anything the AI writes or estimates, including nutrition figures, can be wrong. Check ingredients for allergies and cook food safely; ConjureOS LLC is not responsible for the outcome of any recipe.",
+  "To report content that breaks these terms or infringes your rights, use Report in ConjureOS or email abuse@conjureos.com. Copyright notices follow the ConjureOS DMCA policy (www.conjureos.com/dmca.html).",
   "We may update these terms. If we do, Recipes will ask you to accept the new version before you add more content.",
 ];
 
