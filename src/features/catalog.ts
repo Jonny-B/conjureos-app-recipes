@@ -162,15 +162,16 @@ export function categories(): { name: string; count: number }[] {
 
 /**
  * Strip catalog-only fields to a plain Recipe (the seam to storage.saveRecipe).
- * The category travels with the copy (every saved dish used to be filed under
- * "Dinner"). The PHOTO deliberately does not, yet: recipes-db's admin delete /
- * remove-photo would delete the shared object behind a copy that points at a
- * catalog photo (an NHLBI one, today). Carry `imageUrl` once recipes-db keeps
- * any image another row still references.
+ * The photo and category travel with the copy: the saved recipe used to lose
+ * its picture and file every dish under "Dinner". The server derives the
+ * photo's credit from the catalog row with the same URL, and never deletes an
+ * image another recipe still uses (ConjureOS recipes-db, 0.156.1), so the
+ * copy and the catalog row can share one object safely.
  */
 export function toRecipe(c: CatalogRecipe): Recipe & { category: string } {
   return {
     category: c.category,
+    ...(c.imageUrl ? { imageUrl: c.imageUrl } : {}),
     title: c.title,
     difficulty: c.difficulty,
     cookTime: c.cookTime,
