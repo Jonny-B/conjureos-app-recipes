@@ -42,6 +42,15 @@ catalog's canonical tokens) and declare them `required`. Without that, Pantry
 could plan only from the handful of recipes a user has saved; with an empty
 library it planned nothing at all (ConjureOS #915).
 
+The other actions (0.59.0 added `getCatalogRecipe`, `getSharedRecipe`,
+`listChefPicks`, `parseIngredients`, `estimateNutrition`, `scaleRecipe`,
+`unmarkCooked`, and `listRecipes`' `favoritesOnly`/`cookedSince`) are documented
+in the README's "Cross-app integration" table; keep it in step with
+`package.json` → `conjureos.actions`. `getCatalogRecipe` and `getSharedRecipe`
+also satisfy Pantry's `recipe` need, so their `returns` are contract too.
+Deleting, publishing and admin functions are deliberately NOT actions: the
+orchestrator invokes actions without a prompt.
+
 `schemaSatisfies` **fails closed**. So dropping a field from either list
 action's `required` array, or narrowing a type, disconnects Pantry with **no
 error anywhere** — it just reports that nothing can suggest meals, and plans
