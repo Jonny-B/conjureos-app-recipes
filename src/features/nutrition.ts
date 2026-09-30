@@ -233,14 +233,24 @@ const UNIT_TO_GRAMS: Record<string, number> = {
 const CONTAINER_NOUNS =
   "cans?|jars?|packages?|pkgs?|bags?|boxes|box|containers?|bottles?|tubs?|packets?|envelopes?|cartons?";
 
+// The size is written "(14.5 ounce)", "(28-ounce)" or, without brackets,
+// "15-ounce can": the hyphenated forms fell through to a 50 g per-line guess.
+const SIZED_PAREN = new RegExp(
+  "^(\\d+(?:\\.\\d+)?)?\\s*\\(\\s*(\\d+(?:\\.\\d+)?)[\\s-]*([a-z.]+)\\s*\\)\\s*(?:" +
+    CONTAINER_NOUNS +
+    ")?\\s*(.+)$",
+);
+const SIZED_HYPHEN = new RegExp(
+  "^(\\d+(?:\\.\\d+)?)?\\s*(\\d+(?:\\.\\d+)?)-([a-z.]+)\\s+(?:" + CONTAINER_NOUNS + ")\\s+(.+)$",
+);
+
+// ...and bare, "1 14 oz can tomatoes": a count, then the size.
+const SIZED_BARE = new RegExp(
+  "^(\\d+)\\s+(\\d+(?:\\.\\d+)?)\\s*([a-z.]+)\\s+(?:" + CONTAINER_NOUNS + ")\\s+(.+)$",
+);
+
 function normalizeSizedContainer(text: string): string {
-  const m = text.match(
-    new RegExp(
-      "^(\\d+(?:\\.\\d+)?)?\\s*\\(\\s*(\\d+(?:\\.\\d+)?)\\s*([a-z.]+)\\s*\\)\\s*(?:" +
-        CONTAINER_NOUNS +
-        ")?\\s*(.+)$",
-    ),
-  );
+  const m = text.match(SIZED_PAREN) ?? text.match(SIZED_HYPHEN) ?? text.match(SIZED_BARE);
   if (!m) return text;
   const count = m[1] ? Number(m[1]) : 1;
   const amount = Number(m[2]);
@@ -336,16 +346,23 @@ export function parseIngredient(line: string): ParsedIngredient | null {
   const tokens = trimmed.split(/\s+/);
   if (tokens.length === 0) return null;
 
-  // Pull leading quantity. Supports mixed numbers ("1 1/2 cups") via
-  // repeated parseQuantityToken application.
+  // Pull the leading quantity: one number, plus a fraction after a whole
+  // number ("1 1/2 cups"). Only that: summing every leading number read
+  // "1 14 oz can" as 15 oz.
   let i = 0;
   let quantity: number | null = null;
-  while (i < tokens.length) {
-    const tok = tokens[i]!;
-    const parsed = parseQuantityToken(tok);
-    if (parsed === null) break;
-    quantity = (quantity ?? 0) + parsed;
-    i += 1;
+  const first = tokens[0] ? parseQuantityToken(tokens[0]) : null;
+  if (first !== null) {
+    quantity = first;
+    i = 1;
+    const second = tokens[1];
+    if (/^\d+$/.test(tokens[0]!) && second && /^\d+\/\d+$/.test(second)) {
+      const frac = parseQuantityToken(second);
+      if (frac !== null && frac < 1) {
+        quantity += frac;
+        i = 2;
+      }
+    }
   }
 
   // Find the unit (next token, possibly two for "fl oz")
@@ -474,7 +491,16 @@ async function searchUSDA(query: string, signal?: AbortSignal): Promise<USDAFetc
     return { kind: "rate-limited" };
   }
   if (!resp.ok) return { kind: "error" };
-  const json = (await resp.json()) as {
+  // A 200 with a body that isn't JSON (a proxy error page, a truncated reply)
+  // is one failed lookup, not a throw that sinks the whole recipe's estimate.
+  let parsed: unknown;
+  try {
+    parsed = await resp.json();
+  } catch {
+    return { kind: "error" };
+  }
+  if (!parsed || typeof parsed !== "object") return { kind: "error" };
+  const json = parsed as {
     foods?: Array<{
       fdcId: number;
       description: string;

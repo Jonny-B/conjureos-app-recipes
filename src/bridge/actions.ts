@@ -145,15 +145,20 @@ function asString(v: unknown, field: string, maxLen: number): string {
   if (typeof v !== "string") {
     throw new Error(`params.${field} must be a string`);
   }
-  const trimmed = v.trim();
-  if (!trimmed) throw new Error(`params.${field} cannot be empty`);
-  if (trimmed.length > maxLen) {
+  // Strip ASCII control chars to prevent terminal-escape / log-poisoning
+  // when another app's output gets surfaced. Line breaks and tabs become a
+  // space first: deleting them glued words together ("1 cup\tflour" was
+  // saved as "1 cupflour"). Checked AFTER cleaning, so "\x00" is empty.
+  const cleaned = v
+    .replace(/[\t\r\n]+/g, " ")
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\x00-\x1F\x7F]/g, "")
+    .trim();
+  if (!cleaned) throw new Error(`params.${field} cannot be empty`);
+  if (cleaned.length > maxLen) {
     throw new Error(`params.${field} exceeds ${maxLen} characters`);
   }
-  // Strip ASCII control chars to prevent terminal-escape / log-poisoning
-  // when another app's output gets surfaced.
-  // eslint-disable-next-line no-control-regex
-  return trimmed.replace(/[\x00-\x1F\x7F]/g, "");
+  return cleaned;
 }
 
 function asOptionalString(v: unknown, field: string, maxLen: number): string | undefined {
@@ -516,8 +521,10 @@ async function unmarkCooked(
  */
 async function searchRecipes(rawParams?: unknown): Promise<{ recipes: unknown[] }> {
   const p = asObject(rawParams ?? {});
-  const query = typeof p.query === "string" ? p.query.slice(0, 100).trim() : "";
-  const category = typeof p.category === "string" ? p.category.slice(0, 40) : "";
+  // Validated, not coerced: a wrong-typed query used to become "" and the
+  // caller got the first page of the whole catalog as "matches".
+  const query = asOptionalString(p.query, "query", 100) ?? "";
+  const category = asOptionalString(p.category, "category", 40) ?? "";
   const limit = p.limit === undefined ? 20 : asPositiveInt(p.limit, "limit", 50);
   await requireCatalog();
   let hits = query ? searchCatalog(query) : getCatalog();

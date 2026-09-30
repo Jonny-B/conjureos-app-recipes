@@ -46,8 +46,8 @@ export function RecipeEditor({
   const [busy, setBusy] = useState<null | "tidying" | "saving">(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  // True once the user hand-edits the recipe; gates the "Verify & tidy"
-  // recommendation and lets them re-save after a save.
+  // True once the user hand-edits the recipe; shows the "Verify & tidy"
+  // recommendation beside Save (never instead of it) and lets them re-save.
   const [dirty, setDirty] = useState(false);
 
   // Apply a mutation to the working recipe and mark it hand-edited.
@@ -83,6 +83,7 @@ export function RecipeEditor({
         await saveRecipe({ ...recipe, imageUrl: image });
       }
       setSaved(true);
+      setDirty(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -287,24 +288,26 @@ function EditablePreview({
               {editing ? "Done editing" : "Edit"}
             </button>
             <div style={{ flex: 1 }} />
-            {dirty ? (
-              <button className="btn" onClick={onTidy} disabled={busy !== null}>
+            {/* Tidy is a RECOMMENDATION after a hand edit, never a gate: the AI
+                can be unavailable (mobile, no credits) and a person's own edit
+                must still save. */}
+            {dirty && (
+              <button className="btn secondary" onClick={onTidy} disabled={busy !== null}>
                 <Icon name="wand" />
                 {busy === "tidying" ? "Verifying…" : "Verify & tidy with AI"}
               </button>
-            ) : (
-              <button className="btn" onClick={onSave} disabled={busy !== null}>
-                {busy === "saving"
-                  ? chefMode
-                    ? "Publishing…"
-                    : "Saving…"
-                  : chefMode
-                    ? editId
-                      ? "Update recipe"
-                      : "Publish as Chef Payson"
-                    : "Save recipe"}
-              </button>
             )}
+            <button className="btn" onClick={onSave} disabled={busy !== null}>
+              {busy === "saving"
+                ? chefMode
+                  ? "Publishing…"
+                  : "Saving…"
+                : chefMode
+                  ? editId
+                    ? "Update recipe"
+                    : "Publish as Chef Payson"
+                  : "Save recipe"}
+            </button>
           </>
         )}
       </div>

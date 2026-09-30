@@ -43,6 +43,11 @@ export function isCatalogLoaded(): boolean {
   return loaded;
 }
 
+/** True while a catalog fetch is in flight (so "not loaded" isn't "failed"). */
+export function isCatalogLoading(): boolean {
+  return inflight !== null;
+}
+
 /**
  * Load the catalog from recipes-db. Pages until a short page comes back, so
  * it's correct against any server-side page cap. Concurrent callers share one
@@ -155,9 +160,17 @@ export function categories(): { name: string; count: number }[] {
   return [...counts.entries()].map(([name, count]) => ({ name, count }));
 }
 
-/** Strip catalog-only fields to a plain Recipe (the seam to storage.saveRecipe). */
-export function toRecipe(c: CatalogRecipe): Recipe {
+/**
+ * Strip catalog-only fields to a plain Recipe (the seam to storage.saveRecipe).
+ * The category travels with the copy (every saved dish used to be filed under
+ * "Dinner"). The PHOTO deliberately does not, yet: recipes-db's admin delete /
+ * remove-photo would delete the shared object behind a copy that points at a
+ * catalog photo (an NHLBI one, today). Carry `imageUrl` once recipes-db keeps
+ * any image another row still references.
+ */
+export function toRecipe(c: CatalogRecipe): Recipe & { category: string } {
   return {
+    category: c.category,
     title: c.title,
     difficulty: c.difficulty,
     cookTime: c.cookTime,

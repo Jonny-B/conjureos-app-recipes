@@ -82,7 +82,10 @@ export function GuidedCook({ recipe, saved, savedPath = null, onBack, onMade, on
   };
 
   const setServings = (n: number) => {
-    const clamped = Math.max(1, Math.min(24, n));
+    // The cap follows the recipe: a flat 24 made a 36-serving recipe shrink
+    // to 24 on the first tap of "+".
+    const max = Math.max(24, baseServings * 2);
+    const clamped = Math.max(1, Math.min(max, n));
     setFactor(clamped / baseServings);
   };
 

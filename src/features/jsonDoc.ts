@@ -98,3 +98,18 @@ export async function requireJsonDoc<T>(
   if (!r.ok) throw new UnreadableDocError(opts.what);
   return r.value;
 }
+
+/**
+ * Run a read-modify-write on one document after every earlier one on the same
+ * path has finished. Without it two quick toggles (two hearts tapped, or two
+ * `setBlocked` actions back to back) both read the same old set and the second
+ * write drops the first change. Per page only: another device, or another app
+ * writing the same file, can still race; this closes the common case.
+ */
+const docChains = new Map<string, Promise<unknown>>();
+export function withDocLock<T>(path: string, fn: () => Promise<T>): Promise<T> {
+  const prev = docChains.get(path) ?? Promise.resolve();
+  const next = prev.then(fn, fn);
+  docChains.set(path, next.catch(() => undefined));
+  return next;
+}

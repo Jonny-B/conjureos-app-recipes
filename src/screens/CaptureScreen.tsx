@@ -59,6 +59,9 @@ export function CaptureScreen({ onIdentify, initialPhotos, title, emptyHint, mor
   const isTouch = usePointerCoarse();
 
   const addFiles = async (files: FileList | File[]) => {
+    // One batch at a time: a drop while photos are still being prepared
+    // would compute its room from a list that is about to grow.
+    if (busy) return;
     setErr(null);
     const all = Array.from(files);
     if (all.length === 0) return;
@@ -103,7 +106,10 @@ export function CaptureScreen({ onIdentify, initialPhotos, title, emptyHint, mor
         }
       }
       if (prepared.length > 0) {
-        setPhotos((prev) => [...prev, ...prepared]);
+        // Capped HERE, against the latest list: `room` above was computed from
+        // this render's `photos`, and a second drop while this one was still
+        // preparing computed the same room, so both landed and passed the cap.
+        setPhotos((prev) => [...prev, ...prepared].slice(0, MAX_PHOTOS));
       }
     } finally {
       setBusy(false);

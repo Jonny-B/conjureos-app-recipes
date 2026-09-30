@@ -9,7 +9,7 @@
  */
 
 import { vfs } from "../bridge/vfs";
-import { readJsonDoc, requireJsonDoc } from "./jsonDoc";
+import { readJsonDoc, requireJsonDoc, withDocLock } from "./jsonDoc";
 
 const RECIPES_DIR = "/home/Documents/Recipes";
 const FAV_PATH = `${RECIPES_DIR}/.favorites.json`;
@@ -42,12 +42,14 @@ async function loadFavoritesForWrite(): Promise<Set<string>> {
   return requireJsonDoc(FAV_PATH, parseFavs, { ...FAV_DOC, what: "favorites" });
 }
 
-export async function toggleCatalogFavorite(id: string): Promise<Set<string>> {
-  const favs = await loadFavoritesForWrite();
-  if (favs.has(id)) favs.delete(id);
-  else favs.add(id);
-  await save(favs);
-  return favs;
+export function toggleCatalogFavorite(id: string): Promise<Set<string>> {
+  return withDocLock(FAV_PATH, async () => {
+    const favs = await loadFavoritesForWrite();
+    if (favs.has(id)) favs.delete(id);
+    else favs.add(id);
+    await save(favs);
+    return favs;
+  });
 }
 
 async function save(favs: Set<string>): Promise<void> {

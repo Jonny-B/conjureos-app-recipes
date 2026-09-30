@@ -10,6 +10,7 @@ import { markMade, unmarkMade, saveRecipe } from "./features/storage";
 import { useWhoami } from "./hooks/useWhoami";
 import { useRole } from "./hooks/useRole";
 import { Icon } from "./icons";
+import { useSheetDialog } from "./hooks/useSheetDialog";
 import type { IconName } from "./icons";
 import { AppearanceSheet } from "./components/AppearanceSheet";
 import { TermsSheet } from "./components/TermsSheet";
@@ -99,9 +100,11 @@ export function App() {
       // eslint-disable-next-line no-console
       console.warn("[recipes] action registration failed:", err);
     });
+    // Bumped on EVERY outcome, failure included: the browse screen tells
+    // "still loading" from "failed" by re-reading the catalog's state.
     ensureCatalogLoaded()
-      .then((changed) => changed && setCatalogVersion((v) => v + 1))
       .catch(() => {})
+      .then(() => setCatalogVersion((v) => v + 1))
       .finally(() => setSplash((s) => (s === "up" ? "leaving" : s)));
     // Never hold the app hostage to a slow network: past this the browse
     // screen's own loading state takes over.
@@ -165,6 +168,12 @@ export function App() {
               onCook={startCook}
               catalogVersion={catalogVersion}
               isAdmin={role === "admin"}
+              cooking={cooking}
+              onCatalogRetry={() =>
+                ensureCatalogLoaded(true)
+                  .catch(() => {})
+                  .then(() => setCatalogVersion((v) => v + 1))
+              }
             />
           )}
           {tab === "studio" && <StudioScreen />}
@@ -227,37 +236,17 @@ export function App() {
               : "")}
       </footer>
       {cogOpen && (
-        <div className="sheet-overlay" onClick={() => setCogOpen(false)}>
-          <div
-            className="settings-sheet"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="sheet-handle" />
-            <button
-              className="sheet-item"
-              onClick={() => {
-                setCogOpen(false);
-                setAppearanceOpen(true);
-              }}
-            >
-              <Icon name="palette" /> Appearance
-            </button>
-            <button
-              className="sheet-item"
-              onClick={() => {
-                setCogOpen(false);
-                setTerms({});
-              }}
-            >
-              <Icon name="circle-info" /> Recipe terms
-            </button>
-            <button className="sheet-item sheet-cancel" onClick={() => setCogOpen(false)}>
-              Close
-            </button>
-          </div>
-        </div>
+        <CogSheet
+          onClose={() => setCogOpen(false)}
+          onAppearance={() => {
+            setCogOpen(false);
+            setAppearanceOpen(true);
+          }}
+          onTerms={() => {
+            setCogOpen(false);
+            setTerms({});
+          }}
+        />
       )}
       {appearanceOpen && <AppearanceSheet onClose={() => setAppearanceOpen(false)} />}
       {terms && (
@@ -269,6 +258,34 @@ export function App() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+/** The cog's menu: a modal sheet, with the keyboard behaviour of one. */
+function CogSheet({ onClose, onAppearance, onTerms }: { onClose: () => void; onAppearance: () => void; onTerms: () => void }) {
+  const dialog = useSheetDialog<HTMLDivElement>(onClose);
+  return (
+    <div className="sheet-overlay" onClick={onClose}>
+      <div
+        ref={dialog}
+        className="settings-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Settings"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sheet-handle" />
+        <button className="sheet-item" onClick={onAppearance}>
+          <Icon name="palette" /> Appearance
+        </button>
+        <button className="sheet-item" onClick={onTerms}>
+          <Icon name="circle-info" /> Recipe terms
+        </button>
+        <button className="sheet-item sheet-cancel" onClick={onClose}>
+          Close
+        </button>
+      </div>
     </div>
   );
 }
