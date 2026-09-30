@@ -8,6 +8,7 @@ import {
   type Flavor,
 } from "../theme";
 import { Icon } from "../icons";
+import { useSheetDialog } from "../hooks/useSheetDialog";
 
 /**
  * Recipes' own appearance control: light or dark. That's the whole sheet.
@@ -20,6 +21,7 @@ import { Icon } from "../icons";
  */
 export function AppearanceSheet({ onClose }: { onClose: () => void }) {
   const [state, setState] = useState<Appearance>(() => resolve());
+  const dialog = useSheetDialog<HTMLDivElement>(onClose);
 
   // Also fires for pushes from ConjureOS, so the buttons stay honest while
   // someone changes the OS flavor in another window with this sheet open —
@@ -38,6 +40,7 @@ export function AppearanceSheet({ onClose }: { onClose: () => void }) {
   return (
     <div className="sheet-overlay" onClick={onClose}>
       <div
+        ref={dialog}
         className="settings-sheet appearance-sheet"
         role="dialog"
         aria-modal="true"

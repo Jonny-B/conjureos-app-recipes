@@ -43,6 +43,11 @@ export function isCatalogLoaded(): boolean {
   return loaded;
 }
 
+/** True while a catalog fetch is in flight (so "not loaded" isn't "failed"). */
+export function isCatalogLoading(): boolean {
+  return inflight !== null;
+}
+
 /**
  * Load the catalog from recipes-db. Pages until a short page comes back, so
  * it's correct against any server-side page cap. Concurrent callers share one
@@ -155,9 +160,18 @@ export function categories(): { name: string; count: number }[] {
   return [...counts.entries()].map(([name, count]) => ({ name, count }));
 }
 
-/** Strip catalog-only fields to a plain Recipe (the seam to storage.saveRecipe). */
-export function toRecipe(c: CatalogRecipe): Recipe {
+/**
+ * Strip catalog-only fields to a plain Recipe (the seam to storage.saveRecipe).
+ * The photo and category travel with the copy: the saved recipe used to lose
+ * its picture and file every dish under "Dinner". The server derives the
+ * photo's credit from the catalog row with the same URL, and never deletes an
+ * image another recipe still uses (ConjureOS recipes-db, 0.156.1), so the
+ * copy and the catalog row can share one object safely.
+ */
+export function toRecipe(c: CatalogRecipe): Recipe & { category: string } {
   return {
+    category: c.category,
+    ...(c.imageUrl ? { imageUrl: c.imageUrl } : {}),
     title: c.title,
     difficulty: c.difficulty,
     cookTime: c.cookTime,

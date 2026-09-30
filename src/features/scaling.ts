@@ -61,15 +61,25 @@ export function parseDisplayQuantity(line: string): DisplayQuantity {
   const tokens = line.trim().split(/\s+/);
   if (tokens.length === 0) return { count: null, unit: null, rest: line };
 
-  // Pull leading numeric tokens. Supports "2", "1.5", "1/2", "1 1/2".
+  // The leading quantity: "2", "1.5", "1/2", or a whole number followed by a
+  // proper fraction, "1 1/2". Nothing more: summing every leading number read
+  // "1 14 oz can tomatoes" as 15 and scaled the can size with it.
   let i = 0;
   let count: number | null = null;
-  while (i < tokens.length) {
-    const tok = tokens[i]!;
-    const parsed = parseNumericToken(tok);
-    if (parsed === null) break;
-    count = (count ?? 0) + parsed;
-    i += 1;
+  const first = tokens[0] ? parseNumericToken(tokens[0]) : null;
+  if (first !== null) {
+    count = first;
+    i = 1;
+    // "1 1/2", and "1 and 1/2" the way people also write it.
+    const withAnd = tokens[1]?.toLowerCase() === "and";
+    const second = tokens[withAnd ? 2 : 1];
+    if (/^\d+$/.test(tokens[0]!) && second && /^\d+\/\d+$/.test(second)) {
+      const frac = parseNumericToken(second);
+      if (frac !== null && frac < 1) {
+        count += frac;
+        i = withAnd ? 3 : 2;
+      }
+    }
   }
 
   if (count === null) {
@@ -151,6 +161,27 @@ export function formatScaledNumber(n: number): string {
  */
 export function scaleLine(line: string, factor: number): string {
   if (factor === 1 || !Number.isFinite(factor) || factor <= 0) return line;
+  // A range, "2-3 cups" or "2 to 3 cups": both ends scale. It used to parse as
+  // no quantity at all and pass through unscaled.
+  const range = line.match(/^\s*(\d+(?:\.\d+)?(?:\/\d+)?)\s*(?:-|–|to)\s*(\d+(?:\.\d+)?(?:\/\d+)?)\b\s*(.*)$/);
+  if (range) {
+    const lo = parseNumericToken(range[1]!);
+    const hi = parseNumericToken(range[2]!);
+    if (lo !== null && hi !== null && hi > lo) {
+      const tail = range[3]!.trim();
+      return `${formatScaledNumber(lo * factor)}-${formatScaledNumber(hi * factor)}${tail ? ` ${tail}` : ""}`;
+    }
+  }
+  // A compound amount, "1 cup + 2 tbsp flour" or "1 cup plus 2 tbsp": the
+  // second amount scales too, or the proportions come out wrong.
+  const compound = line.match(/^(.*?\S)\s+(\+|plus|and)\s+(\d.*)$/);
+  if (compound && parseDisplayQuantity(compound[1]!).count !== null && parseDisplayQuantity(compound[1]!).unit) {
+    const tail = compound[3]!;
+    const tq = parseDisplayQuantity(tail);
+    if (tq.count !== null && tq.unit) {
+      return `${scaleLine(compound[1]!, factor)} ${compound[2]} ${scaleLine(tail, factor)}`;
+    }
+  }
   const parsed = parseDisplayQuantity(line);
   if (parsed.count === null) return line;
   const scaled = parsed.count * factor;

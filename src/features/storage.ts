@@ -22,7 +22,7 @@ const RECIPES_DIR = "/home/Documents/Recipes";
 /** Marker so the one-time VFS to DB import runs at most once per device. */
 const MIGRATED_FLAG = `${RECIPES_DIR}/.migrated-to-db`;
 
-export async function saveRecipe(recipe: Recipe): Promise<SavedRecipe> {
+export async function saveRecipe(recipe: Recipe & { category?: string }): Promise<SavedRecipe> {
   return api.addRecipe({ ...recipe, visibility: "private" });
 }
 

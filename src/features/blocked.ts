@@ -14,7 +14,7 @@
  */
 
 import { vfs } from "../bridge/vfs";
-import { readJsonDoc, requireJsonDoc } from "./jsonDoc";
+import { readJsonDoc, requireJsonDoc, withDocLock } from "./jsonDoc";
 
 const RECIPES_DIR = "/home/Documents/Recipes";
 const BLOCKED_PATH = `${RECIPES_DIR}/.blocked.json`;
@@ -61,17 +61,21 @@ async function save(ids: Set<string>): Promise<void> {
 }
 
 /** Block a recipe from future recommendations. Returns the new set. */
-export async function blockRecipe(id: string): Promise<Set<string>> {
-  const ids = await loadBlockedForWrite();
-  ids.add(id);
-  await save(ids);
-  return ids;
+export function blockRecipe(id: string): Promise<Set<string>> {
+  return withDocLock(BLOCKED_PATH, async () => {
+    const ids = await loadBlockedForWrite();
+    ids.add(id);
+    await save(ids);
+    return ids;
+  });
 }
 
 /** Un-block, so it can be suggested again. Returns the new set. */
-export async function unblockRecipe(id: string): Promise<Set<string>> {
-  const ids = await loadBlockedForWrite();
-  ids.delete(id);
-  await save(ids);
-  return ids;
+export function unblockRecipe(id: string): Promise<Set<string>> {
+  return withDocLock(BLOCKED_PATH, async () => {
+    const ids = await loadBlockedForWrite();
+    ids.delete(id);
+    await save(ids);
+    return ids;
+  });
 }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSheetDialog } from "../hooks/useSheetDialog";
 import { acceptTerms } from "../bridge/recipesApi";
 import { TERMS_BODY, TERMS_TITLE, TERMS_VERSION, hasAcceptedCurrentTerms, setAcceptedTermsVersion } from "../features/terms";
 
@@ -10,6 +11,8 @@ export function TermsSheet({ onClose, asking }: { onClose: (accepted: boolean) =
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const accepted = hasAcceptedCurrentTerms();
+  // Escape is "Not now", as a tap outside is; neither closes it mid-save.
+  const dialog = useSheetDialog<HTMLDivElement>(busy ? null : () => onClose(false));
 
   const accept = async () => {
     setBusy(true);
@@ -28,6 +31,7 @@ export function TermsSheet({ onClose, asking }: { onClose: (accepted: boolean) =
   return (
     <div className="sheet-overlay" onClick={() => !busy && onClose(false)}>
       <div
+        ref={dialog}
         className="settings-sheet terms-sheet"
         role="dialog"
         aria-modal="true"

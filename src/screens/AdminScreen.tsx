@@ -146,7 +146,12 @@ function UsersView({ myEmail, onViewRecipes }: { myEmail: string | null; onViewR
       return;
     }
     setConfirmRole(null);
-    void run(u, async () => replace(await adminSetRole(u.userId, role)));
+    // Merged, not replaced: the role endpoint's reply has no ban fields, so a
+    // banned user whose role changed showed as not banned.
+    void run(u, async () => {
+      const updated = await adminSetRole(u.userId, role);
+      replace({ ...u, ...updated, bannedAt: updated.bannedAt ?? u.bannedAt, banReason: updated.banReason ?? u.banReason });
+    });
   };
 
   return (

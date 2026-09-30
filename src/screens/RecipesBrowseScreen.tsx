@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogRecipe, FeedRecipe, Recipe, RecipeSource, SavedRecipe } from "../types";
-import { getCatalog, categories, toRecipe, loadRecipeBody, withRecipeBody, patchCatalogRecipe } from "../features/catalog";
+import { getCatalog, categories, toRecipe, loadRecipeBody, withRecipeBody, patchCatalogRecipe, isCatalogLoaded, isCatalogLoading } from "../features/catalog";
 import {
   listSavedRecipesResult,
   saveRecipe,
@@ -35,6 +35,10 @@ interface Props {
   catalogVersion?: number;
   /** Admin: may give any recipe an AI photo or remove its photo. */
   isAdmin?: boolean;
+  /** True while the guided cook covers this screen; it re-reads when the cook closes. */
+  cooking?: boolean;
+  /** Retry a catalog load that failed (App owns the catalog and its version). */
+  onCatalogRetry?: () => Promise<unknown>;
 }
 
 const SOURCE_TABS: { id: RecipeSource; label: string }[] = [
@@ -57,7 +61,7 @@ function keyOf(fi: FeedRecipe): string {
   return fi.kind === "catalog" ? `c:${fi.id}` : `s:${fi.recipe.path}`;
 }
 
-export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVersion = 0, isAdmin = false }: Props) {
+export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVersion = 0, isAdmin = false, cooking = false, onCatalogRetry }: Props) {
   const [saved, setSaved] = useState<SavedRecipe[]>([]);
   /**
    * A cook left running, if there is one.
@@ -81,6 +85,19 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
   const [chefPick, setChefPick] = useState<CatalogRecipe | null>(null);
 
   const catalog = useMemo(() => getCatalog(), [catalogVersion]);
+  // "All" with no catalog is a load that failed or is still running, never an
+  // empty catalog, and it must say which (it used to say "No recipes to show").
+  const [retryingCatalog, setRetryingCatalog] = useState(false);
+  const catalogState: "ok" | "loading" | "failed" = isCatalogLoaded()
+    ? "ok"
+    : retryingCatalog || isCatalogLoading()
+      ? "loading"
+      : "failed";
+  const retryCatalog = () => {
+    if (!onCatalogRetry) return;
+    setRetryingCatalog(true);
+    void onCatalogRetry().finally(() => setRetryingCatalog(false));
+  };
 
   // A failed library read must not render as "you haven't saved any recipes
   // yet" — that sentence is a claim about the user's data, and getting it wrong
@@ -98,12 +115,20 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
     setFavs(f);
     setLoaded(true);
   }, []);
+  // This screen stays mounted (hidden) under the guided cook, so it re-reads
+  // when the cook CLOSES: a recipe saved or marked cooked mid-cook, and the
+  // cook's own session (finished, or left running), were otherwise stale
+  // until a reload — the "Still cooking" banner could point at a cook that
+  // had ended, or be missing for one just left.
+  const wasCooking = useRef(cooking);
+  useEffect(() => {
+    if (wasCooking.current && !cooking) void refresh();
+    wasCooking.current = cooking;
+    if (!cooking) setResumable(loadCookSession());
+  }, [cooking, refresh]);
   useEffect(() => {
     refresh();
   }, [refresh]);
-  useEffect(() => {
-    setResumable(loadCookSession());
-  }, []);
   // Chef Payson's newest promoted recipe (best-effort; absent if none/offline).
   useEffect(() => {
     fetchChefLatest(1)
@@ -267,7 +292,9 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
   return (
     <div className="browse-screen">
       <ErrorBanner error={actionError} onDismiss={clearActionError} />
-      {resumable && (
+      {/* After the library loads: resuming matches the session to its saved
+          recipe, and before then every session looked unsaved. */}
+      {resumable && loaded && (
         <ResumeCook
           session={resumable}
           saved={saved}
@@ -417,7 +444,7 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
       {!loaded ? (
         <div className="center-spinner"><div className="spinner" /></div>
       ) : ranked.length === 0 ? (
-        <EmptyState source={source} hasQuery={!!query || (source === "all" && category !== "all")} onAdd={() => setMode("write")} failed={loadFailed} onRetry={() => { setLoaded(false); void refresh(); }} />
+        <EmptyState source={source} hasQuery={!!query || (source === "all" && category !== "all")} onAdd={() => setMode("write")} failed={loadFailed} onRetry={() => { setLoaded(false); void refresh(); }} catalogRetry={retryCatalog} catalogState={catalogState} />
       ) : (
         <>
           <div className="browse-list">
@@ -499,7 +526,17 @@ function matchesQuery(fi: FeedRecipe, q: string): boolean {
   return false;
 }
 
-function EmptyState({ source, hasQuery, onAdd, failed, onRetry }: { source: RecipeSource; hasQuery: boolean; onAdd: () => void; failed: boolean; onRetry: () => void }) {
+function EmptyState({ source, hasQuery, onAdd, failed, onRetry, catalogRetry, catalogState }: { source: RecipeSource; hasQuery: boolean; onAdd: () => void; failed: boolean; onRetry: () => void; catalogRetry: () => void; catalogState: "ok" | "loading" | "failed" }) {
+  if (source === "all" && catalogState === "loading")
+    return <div className="center-spinner"><div className="spinner" /></div>;
+  if (source === "all" && catalogState === "failed")
+    return (
+      <div className="empty-state">
+        <Icon name="bowl-food" className="empty-icon" />
+        <div>Couldn&apos;t load the recipe catalog. This is a connection problem — nothing is missing.</div>
+        <button className="btn" onClick={catalogRetry}>Try again</button>
+      </div>
+    );
   if (hasQuery)
     return (
       <div className="empty-state">
