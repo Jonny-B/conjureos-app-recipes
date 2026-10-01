@@ -4,9 +4,11 @@
  * Owner decision (2026-09-23): users KEEP ownership of what they upload and
  * grant ConjureOS LLC a broad licence — not a transfer of ownership, which is
  * harder to enforce and impossible for recipes a user copied from somewhere
- * else. The text below is a DRAFT written by an engineer, not a lawyer; have
- * it reviewed before relying on it. Bump TERMS_VERSION whenever it changes:
- * the app asks again whenever the version a user accepted is older.
+ * else. Decision (2026-10-01): the licence ends when the content or account is
+ * deleted, with three stated exceptions, instead of surviving deletion, which
+ * sat badly with GDPR/CCPA deletion rights. Bump TERMS_VERSION whenever the
+ * text changes: the app asks again whenever the version a user accepted is
+ * older.
  *
  * Enforcement is server-side too: recipes-db refuses `add` / `update` /
  * `chefUpsert` / `uploadImage` until the caller has accepted SOME version
@@ -14,14 +16,15 @@
  * write instead of letting the write fail.
  */
 
-export const TERMS_VERSION = "2026-09-30";
+export const TERMS_VERSION = "2026-10-01";
 
 export const TERMS_TITLE = "Recipes terms for your content";
 
 /** Paragraphs, rendered in order. Plain text only. */
 export const TERMS_BODY: string[] = [
   "These terms cover anything you add to Recipes: recipes you write, photograph, describe or edit, their text, and any photo or image attached to them (\"your content\"). They sit alongside the ConjureOS Terms of Service and Privacy Policy (www.conjureos.com/terms.html and www.conjureos.com/privacy.html).",
-  "You keep ownership of your content. By adding it to Recipes you grant ConjureOS LLC a worldwide, perpetual, irrevocable, royalty-free, non-exclusive licence to host, store, copy, use, adapt, edit, translate, publish, display and distribute it, and to create derivative works from it, in any media, and to sublicense these rights to others, including to operate, promote and improve ConjureOS and its apps. This licence continues after you delete your content or your account, for copies already made or shared.",
+  "You keep ownership of your content. By adding it to Recipes you grant ConjureOS LLC a worldwide, royalty-free, non-exclusive licence to host, store, copy, use, adapt, edit, translate, publish, display and distribute it, and to create derivative works from it, in any media, and to sublicense these rights to others, including to operate, promote and improve ConjureOS and its apps.",
+  "The licence lasts until you delete the content or your ConjureOS account. When you do, we stop using and showing it, except for copies other people saved before you deleted it, copies in our backups until they are overwritten (up to 7 days), and anything the law requires us to keep.",
   "You confirm that you have the right to grant this licence: the content is yours, or you have permission to share it, and it doesn't infringe anyone else's rights. Don't upload recipes or photos copied from cookbooks, websites or other people unless you're allowed to. That includes a recipe you import by photographing a page: keep it private unless it is yours to share.",
   "AI-generated images are marked \"AI-generated\" on the image itself. Don't remove or hide that mark, and don't present an AI image as a real photograph of your cooking.",
   "Don't add anything unlawful, hateful, harassing, sexually explicit, dangerous (including unsafe food-handling advice), or that impersonates someone else.",
