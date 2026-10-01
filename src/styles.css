@@ -1613,19 +1613,9 @@ select {
   .browse-screen.form-screen { max-width: 780px; }
 }
 
-/* Above ~1500px the two-column recipe grid leaves rows uncomfortably long;
-   let it find a third column instead of stretching. */
-@media (min-width: 1500px) and (pointer: fine) {
-  .browse-screen { max-width: 1360px; }
-}
-
-/* Extra-large windows (ConjureOS #996): widen the library so a fourth column
-   fits rather than leaving half the screen empty. The open recipe keeps its
-   own 960px reading measure (.detail-screen, the owner's mockup). */
-@media (min-width: 1800px) and (pointer: fine) {
-  .browse-screen:not(.detail-screen) { max-width: 1640px; }
-  .app-body { padding-left: 56px; padding-right: 56px; }
-}
+/* Wide and extra-large windows: see the 1280px and 1600px blocks at the end
+   of this file (ConjureOS #996). They sit last so they win over the
+   per-feature desktop rules further down. */
 
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -2955,3 +2945,58 @@ button.step-row { display: flex; }
 /* The open recipe's favourite, in the action bar beside Cook this. */
 .detail-fav.on, .detail-fav.on:hover { color: var(--cui-support-text); }
 .detail-fav .fa-icon { width: 17px; height: 17px; }
+
+/* ── Wide windows (ConjureOS #996) ───────────────────────────────────
+ * On a big monitor Recipes should read like a website, not a phone layout
+ * with the edges pulled out. Two steps above the 860px desktop layout:
+ *   1280+  a wider page and a three-column recipe grid; the hero is capped
+ *          so it no longer pushes the library below the fold.
+ *   1600+  the widest page, four columns, roomier gutters.
+ * The open recipe keeps its own reading measure (.detail-screen). Phone and
+ * tablet never match these queries. */
+@media (min-width: 1280px) and (pointer: fine) {
+  .browse-screen:not(.detail-screen):not(.form-screen),
+  .home-screen { max-width: 1360px; }
+  .browse-screen > .browse-list {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+  .hero-card { grid-template-columns: minmax(260px, 34%) minmax(0, 1fr); }
+  .hero-card > .plate--poster { min-height: 280px; max-height: 360px; }
+}
+
+@media (min-width: 1600px) and (pointer: fine) {
+  .browse-screen:not(.detail-screen):not(.form-screen),
+  .home-screen { max-width: 1640px; }
+  .app-body { padding-left: 56px; padding-right: 56px; }
+  .browse-screen > .browse-list {
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  }
+  .hero-card { grid-template-columns: minmax(300px, 30%) minmax(0, 1fr); }
+  .hero-card > .plate--poster { max-height: 380px; }
+}
+
+/* ── 44px targets ─────────────────────────────────────────────────────
+ * Every control is at least 44px to aim at. Text controls grow to it; the
+ * fixed-size icon buttons keep their drawn size and get the same invisible
+ * 44px hit area .icon-btn already uses. */
+.seg-btn,
+.cat-chip,
+.btn,
+.tab,
+.browse-filter input { min-height: 44px; }
+.topbar-cog,
+.lib-icon { position: relative; }
+/* .hero-refresh is already absolutely placed, which anchors its ::after. */
+.topbar-cog::after,
+.hero-refresh::after,
+.lib-icon::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+  background: none;
+}
+.cat-chip { min-width: 44px; justify-content: center; }
