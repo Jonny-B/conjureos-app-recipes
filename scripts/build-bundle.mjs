@@ -3,15 +3,19 @@
  * ConjureOS's real @bundle pipeline (esbuild + jspm importmap, via
  * @conjureos/pack), the EXACT path the App Store publish uses.
  *
- * `conj-pack dev` is an esbuild dev server with mocked bridges; it does NOT
- * exercise this pipeline, so bundle-time / runtime differences (JSON imports,
- * encoding, externalized deps, srcdoc execution) slip past it. Run this and
- * smoke-test the output BEFORE publishing:
+ * `conj-pack dev` is an esbuild dev server with NO bridge emulation at all (no
+ * injected shim: ai.complete, actions.*, auth.whoami, notify and the VFS are
+ * absent locally -- ConjureOS #722). It also does NOT exercise this pipeline,
+ * so bundle-time / runtime differences (loader-map gaps, encoding,
+ * externalized deps, srcdoc execution) slip past it. This build is the gate:
  *
- *   npm run build
- *   then open dist/recipes.html in a browser and check the console.
+ *   npm run build          # must succeed; bundle() throws on a real error
+ *   then optionally open dist/recipes.html and check the console
+ *     (that proves it BUNDLES, not that it WORKS)
  *
- * Mirrors ConjureOS scripts/bundle-app.ts so local output matches CI output.
+ * Mirrors ConjureOS scripts/bundle-app.ts so local output matches CI output --
+ * but only while this repo's @conjureos/pack stays on the 0.2.x line CI uses.
+ * CI installs its own copy from ConjureOS scripts/; see CLAUDE.md.
  */
 import { readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, relative, sep, dirname } from "node:path";

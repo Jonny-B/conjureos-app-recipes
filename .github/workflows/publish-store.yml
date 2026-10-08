@@ -80,6 +80,20 @@ jobs:
           token: ${{ secrets.CONJUREOS_REPO_TOKEN }}
           path: .conjureos
 
+      # Guard the publish gate itself. `npm run build` (and CI's bundle-app.ts)
+      # only mean anything if this repo's @conjureos/pack is a version CI can
+      # also resolve -- they are two separate installs of the same package and
+      # nothing structural keeps them equal. This has drifted twice: the repo
+      # sat on 0.1.1 while CI built on 0.2.x, and the docs meant to catch it
+      # cited the wrong version (conjureos-app-recipes#76, ConjureOS#726).
+      #
+      # Runs AFTER the ConjureOS checkout on purpose: with .conjureos/ present
+      # the guard reads CI's real range out of scripts/package.json instead of
+      # falling back to its hardcoded expectation. Runs BEFORE the publish so a
+      # skewed bundler fails the run rather than shipping to the store.
+      - name: Check @conjureos/pack pin matches the publish pipeline
+        run: npx -y tsx scripts/pack-pin.ts
+
       # The manifest's remoteActions.recipesDb.url (per-user DB reads/writes via
       # the minted-token flow) must point at the SAME project we're publishing
       # to. Rewrite it from the per-env project-ref secret. (Catalog browse uses

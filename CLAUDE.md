@@ -59,32 +59,68 @@ three schemas, run
 `conjureos-pantry/scripts/needs.test.ts`, which checks this app's real shapes
 against Pantry's declared needs using the kernel's own matcher.
 
-## Before publishing: build the REAL store bundle and smoke-test it
+## Before publishing: `npm run build` must pass, and CI must be green
 
-`npm run dev` (conj-pack dev) is a fast esbuild dev server with mocked bridges.
-It is NOT the pipeline the App Store uses, so code can pass in dev and still
-crash on import. The store build is `@conjureos/pack`'s `bundle()` (esbuild-wasm
-+ jspm importmap), run by ConjureOS `@bundle` in CI.
+`npm run dev` (conj-pack dev) is a fast esbuild dev server. It serves your
+source and reloads it; it does **not** stand up any part of the ConjureOS
+bridge — there is no injected shim, so `ai.complete`, `actions.*`,
+`auth.whoami`, `notify` and the VFS are simply absent locally. (Anything
+claiming `conj-pack dev` has "mocked bridges" is wrong; see ConjureOS #722.)
+Dev covers layout and state and stops there, so code can pass in dev and still
+crash on import.
 
-Hard rule: never publish (dev or prod) without building the store bundle locally
-and loading it.
+The store build is `@conjureos/pack`'s `bundle()` (esbuild-wasm + jspm
+importmap), run by ConjureOS `@bundle` in CI.
+
+**The gate for this repo is: `npm run build` succeeds and CI is green.**
+
+Note what that is *not*: it is not "`conj-pack` passes". This repo never invokes
+the CLI — both `npm run build` (`scripts/build-bundle.mjs`) and CI
+(`bundle-app.ts`) call `bundle()` directly, so the CLI's own build-check gate
+(`@conjureos/pack`'s `src/buildcheck.ts`, which runs during `conj-pack`
+*packing*) is not on this repo's path. Same bundler, so real build errors still
+surface — `bundle()` throws on them and `npm run build` exits non-zero — but
+state the gate accurately rather than importing the generic story.
 
 1. `npm run build` produces `dist/recipes.html` via the same `bundle()` CI uses.
-2. Open `dist/recipes.html` in a browser. It runs standalone with the same mocked
-   bridges, so confirm it renders with a clean console. A crash here is a real
-   store-build bug.
-
-Treat "`dist/recipes.html` loads clean" as the gate for any publish.
+2. **Optional but recommended:** serve `dist/` and open `dist/recipes.html` in a
+   browser. A clean build proves the app **bundles**; it does not prove the app
+   **works**. Those are different guarantees and collapsing them trades one
+   wrong lesson for another. Note the bridge is absent here too, so this checks
+   render-and-console health, not platform behavior.
 
 ### Known dev-vs-store differences (do not get bitten again)
 
-- The store bundler's loader map covers tsx/ts/jsx/js/css + image/font types, but
-  NOT `.json`. Do not `import x from "*.json"`; a JSON import returns `undefined`
-  in the store build and works fine in dev.
+- `.json` imports are **fine now** — but only on `@conjureos/pack` >= 0.1.2.
+  Before that the store bundler's loader map omitted `.json`, so the import fell
+  through to the `text` loader: the default export was the raw JSON string and
+  there were **no named exports** (so a named import made `bundle()` reject).
+  The frequently-repeated "a JSON import returns `undefined`" is not the
+  mechanism. Fixed in `749b7a5` with a regression test; `.json` now gets
+  esbuild's real `json` loader in both the dev server and the store build.
+- **The live version of that bug class:** any extension *not* in the loader map
+  still falls through to `text` silently — `.scss`, `.md`, `.yaml`, `.wasm` and
+  friends. You get a string where you expected parsed data, with no error. The
+  map covers tsx/ts/jsx/js/json/css + image/font types (`@conjureos/pack`
+  `src/bundle/core/vfs-plugin.ts`).
 - The bundler cannot resolve a `.js` extension on a TypeScript import. Relative
   imports in this repo are extensionless; keep them that way.
-- Keep `@conjureos/pack` aligned with the version CI uses (ConjureOS
-  `scripts/package.json` pins it).
+- **`@conjureos/pack` must stay on the same version line CI uses, which is
+  `0.2.x`.** CI's pin lives in ConjureOS `scripts/package.json` (`^0.2.0`) and
+  the shared publish action installs it with `npm install`, not `npm ci`
+  (`ConjureOS/.github/actions/publish-anchor-app/action.yml`), so CI resolves
+  **the newest 0.2.x on npm at the moment it runs** and its committed lockfile
+  is not honored. Consequences:
+  - Do **not** bump this repo to `0.3.x` just because npm `latest` says so. CI
+    cannot reach it (`^0.2.0` excludes 0.3.0), and you would recreate the skew
+    in the opposite direction — a local build *newer* than the store's.
+  - Bump only when ConjureOS `scripts/package.json` moves first.
+  - `npm run build` uses **this repo's own** installed copy of
+    `@conjureos/pack`; CI uses the one in ConjureOS `scripts/`. They are two
+    separate installs, so this version alignment is the only thing that makes a
+    passing local build evidence about the store build.
+  - `npm run check:pack-pin` verifies the pin and the lockfile agree and stay on
+    the CI line; it runs in CI too.
 
 ## Appearance
 

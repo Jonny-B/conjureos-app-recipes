@@ -113,14 +113,16 @@ npm run dev          # conj-pack dev: esbuild dev server (no Vite), live reload
 npm run build        # the REAL store bundle (ConjureOS @bundle) -> dist/recipes.html
 ```
 
-`npm run dev` is a fast esbuild dev server with mocked AI + VFS bridges. It is **not** the same pipeline as the store build, so code can pass in dev and still break on import. (Concrete example that bit us: a `.json` import works in dev, but the store bundler's loader map has no JSON loader and hands back `undefined`, crashing at runtime. Ship bundled data as a `.ts` module instead, see `src/data/catalog.ts`.)
+`npm run dev` is a fast esbuild dev server. It serves and live-reloads your source; it does **not** stand up any part of the ConjureOS bridge — there is no injected shim, so `ai.complete`, `actions.*`, `auth.whoami`, `notify` and the VFS are absent locally. (Older copy here claimed "mocked AI + VFS bridges"; that was never true. See ConjureOS #722.) It is also **not** the same pipeline as the store build, so code can pass in dev and still break on import.
 
-**Always verify with the store bundle before publishing:**
+The gate for this repo is **`npm run build` succeeds and CI is green** — not "`conj-pack` passes", since this repo calls `bundle()` directly and never invokes the CLI.
 
-1. `npm run build` runs the same `@conjureos/pack` `bundle()` that CI's `@bundle` uses, writing `dist/recipes.html`.
-2. Serve `dist/` (any static server) and open `dist/recipes.html` in a browser. It runs standalone with the same mocked bridges, so confirm it renders with a clean console. A crash here is a real store-build bug.
+1. `npm run build` runs the same `@conjureos/pack` `bundle()` that CI's `@bundle` uses, writing `dist/recipes.html`. It throws and exits non-zero on a real build error.
+2. **Optional runtime sanity check:** serve `dist/` (any static server) and open `dist/recipes.html` in a browser, and confirm it renders with a clean console. A clean build proves the app *bundles*; it does not prove the app *works*. The bridge is absent here too, so this is not a test of platform behavior.
 
-Treat "`dist/recipes.html` loads clean" as the gate for publishing. Bump `version` in **both** `package.json` and `src/version.ts` together (the in-app footer reads the latter, and CI fails the publish if they disagree).
+Keep `@conjureos/pack` on the `0.2.x` line CI uses — see CLAUDE.md for why bumping to npm `latest` would *recreate* the local-vs-store skew rather than fix it. `npm run check:pack-pin` enforces it.
+
+Bump `version` in **both** `package.json` and `src/version.ts` together (the in-app footer reads the latter, and CI fails the publish if they disagree).
 
 ## Publishing to the ConjureOS App Store (CI)
 
