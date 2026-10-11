@@ -164,6 +164,13 @@ corner props on a wide screen): it is drawn as two height-fitted halves pinned
 to the screen's edges (styles.css "Splash"). It is always Spring dark, whatever
 the user picked, because the art is dark.
 
+## App type
+
+Sealed (ConjureOS Phase 62): the AI changes nothing in this app. `package.json`
+declares `"appType": "sealed"` plus `"editable": false`, the mirror older
+clients read. Do not add `editStyle`; the store and the kernel write the legacy
+keys themselves.
+
 ## Versioning
 
 Bump `version` in BOTH `package.json` and `src/version.ts` together. CI fails the
