@@ -14,7 +14,7 @@
  *     (that proves it BUNDLES, not that it WORKS)
  *
  * Mirrors ConjureOS scripts/bundle-app.ts so local output matches CI output --
- * but only while this repo's @conjureos/pack stays on the 0.2.x line CI uses.
+ * but only while this repo's @conjureos/pack stays on the 0.4.x line CI uses.
  * CI installs its own copy from ConjureOS scripts/; see CLAUDE.md.
  */
 import { readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from "node:fs";

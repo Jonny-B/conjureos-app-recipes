@@ -33,9 +33,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** ConjureOS `scripts/package.json` declares `^0.2.0`. Used only when that
+/** ConjureOS `scripts/package.json` declares `^0.4.0`. Used only when that
  *  file is not reachable; bump it in the same commit that bumps the pin. */
-export const EXPECTED_CI_LINE = "0.2";
+export const EXPECTED_CI_LINE = "0.4";
 
 export const PACK = "@conjureos/pack";
 

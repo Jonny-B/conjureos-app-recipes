@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.60.3",
+  "version": "0.60.4",
   "description": "Recipes for ConjureOS: a library you add to, browse and cook from. Write a recipe, photograph one, or describe a dish and have one written; then cook it step by step.",
   "type": "module",
   "license": "MIT",
@@ -1058,7 +1058,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@conjureos/pack": "^0.2.7",
+    "@conjureos/pack": "^0.4.0",
     "@conjureos/ui": "^1.0.3",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

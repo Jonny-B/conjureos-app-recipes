@@ -106,13 +106,15 @@ state the gate accurately rather than importing the generic story.
 - The bundler cannot resolve a `.js` extension on a TypeScript import. Relative
   imports in this repo are extensionless; keep them that way.
 - **`@conjureos/pack` must stay on the same version line CI uses, which is
-  `0.2.x`.** CI's pin lives in ConjureOS `scripts/package.json` (`^0.2.0`) and
-  the shared publish action installs it with `npm install`, not `npm ci`
-  (`ConjureOS/.github/actions/publish-anchor-app/action.yml`), so CI resolves
-  **the newest 0.2.x on npm at the moment it runs** and its committed lockfile
-  is not honored. Consequences:
-  - Do **not** bump this repo to `0.3.x` just because npm `latest` says so. CI
-    cannot reach it (`^0.2.0` excludes 0.3.0), and you would recreate the skew
+  `0.4.x`** (it was `0.2.x` until 2026-10-22; the single-file output of this app
+  was byte-identical on 0.2.0, 0.2.7 and 0.4.0). CI's pin lives in ConjureOS
+  `scripts/package.json` (`^0.4.0`) and the shared publish action installs it
+  with `npm install`, not `npm ci`
+  (`ConjureOS/.github/actions/publish-anchor-app/action.yml`), so CI builds on
+  the version recorded in ConjureOS `scripts/package-lock.json` while that
+  satisfies the range, and otherwise on the newest 0.4.x on npm. Consequences:
+  - Do **not** bump this repo to `0.5.x` just because npm `latest` says so. CI
+    cannot reach it (`^0.4.0` excludes 0.5.0), and you would recreate the skew
     in the opposite direction — a local build *newer* than the store's.
   - Bump only when ConjureOS `scripts/package.json` moves first.
   - `npm run build` uses **this repo's own** installed copy of

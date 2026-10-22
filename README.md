@@ -120,7 +120,7 @@ The gate for this repo is **`npm run build` succeeds and CI is green** — not "
 1. `npm run build` runs the same `@conjureos/pack` `bundle()` that CI's `@bundle` uses, writing `dist/recipes.html`. It throws and exits non-zero on a real build error.
 2. **Optional runtime sanity check:** serve `dist/` (any static server) and open `dist/recipes.html` in a browser, and confirm it renders with a clean console. A clean build proves the app *bundles*; it does not prove the app *works*. The bridge is absent here too, so this is not a test of platform behavior.
 
-Keep `@conjureos/pack` on the `0.2.x` line CI uses — see CLAUDE.md for why bumping to npm `latest` would *recreate* the local-vs-store skew rather than fix it. `npm run check:pack-pin` enforces it.
+Keep `@conjureos/pack` on the `0.4.x` line CI uses. See CLAUDE.md for why bumping to npm `latest` would *recreate* the local-vs-store skew rather than fix it. `npm run check:pack-pin` enforces it.
 
 Bump `version` in **both** `package.json` and `src/version.ts` together (the in-app footer reads the latter, and CI fails the publish if they disagree).
 

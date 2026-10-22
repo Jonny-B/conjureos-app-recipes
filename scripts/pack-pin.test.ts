@@ -134,10 +134,10 @@ const at = (opts: { pin: string; locked: string | null; ciPin?: string }) => {
 }
 
 // --- newer than CI is also wrong ----------------------------------------
-// The tempting "just bump to npm latest" move: 0.3.0 is unreachable from
-// CI's ^0.2.0, so it breaks the gate in the opposite direction.
+// The tempting "just bump to npm latest" move: 0.5.0 is unreachable from
+// CI's ^0.4.0, so it breaks the gate in the opposite direction.
 {
-  const r = check(at({ pin: "^0.3.0", locked: "0.3.0", ciPin: "^0.2.0" }));
+  const r = check(at({ pin: "^0.5.0", locked: "0.5.0", ciPin: "^0.4.0" }));
   ok(
     r.errors.some((e) => e.includes("NEWER than")),
     "being ahead of CI fails too, not just being behind",
@@ -146,8 +146,8 @@ const at = (opts: { pin: string; locked: string | null; ciPin?: string }) => {
 
 // --- the healthy state passes -------------------------------------------
 {
-  const r = check(at({ pin: "^0.2.7", locked: "0.2.7", ciPin: "^0.2.0" }));
-  ok(r.errors.length === 0, `aligned 0.2.x state passes (got: ${r.errors.join("; ")})`);
+  const r = check(at({ pin: "^0.4.0", locked: "0.4.0", ciPin: "^0.4.0" }));
+  ok(r.errors.length === 0, `aligned 0.4.x state passes (got: ${r.errors.join("; ")})`);
 }
 
 // --- CI moving on tells you to update the fallback ----------------------
@@ -174,7 +174,7 @@ const at = (opts: { pin: string; locked: string | null; ciPin?: string }) => {
     "and an off-line pin still fails without ConjureOS present",
   );
 
-  const good = check(at({ pin: "^0.2.7", locked: "0.2.7" }));
+  const good = check(at({ pin: "^0.4.0", locked: "0.4.0" }));
   ok(good.errors.length === 0, "an on-line pin passes in fallback mode");
 }
 
