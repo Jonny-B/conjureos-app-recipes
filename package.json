@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.60.1",
+  "version": "0.60.3",
   "description": "Recipes for ConjureOS: a library you add to, browse and cook from. Write a recipe, photograph one, or describe a dish and have one written; then cook it step by step.",
   "type": "module",
   "license": "MIT",
@@ -1042,7 +1042,7 @@
       "Save this recipe to my library",
       "What did I cook this week?"
     ],
-    "editStyle": "locked",
+    "appType": "sealed",
     "editable": false
   },
   "//": "No Vite. `npm run dev` is the esbuild dev server from @conjureos/pack; the published build goes through ConjureOS @bundle in CI (same as a user-published app). Bump `version` here AND in src/version.ts together.",
@@ -1050,7 +1050,7 @@
     "dev": "conj-pack dev",
     "build": "npx -y tsx scripts/build-bundle.mjs",
     "typecheck": "tsc -b --noEmit",
-    "test": "npx -y tsx scripts/theme.test.ts && npx -y tsx scripts/catalog.test.ts && npx -y tsx scripts/pack-pin.test.ts",
+    "test": "npx -y tsx scripts/theme.test.ts && npx -y tsx scripts/catalog.test.ts && npx -y tsx scripts/pack-pin.test.ts && npx -y tsx scripts/app-type.test.ts",
     "check:pack-pin": "npx -y tsx scripts/pack-pin.ts"
   },
   "dependencies": {
