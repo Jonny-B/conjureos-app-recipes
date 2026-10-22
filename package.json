@@ -1,6 +1,6 @@
 {
   "name": "conjureos-app-recipes",
-  "version": "0.59.3",
+  "version": "0.59.4",
   "description": "Recipes for ConjureOS: a library you add to, browse and cook from. Write a recipe, photograph one, or describe a dish and have one written; then cook it step by step.",
   "type": "module",
   "license": "MIT",
@@ -1041,14 +1041,16 @@
       "What can I cook with chicken and rice?",
       "Save this recipe to my library",
       "What did I cook this week?"
-    ]
+    ],
+    "appType": "sealed",
+    "editable": false
   },
   "//": "No Vite. `npm run dev` is the esbuild dev server from @conjureos/pack; the published build goes through ConjureOS @bundle in CI (same as a user-published app). Bump `version` here AND in src/version.ts together.",
   "scripts": {
     "dev": "conj-pack dev",
     "build": "npx -y tsx scripts/build-bundle.mjs",
     "typecheck": "tsc -b --noEmit",
-    "test": "npx -y tsx scripts/theme.test.ts && npx -y tsx scripts/catalog.test.ts"
+    "test": "npx -y tsx scripts/theme.test.ts && npx -y tsx scripts/catalog.test.ts && npx -y tsx scripts/app-type.test.ts"
   },
   "dependencies": {
     "react": "^18.3.1",
