@@ -107,8 +107,8 @@ function parseRecipesResponse(raw: string): Recipe[] {
       : [];
     if (ingredients.length === 0 || instructions.length === 0) continue;
     const servings =
-      typeof o.servings === "number" && o.servings > 0 && o.servings <= 24
-        ? Math.round(o.servings)
+      typeof o.servings === "number" && Number.isFinite(o.servings) && o.servings > 0
+        ? Math.max(1, Math.round(o.servings))
         : 2;
     out.push({
       title: o.title.trim(),

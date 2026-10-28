@@ -236,7 +236,7 @@ function parseOneRecipe(raw: string): Recipe {
     difficulty: normalizeDifficulty(obj.difficulty),
     cookTime: typeof obj.cookTime === "number" && obj.cookTime > 0 ? Math.round(obj.cookTime) : 30,
     servings:
-      typeof obj.servings === "number" && obj.servings > 0 && obj.servings <= 24
+      typeof obj.servings === "number" && obj.servings > 0 && obj.servings <= 48
         ? Math.round(obj.servings)
         : 2,
     ingredients,

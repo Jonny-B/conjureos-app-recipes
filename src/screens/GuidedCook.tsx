@@ -112,15 +112,23 @@ export function GuidedCook({ recipe, saved, savedPath = null, onBack, onMade, on
    * Only once there IS progress: opening a recipe and backing straight out
    * must not overwrite the cook you left running on another recipe, and must
    * not manufacture a "Still cooking" card out of nothing. Once a session has
-   * been written, later changes keep writing even back down to nothing, so
-   * un-ticking your last step doesn't strand a stale snapshot on disk.
+   * been written, getting back down to nothing clears it, so un-ticking your
+   * last step doesn't strand a stale snapshot on disk.
    */
   const hasWritten = useRef(!!restored);
   useEffect(() => {
     if (madeDone) return; // the finish path owns clearing; don't rewrite behind it
     const steps = [...checkedStep];
     const ingredients = [...checkedIng];
-    if (!hasWritten.current && !hasProgress({ steps, ingredients, factor })) return;
+    if (!hasProgress({ steps, ingredients, factor })) {
+      // Back down to nothing: drop our snapshot rather than rewrite an empty
+      // one, which Home would offer as "Still cooking, 0 of N steps".
+      if (hasWritten.current) {
+        clearCookSession(cookKey);
+        hasWritten.current = false;
+      }
+      return;
+    }
     hasWritten.current = true;
     saveCookSession({ key: cookKey, recipe, savedPath, steps, ingredients, factor });
   }, [checkedStep, checkedIng, factor, madeDone, cookKey, recipe, savedPath]);

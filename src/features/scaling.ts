@@ -61,6 +61,16 @@ export function parseDisplayQuantity(line: string): DisplayQuantity {
   const tokens = line.trim().split(/\s+/);
   if (tokens.length === 0) return { count: null, unit: null, rest: line };
 
+  // An attached unit, "200g flour" or "500ml milk", splits into "200 g" so the
+  // unit detection below applies.
+  const attached = tokens[0]?.match(/^(\d+(?:\.\d+)?)([a-zA-Z]+)\.?$/);
+  if (attached) {
+    const letters = attached[2]!.toLowerCase();
+    if (KNOWN_UNITS.has(letters) || KNOWN_UNITS.has(letters.replace(/s$/, ""))) {
+      tokens.splice(0, 1, attached[1]!, attached[2]!);
+    }
+  }
+
   // The leading quantity: "2", "1.5", "1/2", or a whole number followed by a
   // proper fraction, "1 1/2". Nothing more: summing every leading number read
   // "1 14 oz can tomatoes" as 15 and scaled the can size with it.
@@ -120,6 +130,15 @@ function parseNumericToken(token: string): number | null {
   return null;
 }
 
+/** One end of a range: a number, or a whole number plus a proper fraction ("1 1/2"). */
+function parseRangeEnd(text: string): number | null {
+  const [a, b] = text.trim().split(/\s+/);
+  const whole = parseNumericToken(a!);
+  if (whole === null || b === undefined) return whole;
+  const frac = parseNumericToken(b);
+  return /^\d+$/.test(a!) && frac !== null && frac < 1 ? whole + frac : null;
+}
+
 // ── Scaled-line formatting ────────────────────────────────────────────
 
 /**
@@ -163,10 +182,12 @@ export function scaleLine(line: string, factor: number): string {
   if (factor === 1 || !Number.isFinite(factor) || factor <= 0) return line;
   // A range, "2-3 cups" or "2 to 3 cups": both ends scale. It used to parse as
   // no quantity at all and pass through unscaled.
-  const range = line.match(/^\s*(\d+(?:\.\d+)?(?:\/\d+)?)\s*(?:-|–|to)\s*(\d+(?:\.\d+)?(?:\/\d+)?)\b\s*(.*)$/);
+  // Either end may be a mixed number, "1 1/2 to 2 cups".
+  const Q = String.raw`\d+\s+\d+\/\d+|\d+(?:\.\d+)?(?:\/\d+)?`;
+  const range = line.match(new RegExp(`^\\s*(${Q})\\s*(?:-|\\u2013|to)\\s*(${Q})(?=\\s|$)\\s*(.*)$`));
   if (range) {
-    const lo = parseNumericToken(range[1]!);
-    const hi = parseNumericToken(range[2]!);
+    const lo = parseRangeEnd(range[1]!);
+    const hi = parseRangeEnd(range[2]!);
     if (lo !== null && hi !== null && hi > lo) {
       const tail = range[3]!.trim();
       return `${formatScaledNumber(lo * factor)}-${formatScaledNumber(hi * factor)}${tail ? ` ${tail}` : ""}`;

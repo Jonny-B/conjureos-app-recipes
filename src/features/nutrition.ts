@@ -163,23 +163,27 @@ interface CacheShape {
 }
 
 let cache: CacheShape | null = null;
-let cacheLoaded = false;
 
-async function loadCache(): Promise<CacheShape> {
-  if (cacheLoaded && cache) return cache;
+// One shared load: concurrent callers (the lookup workers) all await the same
+// promise, so they all get the same cache object rather than one each.
+let cachePromise: Promise<CacheShape> | null = null;
+
+function loadCache(): Promise<CacheShape> {
+  return (cachePromise ??= doLoad());
+}
+
+async function doLoad(): Promise<CacheShape> {
   try {
     const text = await vfs.read(CACHE_PATH);
     const parsed = JSON.parse(text);
     if (parsed && parsed.v === 1 && typeof parsed.entries === "object") {
       cache = parsed as CacheShape;
-      cacheLoaded = true;
       return cache;
     }
   } catch {
     /* no cache yet */
   }
   cache = { v: 1, entries: {} };
-  cacheLoaded = true;
   return cache;
 }
 
@@ -343,8 +347,29 @@ export function parseIngredient(line: string): ParsedIngredient | null {
   const trimmed = normalizeSizedContainer(
     lower.replace(/^[-*]\s*/, "").replace(/\s*\([^)]*\)\s*$/, "").trim(),
   );
-  const tokens = trimmed.split(/\s+/);
+  // A leading range, "4-6 chicken thighs" or "2 to 3 cloves garlic", counts as
+  // its midpoint. hi > lo keeps "1-1/2 cups" (a mixed number) from reading as 1 to 1/2.
+  let text = trimmed;
+  const range = trimmed.match(
+    /^(\d+(?:\.\d+)?(?:\/\d+)?)\s*(?:-|–|to)\s*(\d+(?:\.\d+)?(?:\/\d+)?)\s+(.+)$/,
+  );
+  if (range) {
+    const lo = parseQuantityToken(range[1]!);
+    const hi = parseQuantityToken(range[2]!);
+    if (lo !== null && hi !== null && hi > lo) text = `${round2((lo + hi) / 2)} ${range[3]}`;
+  }
+  const tokens = text.split(/\s+/);
   if (tokens.length === 0) return null;
+
+  // An attached unit, "200g flour" or "500ml milk", splits into "200 g".
+  const attached = tokens[0]!.match(/^(\d+(?:\.\d+)?)([a-z]+)\.?$/);
+  if (
+    attached &&
+    (UNIT_TO_GRAMS[attached[2]!] !== undefined ||
+      UNIT_TO_GRAMS[attached[2]!.replace(/s$/, "")] !== undefined)
+  ) {
+    tokens.splice(0, 1, attached[1]!, attached[2]!);
+  }
 
   // Pull the leading quantity: one number, plus a fraction after a whole
   // number ("1 1/2 cups"). Only that: summing every leading number read

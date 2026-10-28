@@ -553,10 +553,22 @@ export async function acceptTerms(version: string): Promise<void> {
 }
 
 /** Admin-only: search the user directory (by email / display name). */
-export async function adminListUsers(query = "", limit = 50, offset = 0): Promise<{ users: AppUser[]; total: number }> {
-  if (!isBackendAvailable()) return { users: MOCK_USERS, total: MOCK_USERS.length };
-  const r = await invokeRaw<{ users?: AppUser[]; total?: number }>("adminListUsers", { query, limit, offset });
-  return { users: r.users ?? [], total: r.total ?? 0 };
+export async function adminListUsers(
+  query = "",
+  limit = 50,
+  offset = 0,
+): Promise<{ users: AppUser[]; total: number; nextOffset: number; hasMore: boolean }> {
+  if (!isBackendAvailable()) return { users: MOCK_USERS, total: MOCK_USERS.length, nextOffset: MOCK_USERS.length, hasMore: false };
+  const r = await invokeRaw<{ users?: AppUser[]; total?: number; nextOffset?: number; hasMore?: boolean }>(
+    "adminListUsers",
+    { query, limit, offset },
+  );
+  const users = r.users ?? [];
+  const total = r.total ?? 0;
+  // The paging fields come from the server's raw row offset (test accounts are
+  // dropped from a page); an older server sends none, so fall back to counting.
+  const nextOffset = r.nextOffset ?? offset + users.length;
+  return { users, total, nextOffset, hasMore: r.hasMore ?? nextOffset < total };
 }
 
 /** Admin-only: set a user's role. */

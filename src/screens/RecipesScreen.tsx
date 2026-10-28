@@ -93,7 +93,12 @@ export function RecipesScreen({ recipes, onRestart, onCook }: Props) {
         } catch {
           card = { kind: "empty" };
         }
-        if (!run.aborted) setNutrition((prev) => prev.map((s, j) => (j === i ? card : s)));
+        // Cut off mid-lookup: the aborted fetches failed, so what came back
+        // counts only the cached ingredients. Report empty so a save made while
+        // this was pending recomputes it (backfillNutrition) instead of
+        // persisting an undercounted strip.
+        if (run.aborted) return { kind: "empty" };
+        setNutrition((prev) => prev.map((s, j) => (j === i ? card : s)));
         return card;
       });
       chain = p;
@@ -167,7 +172,7 @@ export function RecipesScreen({ recipes, onRestart, onCook }: Props) {
   const adjustServings = (idx: number, delta: number) => {
     const recipe = recipes[idx]!;
     const current = Math.max(1, Math.round(recipe.servings * (scaleFactors[idx] ?? 1)));
-    const next = Math.max(1, Math.min(24, current + delta));
+    const next = Math.max(1, Math.min(Math.max(24, recipe.servings), current + delta));
     const factor = next / recipe.servings;
     setScaleFactors((prev) => prev.map((f, i) => (i === idx ? factor : f)));
   };
@@ -291,7 +296,7 @@ function RecipeCard({
           <button
             className="icon-btn"
             onClick={() => onServingsChange(1)}
-            disabled={scaled.servings >= 24}
+            disabled={scaled.servings >= Math.max(24, original.servings)}
             title="More servings"
             aria-label="Increase servings"
           >

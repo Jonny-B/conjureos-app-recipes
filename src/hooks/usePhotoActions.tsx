@@ -51,6 +51,9 @@ export function usePhotoActions({
   const [busy, setBusy] = useState<PhotoOp | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [original, setOriginal] = useState<string | null>(null);
+  // The original's bytes, not just its URL: on a surface that saves every apply
+  // at once, the server deletes the replaced upload, so the URL goes dead.
+  const originalPhoto = useRef<{ mediaType: string; base64: string } | null>(null);
   const canGenerate = isAiPhotoAvailable();
   const canEnhance = isAiEnhanceAvailable();
   const [generateCost, setGenerateCost] = useState<number | null>(null);
@@ -78,6 +81,7 @@ export function usePhotoActions({
     try {
       const { url } = await enhanceRecipePhoto(photo, subject().recipe);
       setOriginal(originalUrl);
+      originalPhoto.current = photo;
       await apply(url, true);
     } catch (e) {
       // The original is already in place, so a failed enhance loses nothing.
@@ -102,6 +106,7 @@ export function usePhotoActions({
       photo = await preparePhoto(file);
       url = await uploadRecipeImage(photo.mediaType, photo.base64);
       setOriginal(null);
+      originalPhoto.current = null;
       await apply(url, false);
     } catch (err) {
       fail(err);
@@ -152,6 +157,7 @@ export function usePhotoActions({
     try {
       const { url } = await generateRecipePhoto(recipe, category);
       setOriginal(null);
+      originalPhoto.current = null;
       await apply(url, true);
     } catch (e) {
       fail(e);
@@ -165,6 +171,7 @@ export function usePhotoActions({
     setBusy("removing");
     try {
       setOriginal(null);
+      originalPhoto.current = null;
       await apply(null, false);
     } catch (e) {
       fail(e);
@@ -177,11 +184,29 @@ export function usePhotoActions({
   const restoreOriginal = async () => {
     if (!original) return;
     const url = original;
+    const held = originalPhoto.current;
     setError(null);
     setBusy("uploading");
     try {
-      await apply(url, false);
+      // Imported catalog photos are never deleted and carry their credit in
+      // the URL, so put that URL back as it is. Anything else may be gone (the
+      // replacing save deletes it) or not the caller's to set, so upload the
+      // bytes again; the same fallback covers a catalog URL an admin can't set.
+      let done = false;
+      if (!held || /\/recipe-images\/(usda-myplate|nhlbi)\//.test(url)) {
+        try {
+          await apply(url, false);
+          done = true;
+        } catch (e) {
+          if (!held) throw e;
+        }
+      }
+      if (!done && held) {
+        const fresh = await uploadRecipeImage(held.mediaType, held.base64);
+        await apply(fresh, false);
+      }
       setOriginal(null);
+      originalPhoto.current = null;
     } catch (e) {
       fail(e);
     } finally {

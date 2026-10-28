@@ -68,6 +68,9 @@ function downscale(
   canvas.height = dstH;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("2D canvas context unavailable");
+  // JPEG has no alpha, so transparent pixels would come out black.
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, dstW, dstH);
   ctx.drawImage(bitmap as CanvasImageSource, 0, 0, dstW, dstH);
   return { canvas, width: dstW, height: dstH };
 }

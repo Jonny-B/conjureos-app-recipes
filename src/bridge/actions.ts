@@ -649,6 +649,8 @@ function projectCatalog(r: CatalogRecipe): Record<string, unknown> {
 async function getCatalogRecipe(rawParams?: unknown): Promise<{ recipe: Record<string, unknown> | null }> {
   const p = asObject(rawParams);
   const id = asCatalogId(p.id);
+  // Server ids are uuids; a stale non-uuid id (e.g. a deleted AllRecipes row) would 500 in Postgres and read as an outage.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return { recipe: null };
   let r: CatalogRecipe | null;
   try {
     r = await api.fetchCatalogRecipe(id);

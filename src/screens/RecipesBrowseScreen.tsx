@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CatalogRecipe, FeedRecipe, Recipe, RecipeSource, SavedRecipe } from "../types";
 import { getCatalog, categories, toRecipe, loadRecipeBody, withRecipeBody, patchCatalogRecipe, isCatalogLoaded, isCatalogLoading } from "../features/catalog";
 import {
@@ -201,6 +201,14 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
   // the console — see components/ErrorBanner. Delete is the one that hurt
   // most: the confirm dialog just sat there when the call rejected.
   const { error: actionError, clear: clearActionError, run } = useActionError();
+  // The list and the detail share one scroller (.app-body), so the list's offset
+  // is recorded on the way in and put back on the way out.
+  const listScroll = useRef(0);
+  const openRecipe = async (fi: FeedRecipe) => {
+    const full = await withRecipeBody(fi);
+    listScroll.current = document.querySelector<HTMLElement>(".app-body")?.scrollTop ?? 0;
+    setSelected(full);
+  };
   const onToggleFavorite = (fi: FeedRecipe) =>
     run(async () => {
       if (fi.kind === "catalog") setFavs(await toggleCatalogFavorite(fi.id));
@@ -237,6 +245,12 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
     if (!s) return null;
     return { kind: "saved", recipe: s, favorite: !!s.favorite };
   }, [selected, favs, saved]);
+
+  const detailOpen = !!resolvedSelected;
+  useLayoutEffect(() => {
+    const sc = document.querySelector<HTMLElement>(".app-body");
+    if (sc) sc.scrollTop = detailOpen ? 0 : listScroll.current;
+  }, [detailOpen]);
 
   // ── Add-a-recipe sub-views (by hand / by picture / by description) ──
   if (mode === "write" || mode === "snap" || mode === "describe") {
@@ -326,7 +340,7 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
       {browsing && hero && (
         <HeroPick
           scored={hero}
-          onView={() => run(async () => setSelected(await withRecipeBody(hero.fi)))}
+          onView={() => run(() => openRecipe(hero.fi))}
           onShuffle={() => setShuffle((n) => n + 1)}
           canShuffle={heroPool.length > 1}
         />
@@ -336,15 +350,13 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
         <button
           className="chef-promo"
           onClick={() =>
-            run(async () =>
-              setSelected(
-                await withRecipeBody({
-                  kind: "catalog" as const,
-                  id: chefPick.id,
-                  recipe: chefPick,
-                  favorite: favs.has(chefPick.id),
-                }),
-              ),
+            run(() =>
+              openRecipe({
+                kind: "catalog" as const,
+                id: chefPick.id,
+                recipe: chefPick,
+                favorite: favs.has(chefPick.id),
+              }),
             )
           }
         >
@@ -444,7 +456,7 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
       {!loaded ? (
         <div className="center-spinner"><div className="spinner" /></div>
       ) : ranked.length === 0 ? (
-        <EmptyState source={source} hasQuery={!!query || (source === "all" && category !== "all")} onAdd={() => setMode("write")} failed={loadFailed} onRetry={() => { setLoaded(false); void refresh(); }} catalogRetry={retryCatalog} catalogState={catalogState} />
+        <EmptyState source={source} hasQuery={!!query || (source === "all" && category !== "all")} onAdd={() => setMode("write")} failed={loadFailed} onRetry={() => { setLoaded(false); void refresh(); }} catalogRetry={retryCatalog} catalogState={catalogState} hasCatalogFavs={favs.size > 0} />
       ) : (
         <>
           <div className="browse-list">
@@ -452,7 +464,7 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
               <RecipeRow
                 key={keyOf(fi)}
                 fi={fi}
-                onOpen={() => run(async () => setSelected(await withRecipeBody(fi)))}
+                onOpen={() => run(() => openRecipe(fi))}
               />
             ))}
           </div>
@@ -526,10 +538,12 @@ function matchesQuery(fi: FeedRecipe, q: string): boolean {
   return false;
 }
 
-function EmptyState({ source, hasQuery, onAdd, failed, onRetry, catalogRetry, catalogState }: { source: RecipeSource; hasQuery: boolean; onAdd: () => void; failed: boolean; onRetry: () => void; catalogRetry: () => void; catalogState: "ok" | "loading" | "failed" }) {
-  if (source === "all" && catalogState === "loading")
+function EmptyState({ source, hasQuery, onAdd, failed, onRetry, catalogRetry, catalogState, hasCatalogFavs }: { source: RecipeSource; hasQuery: boolean; onAdd: () => void; failed: boolean; onRetry: () => void; catalogRetry: () => void; catalogState: "ok" | "loading" | "failed"; hasCatalogFavs: boolean }) {
+  // Favourited catalog recipes only resolve once the catalog is in, so the Favorites tab waits on it too.
+  const needsCatalog = source === "all" || (source === "favorites" && hasCatalogFavs);
+  if (needsCatalog && catalogState === "loading")
     return <div className="center-spinner"><div className="spinner" /></div>;
-  if (source === "all" && catalogState === "failed")
+  if (needsCatalog && catalogState === "failed")
     return (
       <div className="empty-state">
         <Icon name="bowl-food" className="empty-icon" />

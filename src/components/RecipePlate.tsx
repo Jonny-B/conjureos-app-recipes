@@ -39,14 +39,17 @@ export function RecipePlate({
    */
   variant: "tile" | "poster" | "cover";
 }) {
-  const [broken, setBroken] = useState(false);
+  // Remember WHICH url failed, not that one did: a replaced photo reaches this
+  // same instance with a new url and must get its own chance to load.
+  const [brokenUrl, setBrokenUrl] = useState<string | null>(null);
   const look = lookFor(category);
-  const photo = RECIPE_PHOTOS_ENABLED && recipe.imageUrl && !broken ? recipe.imageUrl : null;
+  const photo =
+    RECIPE_PHOTOS_ENABLED && recipe.imageUrl && recipe.imageUrl !== brokenUrl ? recipe.imageUrl : null;
 
   if (photo) {
     return (
       <div className={`plate plate--${variant} plate--photo`}>
-        <img src={photo} alt="" loading="lazy" onError={() => setBroken(true)} />
+        <img src={photo} alt="" loading="lazy" onError={() => setBrokenUrl(photo)} />
         {variant !== "tile" && recipe.imageCredit && !recipe.imageAi && (
           <span className="plate-credit">Photo: {recipe.imageCredit}</span>
         )}

@@ -504,6 +504,8 @@ select {
   height: 1em;
   flex: 0 0 auto;
   vertical-align: -0.125em;
+  /* Several FA 7 glyphs draw past their viewBox; FA's own CSS does this too. */
+  overflow: visible;
 }
 
 .btn:active {
@@ -2247,8 +2249,8 @@ select {
   align-items: center;
   justify-content: center;
   border-radius: var(--r-1);
-  background: var(--accent-soft);
-  color: var(--accent-warm);
+  background: var(--cui-accent);
+  color: var(--cui-on-accent);
 }
 
 /* ── Admin console ─────────────────────────────────────────────────────── */

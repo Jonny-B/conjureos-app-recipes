@@ -62,7 +62,9 @@ export function RecipeEditor({
     setBusy("tidying");
     try {
       const cleaned = await reviewRecipe(recipe);
-      setRecipe(cleaned);
+      // parseOneRecipe returns only the body fields; merge over the working
+      // recipe so category, tags and tokens survive the next Update.
+      setRecipe((prev) => ({ ...prev, ...cleaned, nutrition: prev.nutrition }));
       setDirty(false);
       setSaved(false);
     } catch (e) {
@@ -196,18 +198,23 @@ function EditablePreview({
 
       {/* Photos are stored and round-tripped, but not surfaced — the app
           commits to a typographic treatment. See features/flags.ts. */}
+      {/* The photo and blog are persisted only by Save, which is hidden once
+          saved; a disabled fieldset keeps them from changing (and from
+          spending credits) on a row that has already been written. */}
       {RECIPE_PHOTOS_ENABLED && (
-        <ImagePicker
-          value={image}
-          onChange={onImageChange}
-          aiSource={() => ({ recipe })}
-          label={chefMode ? "Blog header image" : "Recipe photo"}
-          hint={
-            chefMode
-              ? "Shown big at the top of your post, above the story. Optional."
-              : "A photo of the finished dish. Optional."
-          }
-        />
+        <fieldset disabled={saved} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+          <ImagePicker
+            value={image}
+            onChange={onImageChange}
+            aiSource={() => ({ recipe })}
+            label={chefMode ? "Blog header image" : "Recipe photo"}
+            hint={
+              chefMode
+                ? "Shown big at the top of your post, above the story. Optional."
+                : "A photo of the finished dish. Optional."
+            }
+          />
+        </fieldset>
       )}
 
       <section>
@@ -253,24 +260,26 @@ function EditablePreview({
       </section>
 
       {chefMode && (
-        <section>
-          <h4>
-            Your story{" "}
-            <span className="muted" style={{ fontWeight: 400, fontSize: 13 }}>(optional blog)</span>
-          </h4>
-          <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
-            The story behind the dish — a memory, where it's from, a bit of your life and career.
-            Readers scroll through this before the recipe, or skip straight to it. Markdown supported.
-          </p>
-          <textarea
-            className="chef-blog-input"
-            value={blog}
-            onChange={(e) => onBlogChange(e.target.value)}
-            placeholder="Write as much or as little as you like…"
-            rows={8}
-            maxLength={20000}
-          />
-        </section>
+        <fieldset disabled={saved} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+          <section>
+            <h4>
+              Your story{" "}
+              <span className="muted" style={{ fontWeight: 400, fontSize: 13 }}>(optional blog)</span>
+            </h4>
+            <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+              The story behind the dish — a memory, where it's from, a bit of your life and career.
+              Readers scroll through this before the recipe, or skip straight to it. Markdown supported.
+            </p>
+            <textarea
+              className="chef-blog-input"
+              value={blog}
+              onChange={(e) => onBlogChange(e.target.value)}
+              placeholder="Write as much or as little as you like…"
+              rows={8}
+              maxLength={20000}
+            />
+          </section>
+        </fieldset>
       )}
 
       <div className="row" style={{ marginTop: "auto", flexWrap: "wrap", gap: 8 }}>

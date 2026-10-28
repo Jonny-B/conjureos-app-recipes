@@ -61,9 +61,17 @@ export function Dropdown<T extends string>({ options, value, onChange, ariaLabel
               role="option"
               aria-selected={o.value === value}
               className={`dropdown-option${o.value === value ? " active" : ""}`}
+              tabIndex={0}
               onClick={() => {
                 onChange(o.value);
                 setOpen(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onChange(o.value);
+                  setOpen(false);
+                }
               }}
             >
               <span>{o.label}</span>

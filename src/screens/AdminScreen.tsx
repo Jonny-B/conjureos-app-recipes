@@ -88,6 +88,8 @@ function UsersView({ myEmail, onViewRecipes }: { myEmail: string | null; onViewR
   const [query, setQuery] = useState("");
   const [users, setUsers] = useState<AppUser[] | null>(null);
   const [total, setTotal] = useState(0);
+  const [nextOffset, setNextOffset] = useState(0); // raw row offset, not users.length
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null); // userId mid-update
@@ -99,8 +101,12 @@ function UsersView({ myEmail, onViewRecipes }: { myEmail: string | null; onViewR
     try {
       const r = await adminListUsers(q, PAGE, offset);
       if (mine !== seq.current) return;
-      setUsers((prev) => (offset === 0 || !prev ? r.users : [...prev, ...r.users]));
+      setUsers((prev) =>
+        offset === 0 || !prev ? r.users : [...prev, ...r.users.filter((u) => !prev.some((p) => p.userId === u.userId))],
+      );
       setTotal(r.total);
+      setNextOffset(r.nextOffset);
+      setHasMore(r.hasMore);
       setError(null);
     } catch (e) {
       if (mine === seq.current) setError(e instanceof Error ? e.message : String(e));
@@ -278,9 +284,9 @@ function UsersView({ myEmail, onViewRecipes }: { myEmail: string | null; onViewR
           })}
         </div>
       )}
-      {users && users.length < total && (
+      {users && hasMore && (
         <div style={{ textAlign: "center" }}>
-          <button className="btn ghost" onClick={() => void load(query.trim(), users.length)}>
+          <button className="btn ghost" onClick={() => void load(query.trim(), nextOffset)}>
             Show more ({total - users.length} left)
           </button>
         </div>

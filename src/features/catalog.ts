@@ -96,7 +96,8 @@ export async function loadRecipeBody<T extends { id?: string; ingredients: strin
       bodies.set(c.id, { ingredients: full.ingredients, instructions: full.instructions });
       // Patch the in-memory row so subsequent reads are already complete.
       const i = catalog.findIndex((r) => r.id === c.id);
-      if (i >= 0) catalog[i] = { ...catalog[i]!, ingredients: full.ingredients, instructions: full.instructions };
+      // In place, not a new object: the feed memo holds this row and must see later patches.
+      if (i >= 0) Object.assign(catalog[i]!, { ingredients: full.ingredients, instructions: full.instructions });
       return { ...c, ingredients: full.ingredients, instructions: full.instructions };
     }
   } catch {
@@ -119,7 +120,14 @@ export async function loadRecipeBody<T extends { id?: string; ingredients: strin
 export async function withRecipeBody<T extends { recipe: { id?: string; ingredients: string[]; instructions: string[] } }>(
   fi: T,
 ): Promise<T> {
-  return { ...fi, recipe: await loadRecipeBody(fi.recipe) };
+  const recipe = await loadRecipeBody(fi.recipe);
+  // loadRecipeBody swallows a failed fetch and hands back the slim row. A catalog row always
+  // has a body, so an id-bearing row still empty means the fetch failed: throw so the screen
+  // shows its error banner instead of opening a blank, uncookable recipe.
+  if (recipe.id && (recipe.ingredients.length === 0 || recipe.instructions.length === 0)) {
+    throw new Error("Couldn't load this recipe. Check your connection and try again.");
+  }
+  return { ...fi, recipe };
 }
 
 /**

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Recipe, RecipeSource, SavedRecipe } from "./types";
 import { RecipesBrowseScreen } from "./screens/RecipesBrowseScreen";
 import { StudioScreen } from "./screens/StudioScreen";
@@ -78,6 +78,8 @@ export function App() {
   const [tab, setTab] = useState<Tab>("recipes");
   const [recipeSource, setRecipeSource] = useState<RecipeSource>("all");
   const [cookTarget, setCookTarget] = useState<CookTarget | null>(null);
+  const bodyRef = useRef<HTMLElement>(null);
+  const savedScroll = useRef(0);
   const [catalogVersion, setCatalogVersion] = useState(0);
   const [cogOpen, setCogOpen] = useState(false);
   // The opening screen, up until the catalog has loaded (or SPLASH_MAX_MS).
@@ -124,6 +126,9 @@ export function App() {
    * screens into the library is exactly where you left it.
    */
   const startCook = async (recipe: Recipe, saved: SavedRecipe | null = null) => {
+    // `.app-body` is the one scroll container and the cook mounts inside it, so
+    // remember where the screen underneath was before the cook takes it over.
+    savedScroll.current = bodyRef.current?.scrollTop ?? 0;
     // A catalog row is slim (no ingredients, no steps) until its body is
     // fetched; filling it HERE, where every open lands, means no doorway can
     // open a cook with "Ingredients 0/0" (ConjureOS #643). A no-op for a
@@ -134,6 +139,13 @@ export function App() {
   const endCook = () => setCookTarget(null);
 
   const cooking = !!cookTarget;
+
+  // The cook opens at its own top; closing it puts the screen underneath back.
+  useLayoutEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    el.scrollTop = cooking ? 0 : savedScroll.current;
+  }, [cooking]);
 
   return (
     <div className={`app${tabs.length > 1 ? " app--rail" : ""}`}>
@@ -146,7 +158,7 @@ export function App() {
           <Icon name="gear" />
         </button>
       </header>
-      <main className="app-body">
+      <main className="app-body" ref={bodyRef}>
         {banned && (
           // Server-side every action already refuses; this says so instead of
           // letting each screen fail on its own.
@@ -213,6 +225,10 @@ export function App() {
               onClick={() => {
                 // Leaving a guided cook via the nav always returns to a real
                 // view, never a stale recipe.
+                // A new tab starts at the top; clearing the saved offset keeps
+                // the cook's restore from putting the old one back.
+                savedScroll.current = 0;
+                bodyRef.current?.scrollTo(0, 0);
                 setCookTarget(null);
                 setTab(t.id);
               }}

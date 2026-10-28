@@ -16,6 +16,7 @@
 import { vfs } from "../bridge/vfs";
 import * as api from "../bridge/recipesApi";
 import { isBackendAvailable, recipeIdFromPath } from "../bridge/recipesApi";
+import { TermsDeclinedError } from "./terms";
 import type { NutritionStrip, Recipe, SavedRecipe, Difficulty } from "../types";
 
 const RECIPES_DIR = "/home/Documents/Recipes";
@@ -174,14 +175,18 @@ async function migrateLegacyRecipes(): Promise<void> {
       }
       if (!parsed) continue; // unparseable — same
       const key = importKey(parsed.title);
-      if (existing.has(key)) continue; // already imported on an earlier attempt
+      // An empty key (a title of only punctuation) has no identity to dedupe on.
+      if (key && existing.has(key)) continue; // already imported on an earlier attempt
       try {
         const added = await api.addRecipe({ ...toPlainRecipe(parsed), visibility: "private" });
-        existing.add(key);
+        if (key) existing.add(key);
         if (parsed.favorite) {
           await api.setFavorite(recipeIdFromPath(added.path), true).catch(() => {});
         }
-      } catch {
+      } catch (e) {
+        // Declining the terms is a choice, not an outage: stop asking (the sheet
+        // would reopen once per remaining file) and leave the flag open to retry.
+        if (e instanceof TermsDeclinedError) return;
         backendFailures++;
       }
     }
@@ -199,7 +204,7 @@ async function migrateLegacyRecipes(): Promise<void> {
  * re-importing the same one on every retry.
  */
 function importKey(title: string): string {
-  return title.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return title.normalize("NFKC").trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 }
 
 async function markMigrated(): Promise<void> {
