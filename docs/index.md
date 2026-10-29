@@ -1,6 +1,6 @@
-# Conjure Pantry — Documentation
+# Recipes — Documentation
 
-This folder is the source of truth for how Conjure Pantry works, why it is
+This folder is the source of truth for how Recipes works, why it is
 built the way it is, and the rules we follow when we change it. It exists to
 do two jobs:
 
@@ -18,7 +18,7 @@ exist. Put it here.
 
 | Doc | What it covers |
 |---|---|
-| **[how-it-works.md](./how-it-works.md)** | The keystone. The whole system end to end: the user journey, the layers and why they exist, auth & permissions, the "backend", mocks, the manifest + orchestrator, how we ship PRs, and how deployments work. |
+| **[how-it-works.md](./how-it-works.md)** | The keystone. The whole system end to end: the user journey, the layers and why they exist, the "backend", auth & permissions, running outside ConjureOS, the manifest + orchestrator, how we ship PRs, and how deployments work. |
 
 > The keystone doc is the one you read first and the one every other doc is
 > measured against. New docs narrow in on a single topic; they do not restate
@@ -46,7 +46,7 @@ Forward-looking docs are normal here; we write down the plan before we build
 it. To keep "what is true today" separate from "what we intend", tag any
 section, row, or claim that is not yet real in the code:
 
-- `[Implemented]` — true in the code on `dev` right now. The default; only
+- `[Implemented]` — true in the code on `main` right now. The default; only
   written when a section mixes states.
 - `[Convention]` — the rule we follow by agreement. May not be machine-
   enforced yet (e.g. a PR checklist item with no CI gate).

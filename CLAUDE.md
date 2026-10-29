@@ -23,7 +23,7 @@ Pantry through the action bridge, never to grow a second copy of it.
 | Thing | Value | Changeable? |
 |---|---|---|
 | Store slug | `recipes` | **No.** It is the dedupe key for every installed copy. |
-| VFS path | `/home/Documents/Recipes/` | **No.** It holds saved files on every device. |
+| VFS path | `/home/Documents/Recipes/` | **No.** It holds the catalog-favourites and blocked indices (and the old markdown recipes the one-time import lifts) on every device. Saved recipes themselves are `recipes-db` rows. |
 | Display name | `Recipes` | It was briefly "Conjure Pantry". Two apps with that name is the worst outcome of the split. |
 | Backend | `recipes-db` (in the ConjureOS repo) | Pantry must never read it, and this app must never read Pantry's. |
 
@@ -56,8 +56,10 @@ action's `required` array, or narrowing a type, disconnects Pantry with **no
 error anywhere** — it just reports that nothing can suggest meals, and plans
 nothing. Nothing in this repo's tests will fail. Before touching any of the
 three schemas, run
-`conjureos-pantry/scripts/needs.test.ts`, which checks this app's real shapes
-against Pantry's declared needs using the kernel's own matcher.
+`conjureos-pantry/scripts/needs.test.ts` (`npx tsx scripts/needs.test.ts` there),
+which checks this app's real shapes against Pantry's declared needs using the
+kernel's own matcher, and reads this repo's `package.json` live when it sits
+next to Pantry's checkout.
 
 ## Before publishing: `npm run build` must pass, and CI must be green
 
@@ -66,8 +68,13 @@ source and reloads it; it does **not** stand up any part of the ConjureOS
 bridge — there is no injected shim, so `ai.complete`, `actions.*`,
 `auth.whoami`, `notify` and the VFS are simply absent locally. (Anything
 claiming `conj-pack dev` has "mocked bridges" is wrong; see ConjureOS #722.)
-Dev covers layout and state and stops there, so code can pass in dev and still
-crash on import.
+What does exist is this app's own fallback: `src/bridge/ai.ts`, `vfs.ts`,
+`whoami.ts` and the role, upload and admin calls in `recipesApi.ts` answer with
+canned data, an in-memory VFS and a pretend admin when the host is missing, so
+the UI renders. That is app code, it proves nothing about the real bridge, and
+its canned replies for the retired fridge scan, planner and store-aisle prompts
+in `ai.ts` are dead. Dev covers layout and state and stops there, so code can
+pass in dev and still crash on import.
 
 The store build is `@conjureos/pack`'s `bundle()` (esbuild-wasm + jspm
 importmap), run by ConjureOS `@bundle` in CI.
@@ -139,9 +146,10 @@ itself is never a setting: `data-theme` is always written as `"spr"`, and
 (Conjure Pantry locks BOTH axes — Spring and light — so do not copy its
 `theme.ts` here, or this app loses its dark mode.)
 
-`npm test` runs `scripts/theme.test.ts`: 19 plain-tsx cases, no framework. 18
-exercise `theme.ts`; the last reads `src/conjureos-ui.css` off disk to guard the
-re-sync below.
+`npm test` runs four plain-tsx scripts, no framework: `theme.test.ts` (19
+cases; 18 exercise `theme.ts`, the last reads `src/conjureos-ui.css` off disk to
+guard the re-sync below), `catalog.test.ts` (the catalog's paging, ConjureOS
+#535), `pack-pin.test.ts` and `app-type.test.ts`.
 
 `src/conjureos-ui.css` is a VENDORED copy of `@conjureos/ui` `dist/ui.css` and
 must stay at a 1.x version — 0.x had one dark palette and no light/dark axis, so
@@ -181,9 +189,10 @@ publish if they differ; the in-app footer reads `src/version.ts`.
 
 ## Catalog
 
-The catalog is **USDA MyPlate** — 1,120 recipes, US federal government content,
-public domain. It lives in the `recipes` table (`provenance='usda-myplate'`) and
-is fetched from `recipes-db` at runtime; it is NOT bundled.
+The catalog is 1,240 recipes of US federal government content, public domain:
+**USDA MyPlate**, 1,120 of them, plus the 120 NHLBI recipes below. It lives in
+the `recipes` table (`provenance='usda-myplate'` / `'nhlbi'`, `source='catalog'`,
+public) and is fetched from `recipes-db` at runtime; it is NOT bundled.
 
 **The scraped AllRecipes corpus is gone** (2026-09-17): 3,170 rows deleted from
 prod, 3,169 from dev. Do not regenerate it. `scripts/build-catalog.ts` and
@@ -238,18 +247,23 @@ Backend half lives in ConjureOS `recipes-db` + migration `157_recipes_moderation
   banned, recipes-db refuses everything but `myRole`, and the app shows a
   notice instead of itself. Admins can't be banned (demote first).
 - **Terms** (`src/features/terms.ts`): users keep ownership and grant ConjureOS
-  LLC a broad licence (owner decision; the text is an unreviewed DRAFT). The app
-  asks before the first save/upload/AI photo; recipes-db refuses `add`,
-  `update`, `chefUpsert` and `uploadImage` until accepted. Bump `TERMS_VERSION`
-  when the text changes and everyone is asked again.
+  LLC a broad licence that ends when the content or the account is deleted
+  (owner decisions 2026-09-23 and 2026-10-01; final copy awaiting counsel
+  review, ConjureOS OPEN_QUESTIONS "Legal copy"; the text also says where AI
+  input goes and that AI can be wrong, 0.59.2). The app asks before the first
+  save/upload/AI photo and shows the text under the cog's "Recipe terms";
+  recipes-db refuses `add`, `update`, `chefUpsert` and `uploadImage` until
+  accepted. Bump `TERMS_VERSION` (now `2026-10-01`) when the text changes and
+  everyone is asked again.
 - **AI photos** (`src/features/aiPhoto.ts`): ConjureOS `ai.image.generate`
   (desktop only; billed to the requesting user's credits, an admin's own for
-  admin actions). "AI-generated" is **burned into the pixels** in the app before
-  upload — not a CSS overlay — and uploaded with `ai: true`, which keys it
-  `ai-<uuid>` so the server derives `recipes.image_ai`. The open recipe also
-  shows an "AI image" pill, because the photo fade can cover the stamp there.
-  Terms are checked BEFORE generating, so nobody pays for an image they can't
-  save.
+  admin actions) at the `high` option, `AI_PHOTO_OPTION` (owner, 2026-09-24:
+  the cheapest rung looked poor). "AI-generated" is **burned into the pixels**
+  in the app before upload — not a CSS overlay — and uploaded with `ai: true`,
+  which keys it `ai-<uuid>` so the server derives `recipes.image_ai`. The open
+  recipe also shows an "AI image" pill, because the photo fade can cover the
+  stamp there. Terms are checked BEFORE generating, so nobody pays for an image
+  they can't save.
 
 ## Recipe photos: upload, enhance, generate (0.57.0)
 
@@ -267,9 +281,10 @@ recipe's ••• menu, and each row of Admin → Recipes — goes through ONE 
   edit model can change the food and the person photographed their own dinner.
 - **Generate with AI** from scratch, stamped "AI-generated" (unchanged).
 
-An edit is quoted as a CEILING ("up to N credits") and charged what the input
-actually cost, never more. The enhance options hide themselves on a ConjureOS
-without `ai.image.edit`. Don't add a photo path that bypasses the hook.
+An edit is quoted as a CEILING ("up to N credits", in the editor's picker) and
+charged what the input actually cost, never more. The enhance options hide
+themselves on a ConjureOS without `ai.image.edit`. Don't add a photo path that
+bypasses the hook.
 
 ## Visual language
 
@@ -293,6 +308,14 @@ rules live at the top of `src/styles.css`; the short version:
 - **Never hardcode a colour.** Spring's `--cui-on-accent` is DARK (`#0d1108`) in
   the dark flavour and white in light, so `color: #fff` on a filled button is a
   real bug in Spring dark. Use the token and check both flavours.
+
+**Wide windows** (0.60.0, ConjureOS #996): above the 860px desktop layout there
+are two more steps, 1280px+ (a 1360px page, recipe grid columns of at least
+300px, the hero capped) and 1600px+ (a 1640px page, columns of at least 360px),
+both `(pointer: fine)` only, so phone and tablet never match. The open recipe
+keeps its own reading measure. Every control is at least 44px to aim at: text
+controls grow to it, the fixed icon buttons get an invisible 44px hit area. The
+rules are the two blocks near the end of `src/styles.css`.
 
 The **cookbook layer** (0.54.0) sits on top of that, because squares and
 hairlines alone read as a 2001 directory listing:
