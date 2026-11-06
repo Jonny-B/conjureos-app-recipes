@@ -144,6 +144,8 @@ export interface CatalogRecipe extends Recipe {
   sourceUrl: string;
   /** Canonical ingredient names (parseIngredient), precomputed at build time. */
   tokens: string[];
+  /** True when the signed-in reader wrote it (server-derived); hides Report and Block. */
+  mine?: boolean;
 }
 
 /**

@@ -14,6 +14,8 @@ import { RecipePlate } from "../components/RecipePlate";
 import { RecipeStats } from "../components/RecipeStats";
 import { categoryOf, keyIngredients, lookFor } from "../features/recipeLook";
 import { RecipeDetail } from "./RecipeDetail";
+import { SafetyActions } from "../components/SafetyActions";
+import { isRecipeHidden } from "../features/blockedAuthors";
 import { CreateScreen } from "./CreateScreen";
 import { SnapRecipeScreen } from "./SnapRecipeScreen";
 import { DescribeScreen } from "./DescribeScreen";
@@ -33,6 +35,8 @@ interface Props {
   onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
   /** Bumped by App when the catalog reloads from the DB, so the memos re-run. */
   catalogVersion?: number;
+  /** Bumped by App when the blocked list changes, so the chef pick is re-read. */
+  blockVersion?: number;
   /** Admin: may give any recipe an AI photo or remove its photo. */
   isAdmin?: boolean;
   /** True while the guided cook covers this screen; it re-reads when the cook closes. */
@@ -61,7 +65,7 @@ function keyOf(fi: FeedRecipe): string {
   return fi.kind === "catalog" ? `c:${fi.id}` : `s:${fi.recipe.path}`;
 }
 
-export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVersion = 0, isAdmin = false, cooking = false, onCatalogRetry }: Props) {
+export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVersion = 0, blockVersion = 0, isAdmin = false, cooking = false, onCatalogRetry }: Props) {
   const [saved, setSaved] = useState<SavedRecipe[]>([]);
   /**
    * A cook left running, if there is one.
@@ -130,11 +134,14 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
     refresh();
   }, [refresh]);
   // Chef Payson's newest promoted recipe (best-effort; absent if none/offline).
-  useEffect(() => {
-    fetchChefLatest(1)
-      .then((list) => setChefPick(list[0] ?? null))
+  const loadChefPick = useCallback(() => {
+    fetchChefLatest(5)
+      .then((list) => setChefPick(list.find((r) => !isRecipeHidden(r.id)) ?? null))
       .catch(() => {});
   }, []);
+  useEffect(() => {
+    loadChefPick();
+  }, [loadChefPick, blockVersion]);
 
   const feedItems = useMemo<FeedRecipe[]>(() => {
     const savedItems: FeedRecipe[] = saved.map((r) => ({ kind: "saved", recipe: r, favorite: !!r.favorite }));
@@ -146,7 +153,7 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
         .map((c) => ({ kind: "catalog", id: c.id, recipe: c, favorite: true }));
       return [...savedFavs, ...catFavs];
     }
-    const catItems: FeedRecipe[] = catalog.map((c) => ({ kind: "catalog", id: c.id, recipe: c, favorite: favs.has(c.id) }));
+    const catItems: FeedRecipe[] = catalog.filter((c) => !isRecipeHidden(c.id)).map((c) => ({ kind: "catalog", id: c.id, recipe: c, favorite: favs.has(c.id) }));
     return [...savedItems, ...catItems];
   }, [source, catalog, saved, favs]);
 
@@ -271,6 +278,11 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
           inLibrary={inLibrary}
           onCook={onCook}
           onBack={() => setSelected(null)}
+          onAuthorBlocked={() => {
+            setSelected(null);
+            setChefPick(null);
+            loadChefPick();
+          }}
           onToggleFavorite={() => onToggleFavorite(resolvedSelected)}
           onSaveToLibrary={() => onSaveToLibrary(resolvedSelected)}
           onMade={() => onMade(resolvedSelected)}
@@ -333,6 +345,7 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
       )}
 
       {browsing && chefPick && (
+        <div className="chef-promo-wrap">
         <button
           className="chef-promo"
           onClick={() =>
@@ -354,6 +367,16 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
           <span className="chef-promo-title">{chefPick.title}</span>
           {chefPick.summary && <span className="chef-promo-sub">{chefPick.summary}</span>}
         </button>
+        {!chefPick.mine && (
+          <SafetyActions
+            recipeId={chefPick.id}
+            onBlocked={() => {
+              setChefPick(null);
+              loadChefPick();
+            }}
+          />
+        )}
+        </div>
       )}
 
       {/* One slim control bar: search + add. The category rail sits under it. */}

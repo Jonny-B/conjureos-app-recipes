@@ -1050,7 +1050,7 @@
     "dev": "conj-pack dev",
     "build": "npx -y tsx scripts/build-bundle.mjs",
     "typecheck": "tsc -b --noEmit",
-    "test": "npx -y tsx scripts/theme.test.ts && npx -y tsx scripts/catalog.test.ts && npx -y tsx scripts/pack-pin.test.ts && npx -y tsx scripts/app-type.test.ts",
+    "test": "npx -y tsx scripts/theme.test.ts && npx -y tsx scripts/catalog.test.ts && npx -y tsx scripts/pack-pin.test.ts && npx -y tsx scripts/app-type.test.ts && npx -y tsx scripts/ugc.test.ts",
     "check:pack-pin": "npx -y tsx scripts/pack-pin.ts"
   },
   "dependencies": {
