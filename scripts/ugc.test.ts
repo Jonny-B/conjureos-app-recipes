@@ -22,7 +22,8 @@ import {
   unblockAuthor,
   updateRecipe,
 } from "../src/bridge/recipesApi";
-import { FieldLine } from "../src/components/RecipeEditor";
+import { FieldLine, revealRefusal } from "../src/components/RecipeEditor";
+import { canActOnAuthor } from "../src/components/SafetyActions";
 import { hideRecipe, isRecipeHidden } from "../src/features/blockedAuthors";
 
 let failures = 0;
@@ -127,9 +128,39 @@ async function main(): Promise<void> {
   ok(calls.length === 1 && calls[0]!.action === "chefFeed" && plainFetches === 0, "chefFeed goes through invoke so the token is sent");
   respond = () => remoteError(404, '{"error":"not_found"}');
   ok((await fetchShared("tok")) === null && plainFetches === 0, "getShared 404 through invoke reads as not found");
-  respond = () => remoteError(500, "down");
+  respond = () => remoteError(401, "not signed in");
   await fetchChefLatest(5);
-  ok(plainFetches === 1, "chefFeed falls back to the plain read when invoke fails");
+  ok(plainFetches === 1, "chefFeed falls back to the plain read when the person is signed out");
+  respond = () => remoteError(500, "down");
+  let feedThrew = false;
+  try {
+    await fetchChefLatest(5);
+  } catch {
+    feedThrew = true;
+  }
+  ok(feedThrew && plainFetches === 1, "chefFeed fails closed on a server error, never the unfiltered read");
+  let sharedThrew = false;
+  try {
+    await fetchShared("tok");
+  } catch {
+    sharedThrew = true;
+  }
+  ok(sharedThrew && plainFetches === 1, "getShared fails closed on a server error, never the unfiltered read");
+  respond = () => remoteError(401, "not signed in");
+  await fetchShared("tok");
+  ok(plainFetches === 2, "getShared falls back to the plain read when signed out");
+
+  // ── Report and Block are for someone else's recipe ────────────────
+  ok(canActOnAuthor({ mine: false }, false), "a plain reader may report and block");
+  ok(!canActOnAuthor({ mine: true }, false), "never on a recipe the server marks as yours");
+  ok(!canActOnAuthor({ mine: false }, true), "a chef or admin may be the author, and the read cannot say, so no buttons");
+
+  // ── a refusal is brought into view ────────────────────────────────
+  let scrolled = 0;
+  const el = { scrollIntoView: () => void scrolled++ };
+  revealRefusal({ querySelector: (q: string) => (q === ".field-refusal" ? el : null) } as never);
+  ok(scrolled === 1, "the field line is scrolled into view");
+  revealRefusal({ querySelector: () => null } as never);
 
   // ── Report sheet ──────────────────────────────────────────────────
   ok(REPORT_CATEGORIES.map((c) => c.id).join() === "copyright_dmca,csam,malware,illegal,ip_other,harassment,hateful_sexual,other", "the eight categories recipes-db accepts");

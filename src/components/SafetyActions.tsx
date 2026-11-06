@@ -6,6 +6,16 @@ import { ReportSheet } from "./ReportSheet";
 import { Icon } from "../icons";
 
 /**
+ * Whether to offer Report and Block on a recipe. The chef feed, catalog and
+ * share reads are anonymous-shaped on the server, so `mine` is false on them
+ * even for the author; a chef or admin may be that author, so they get no
+ * buttons there rather than buttons the server will refuse.
+ */
+export function canActOnAuthor(recipe: { mine?: boolean }, viewerMayAuthor: boolean): boolean {
+  return !recipe.mine && !viewerMayAuthor;
+}
+
+/**
  * Report and Block for another person's public recipe. Both are 44px targets.
  * Blocking asks first, hides the recipe at once, and tells the screen so it can
  * re-read its feed (the server leaves a blocked author out of the next read).

@@ -11,6 +11,12 @@ import { refusalFrom, type RecipeRefusal } from "../features/refusal";
 /** Fields that have a place on this card to show their own refusal line. */
 const SLOT_FIELDS = new Set(["title", "summary", "category", "tags", "ingredients", "instructions", "blog", "imageUrl"]);
 
+/** Bring the first field refusal line into view, so a Save at the bottom of a long card shows why it did not go through. */
+export function revealRefusal(root: Pick<ParentNode, "querySelector"> | null | undefined): void {
+  const el = root?.querySelector(".field-refusal") as { scrollIntoView?: (o?: unknown) => void } | null | undefined;
+  el?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+}
+
 /** The refusal for one field, as a plain line right under it. Nothing when it names another field. */
 export function FieldLine({ refusal, fields }: { refusal: RecipeRefusal | null; fields: string[] }) {
   if (!refusal || !fields.includes(refusal.field)) return null;
@@ -89,6 +95,11 @@ export function RecipeEditor({
       setBusy(null);
     }
   };
+
+  // After the line renders, scroll to it (the Save button is far from the top fields).
+  useEffect(() => {
+    if (refusal && typeof document !== "undefined") revealRefusal(document);
+  }, [refusal]);
 
   const save = async () => {
     setError(null);

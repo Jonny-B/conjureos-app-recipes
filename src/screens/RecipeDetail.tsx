@@ -8,7 +8,7 @@ import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
 import { categoryOf } from "../features/recipeLook";
 import { RecipePlate } from "../components/RecipePlate";
 import { CHEF_NAME } from "./StudioScreen";
-import { SafetyActions } from "../components/SafetyActions";
+import { SafetyActions, canActOnAuthor } from "../components/SafetyActions";
 import { Icon } from "../icons";
 
 /**
@@ -47,6 +47,8 @@ interface Props {
   onDelete?: () => void; // saved only
   /** Admins can give ANY recipe (catalog included) an AI photo, or take a photo off. */
   isAdmin?: boolean;
+  /** Viewer is a chef or admin, who may be the author; no Report or Block then. */
+  mayAuthor?: boolean;
   /** The recipe's photo changed on the server; patch it into the screen's state. */
   onImageChanged?: (patch: { imageUrl?: string; imageAi?: boolean; imageCredit?: string }) => void;
 }
@@ -68,6 +70,7 @@ export function RecipeDetail({
   onMade,
   onDelete,
   isAdmin = false,
+  mayAuthor = false,
   onImageChanged,
 }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -286,7 +289,7 @@ export function RecipeDetail({
           {recipe.chefFeatured && <div className="chef-byline">By {CHEF_NAME}</div>}
           {/* Another person's published recipe: Report and Block. Never on
               your own, and a catalog recipe has no author to report. */}
-          {feed.kind === "catalog" && recipe.chefFeatured && !(recipe as { mine?: boolean }).mine && (
+          {feed.kind === "catalog" && recipe.chefFeatured && canActOnAuthor(recipe as { mine?: boolean }, mayAuthor) && (
             <SafetyActions recipeId={feed.id} onBlocked={() => (onAuthorBlocked ?? onBack)()} />
           )}
           {recipe.summary && <p className="recipe-cover-summary">{recipe.summary}</p>}

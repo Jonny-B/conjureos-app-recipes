@@ -53,6 +53,11 @@ const cjs = (): Bridge => (globalThis as { __conjureos?: Bridge }).__conjureos ?
 const apiUrl = (): string => cjs().env?.recipesApiUrl || DEV_RECIPES_URL;
 
 /** True when the per-user backend is reachable (we're inside ConjureOS). */
+/** The host refused the call because nobody is signed in (no identity token to send). */
+function isSignedOutError(msg: string): boolean {
+  return /HTTP 40[13]|not signed in|sign(ed)?[- ]?in/i.test(msg);
+}
+
 export function isBackendAvailable(): boolean {
   return typeof cjs().actions?.invoke === "function";
 }
@@ -297,14 +302,18 @@ export async function fetchCatalogFacets(): Promise<{
 
 export async function fetchShared(shareToken: string): Promise<CatalogRecipe | null> {
   // Signed in, the call carries the minted token, so a recipe by an author the
-  // caller blocked answers 404. Signed out, or if that path fails, the plain
-  // read still works and shows everything.
+  // caller blocked answers 404. Signed out, the plain read still works and
+  // shows everything; any other failure is thrown rather than read unfiltered.
   if (isBackendAvailable()) {
     try {
       const j = await invokeRaw<{ recipe?: DbRecipe }>("getShared", { shareToken });
       return j.recipe ? toCatalogRecipe(j.recipe) : null;
     } catch (e) {
-      if (/HTTP 404/.test(e instanceof Error ? e.message : String(e))) return null;
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/HTTP 404/.test(msg)) return null;
+      // Only a signed-out reader takes the plain read. Any other failure must
+      // not reopen the recipes of an author this person blocked.
+      if (!isSignedOutError(msg)) throw e;
     }
   }
   const res = await fetch(apiUrl(), {
@@ -466,8 +475,10 @@ export async function fetchChefLatest(limit = 12): Promise<CatalogRecipe[]> {
     try {
       const j = await invokeRaw<{ recipes?: DbRecipe[] }>("chefFeed", { limit });
       return (j.recipes ?? []).map(toCatalogRecipe);
-    } catch {
-      /* fall through to the plain read */
+    } catch (e) {
+      // Only a signed-out reader takes the plain read; any other failure must
+      // not bring back authors this person blocked.
+      if (!isSignedOutError(e instanceof Error ? e.message : String(e))) throw e;
     }
   }
   const res = await fetch(apiUrl(), {

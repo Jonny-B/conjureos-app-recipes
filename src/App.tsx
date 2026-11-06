@@ -173,6 +173,7 @@ export function App() {
               catalogVersion={catalogVersion}
               blockVersion={blockVersion}
               isAdmin={role === "admin"}
+              mayAuthor={role === "chef" || role === "admin"}
               cooking={cooking}
               onCatalogRetry={() =>
                 ensureCatalogLoaded(true)

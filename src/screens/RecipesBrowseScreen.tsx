@@ -14,7 +14,7 @@ import { RecipePlate } from "../components/RecipePlate";
 import { RecipeStats } from "../components/RecipeStats";
 import { categoryOf, keyIngredients, lookFor } from "../features/recipeLook";
 import { RecipeDetail } from "./RecipeDetail";
-import { SafetyActions } from "../components/SafetyActions";
+import { SafetyActions, canActOnAuthor } from "../components/SafetyActions";
 import { isRecipeHidden } from "../features/blockedAuthors";
 import { CreateScreen } from "./CreateScreen";
 import { SnapRecipeScreen } from "./SnapRecipeScreen";
@@ -39,6 +39,8 @@ interface Props {
   blockVersion?: number;
   /** Admin: may give any recipe an AI photo or remove its photo. */
   isAdmin?: boolean;
+  /** A chef or admin may be the author of a published recipe; the reads cannot say, so they get no Report or Block. */
+  mayAuthor?: boolean;
   /** True while the guided cook covers this screen; it re-reads when the cook closes. */
   cooking?: boolean;
   /** Retry a catalog load that failed (App owns the catalog and its version). */
@@ -65,7 +67,7 @@ function keyOf(fi: FeedRecipe): string {
   return fi.kind === "catalog" ? `c:${fi.id}` : `s:${fi.recipe.path}`;
 }
 
-export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVersion = 0, blockVersion = 0, isAdmin = false, cooking = false, onCatalogRetry }: Props) {
+export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVersion = 0, blockVersion = 0, isAdmin = false, mayAuthor = false, cooking = false, onCatalogRetry }: Props) {
   const [saved, setSaved] = useState<SavedRecipe[]>([]);
   /**
    * A cook left running, if there is one.
@@ -288,6 +290,7 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
           onMade={() => onMade(resolvedSelected)}
           onDelete={() => onDelete(resolvedSelected)}
           isAdmin={isAdmin}
+          mayAuthor={mayAuthor}
           onImageChanged={(patch) => {
             if (resolvedSelected.kind === "catalog") {
               patchCatalogRecipe(resolvedSelected.id, patch);
@@ -367,7 +370,7 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
           <span className="chef-promo-title">{chefPick.title}</span>
           {chefPick.summary && <span className="chef-promo-sub">{chefPick.summary}</span>}
         </button>
-        {!chefPick.mine && (
+        {canActOnAuthor(chefPick, mayAuthor) && (
           <SafetyActions
             recipeId={chefPick.id}
             onBlocked={() => {
