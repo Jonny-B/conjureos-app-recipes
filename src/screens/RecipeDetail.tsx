@@ -8,6 +8,7 @@ import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
 import { categoryOf } from "../features/recipeLook";
 import { RecipePlate } from "../components/RecipePlate";
 import { CHEF_NAME } from "./StudioScreen";
+import { SafetyActions, canActOnAuthor } from "../components/SafetyActions";
 import { Icon } from "../icons";
 
 /**
@@ -38,12 +39,16 @@ interface Props {
   /** Enter the guided cook for this recipe (savedRecipe set when it's in the library). */
   onCook: (recipe: Recipe, saved: SavedRecipe | null) => void;
   onBack: () => void;
+  /** The reader blocked this recipe's author; the screen should close and re-read its feed. */
+  onAuthorBlocked?: () => void;
   onToggleFavorite: () => void;
   onSaveToLibrary?: () => void; // catalog only
   onMade?: () => void; // saved only
   onDelete?: () => void; // saved only
   /** Admins can give ANY recipe (catalog included) an AI photo, or take a photo off. */
   isAdmin?: boolean;
+  /** Viewer is a chef or admin, who may be the author; no Report or Block then. */
+  mayAuthor?: boolean;
   /** The recipe's photo changed on the server; patch it into the screen's state. */
   onImageChanged?: (patch: { imageUrl?: string; imageAi?: boolean; imageCredit?: string }) => void;
 }
@@ -59,11 +64,13 @@ export function RecipeDetail({
   inLibrary,
   onCook,
   onBack,
+  onAuthorBlocked,
   onToggleFavorite,
   onSaveToLibrary,
   onMade,
   onDelete,
   isAdmin = false,
+  mayAuthor = false,
   onImageChanged,
 }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -280,6 +287,11 @@ export function RecipeDetail({
           </div>
           {recipe.nutrition && <div className="recipe-cover-nutrition">{formatStrip(recipe.nutrition)}</div>}
           {recipe.chefFeatured && <div className="chef-byline">By {CHEF_NAME}</div>}
+          {/* Another person's published recipe: Report and Block. Never on
+              your own, and a catalog recipe has no author to report. */}
+          {feed.kind === "catalog" && recipe.chefFeatured && canActOnAuthor(recipe as { mine?: boolean }, mayAuthor) && (
+            <SafetyActions recipeId={feed.id} onBlocked={() => (onAuthorBlocked ?? onBack)()} />
+          )}
           {recipe.summary && <p className="recipe-cover-summary">{recipe.summary}</p>}
 
           {/* Chef's blog: the story you scroll past on recipe sites — with a skip. */}

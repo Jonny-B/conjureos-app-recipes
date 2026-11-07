@@ -6,6 +6,26 @@ import { publishChefRecipe } from "../bridge/recipesApi";
 import { ImagePicker } from "./ImagePicker";
 import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
 import { Icon } from "../icons";
+import { refusalFrom, type RecipeRefusal } from "../features/refusal";
+
+/** Fields that have a place on this card to show their own refusal line. */
+const SLOT_FIELDS = new Set(["title", "summary", "category", "tags", "ingredients", "instructions", "blog", "imageUrl"]);
+
+/** Bring the first field refusal line into view, so a Save at the bottom of a long card shows why it did not go through. */
+export function revealRefusal(root: Pick<ParentNode, "querySelector"> | null | undefined): void {
+  const el = root?.querySelector(".field-refusal") as { scrollIntoView?: (o?: unknown) => void } | null | undefined;
+  el?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+}
+
+/** The refusal for one field, as a plain line right under it. Nothing when it names another field. */
+export function FieldLine({ refusal, fields }: { refusal: RecipeRefusal | null; fields: string[] }) {
+  if (!refusal || !fields.includes(refusal.field)) return null;
+  return (
+    <p className="field-refusal" role="alert">
+      {refusal.line}
+    </p>
+  );
+}
 
 /**
  * Editable recipe card with save. Seeded from one Recipe (from the
@@ -46,6 +66,9 @@ export function RecipeEditor({
   const [busy, setBusy] = useState<null | "tidying" | "saving">(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  // The server refused a field's text: the line shows beside that field, and
+  // everything the person typed stays where it is.
+  const [refusal, setRefusal] = useState<RecipeRefusal | null>(null);
   // True once the user hand-edits the recipe; shows the "Verify & tidy"
   // recommendation beside Save (never instead of it) and lets them re-save.
   const [dirty, setDirty] = useState(false);
@@ -53,6 +76,7 @@ export function RecipeEditor({
   // Apply a mutation to the working recipe and mark it hand-edited.
   const edit = (fn: (r: Recipe) => Recipe) => {
     setRecipe((prev) => fn(prev));
+    setRefusal(null);
     setDirty(true);
     setSaved(false);
   };
@@ -72,8 +96,14 @@ export function RecipeEditor({
     }
   };
 
+  // After the line renders, scroll to it (the Save button is far from the top fields).
+  useEffect(() => {
+    if (refusal && typeof document !== "undefined") revealRefusal(document);
+  }, [refusal]);
+
   const save = async () => {
     setError(null);
+    setRefusal(null);
     setBusy("saving");
     try {
       if (chefMode) {
@@ -85,7 +115,14 @@ export function RecipeEditor({
       setSaved(true);
       setDirty(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const r = refusalFrom(e);
+      if (r) {
+        setRefusal(r);
+        // A field with no place on this card still gets its line, in the banner.
+        if (!SLOT_FIELDS.has(r.field)) setError(r.line);
+      } else {
+        setError(e instanceof Error ? e.message : String(e));
+      }
     } finally {
       setBusy(null);
     }
@@ -112,9 +149,16 @@ export function RecipeEditor({
         chefMode={chefMode}
         editId={editId}
         blog={blog}
-        onBlogChange={setBlog}
+        onBlogChange={(v) => {
+          setRefusal(null);
+          setBlog(v);
+        }}
         image={image}
-        onImageChange={setImage}
+        onImageChange={(v) => {
+          setRefusal(null);
+          setImage(v);
+        }}
+        refusal={refusal}
       />
     </>
   );
@@ -136,6 +180,7 @@ interface PreviewProps {
   onBlogChange: (v: string) => void;
   image: string | undefined;
   onImageChange: (v: string | undefined) => void;
+  refusal: RecipeRefusal | null;
 }
 
 function EditablePreview({
@@ -154,6 +199,7 @@ function EditablePreview({
   onBlogChange,
   image,
   onImageChange,
+  refusal,
 }: PreviewProps) {
   // Edit mode is off by default: the recipe reads as a clean card until the
   // user clicks Edit, which reveals the inline editors, trash, and add
@@ -187,12 +233,15 @@ function EditablePreview({
           )}
         </h3>
       </div>
+      <FieldLine refusal={refusal} fields={["title"]} />
       <div>
         <span className={`pill ${recipe.difficulty}`}>{recipe.difficulty}</span>
         {recipe.cookTime > 0 && <span className="pill">{recipe.cookTime} min</span>}
         <span className="pill">{recipe.servings} serving{recipe.servings === 1 ? "" : "s"}</span>
       </div>
+      <FieldLine refusal={refusal} fields={["category", "tags"]} />
       {recipe.summary && <p className="summary">{recipe.summary}</p>}
+      <FieldLine refusal={refusal} fields={["summary"]} />
 
       {/* Photos are stored and round-tripped, but not surfaced — the app
           commits to a typographic treatment. See features/flags.ts. */}
@@ -209,6 +258,7 @@ function EditablePreview({
           }
         />
       )}
+      <FieldLine refusal={refusal} fields={["imageUrl"]} />
 
       <section>
         <h4>Ingredients</h4>
@@ -229,6 +279,7 @@ function EditablePreview({
         {editing && (
           <button className="add-line-btn" onClick={addIngredient}>+ Add ingredient</button>
         )}
+        <FieldLine refusal={refusal} fields={["ingredients"]} />
       </section>
 
       <section>
@@ -250,6 +301,7 @@ function EditablePreview({
         {editing && (
           <button className="add-line-btn" onClick={addInstruction}>+ Add step</button>
         )}
+        <FieldLine refusal={refusal} fields={["instructions"]} />
       </section>
 
       {chefMode && (
@@ -270,6 +322,7 @@ function EditablePreview({
             rows={8}
             maxLength={20000}
           />
+          <FieldLine refusal={refusal} fields={["blog"]} />
         </section>
       )}
 

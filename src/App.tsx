@@ -14,6 +14,7 @@ import { useSheetDialog } from "./hooks/useSheetDialog";
 import type { IconName } from "./icons";
 import { AppearanceSheet } from "./components/AppearanceSheet";
 import { TermsSheet } from "./components/TermsSheet";
+import { BlockedSheet } from "./components/BlockedSheet";
 import { Splash } from "./components/Splash";
 import { registerTermsOpener } from "./features/terms";
 import { APP_VERSION } from "./version";
@@ -85,6 +86,9 @@ export function App() {
   // Appearance lives behind the cog rather than on a tab: it is set once and
   // then almost never.
   const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [blockedOpen, setBlockedOpen] = useState(false);
+  // Bumped when the blocked list changes, so the library re-reads what it shows.
+  const [blockVersion, setBlockVersion] = useState(0);
   /**
    * The Recipes terms sheet. `resolve` is set when a save is waiting on the
    * answer (features/terms.ts's gate); unset when it was opened to read.
@@ -167,7 +171,9 @@ export function App() {
               onSourceChange={setRecipeSource}
               onCook={startCook}
               catalogVersion={catalogVersion}
+              blockVersion={blockVersion}
               isAdmin={role === "admin"}
+              mayAuthor={role === "chef" || role === "admin"}
               cooking={cooking}
               onCatalogRetry={() =>
                 ensureCatalogLoaded(true)
@@ -246,8 +252,13 @@ export function App() {
             setCogOpen(false);
             setTerms({});
           }}
+          onBlocked={() => {
+            setCogOpen(false);
+            setBlockedOpen(true);
+          }}
         />
       )}
+      {blockedOpen && <BlockedSheet onClose={() => setBlockedOpen(false)} onChanged={() => setBlockVersion((v) => v + 1)} />}
       {appearanceOpen && <AppearanceSheet onClose={() => setAppearanceOpen(false)} />}
       {terms && (
         <TermsSheet
@@ -263,7 +274,17 @@ export function App() {
 }
 
 /** The cog's menu: a modal sheet, with the keyboard behaviour of one. */
-function CogSheet({ onClose, onAppearance, onTerms }: { onClose: () => void; onAppearance: () => void; onTerms: () => void }) {
+function CogSheet({
+  onClose,
+  onAppearance,
+  onTerms,
+  onBlocked,
+}: {
+  onClose: () => void;
+  onAppearance: () => void;
+  onTerms: () => void;
+  onBlocked: () => void;
+}) {
   const dialog = useSheetDialog<HTMLDivElement>(onClose);
   return (
     <div className="sheet-overlay" onClick={onClose}>
@@ -281,6 +302,9 @@ function CogSheet({ onClose, onAppearance, onTerms }: { onClose: () => void; onA
         </button>
         <button className="sheet-item" onClick={onTerms}>
           <Icon name="circle-info" /> Recipe terms
+        </button>
+        <button className="sheet-item" onClick={onBlocked}>
+          <Icon name="xmark" /> Blocked authors
         </button>
         <button className="sheet-item sheet-cancel" onClick={onClose}>
           Close

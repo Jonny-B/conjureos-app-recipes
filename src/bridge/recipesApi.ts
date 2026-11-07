@@ -16,6 +16,8 @@
  */
 import type { CatalogRecipe, Difficulty, NutritionStrip, Recipe, SavedRecipe } from "../types";
 import { ensureTermsAccepted } from "../features/terms";
+import { blockErrorLine, refusalFrom, reportErrorLine } from "../features/refusal";
+import type { ReportCategory } from "../features/report";
 
 /** Dev project recipes-db, used when the host has not injected a URL (conj-pack dev). */
 const DEV_RECIPES_URL = "https://mqpvjlsywrptefgwuztn.supabase.co/functions/v1/recipes-db";
@@ -51,6 +53,11 @@ const cjs = (): Bridge => (globalThis as { __conjureos?: Bridge }).__conjureos ?
 const apiUrl = (): string => cjs().env?.recipesApiUrl || DEV_RECIPES_URL;
 
 /** True when the per-user backend is reachable (we're inside ConjureOS). */
+/** The host refused the call because nobody is signed in (no identity token to send). */
+function isSignedOutError(msg: string): boolean {
+  return /HTTP 40[13]|not signed in|sign(ed)?[- ]?in/i.test(msg);
+}
+
 export function isBackendAvailable(): boolean {
   return typeof cjs().actions?.invoke === "function";
 }
@@ -116,6 +123,7 @@ export function toCatalogRecipe(r: DbRecipe): CatalogRecipe {
     imageAi: !!r.imageAi,
     imageCredit: r.imageCredit ?? undefined,
     chefFeatured: r.chefFeatured,
+    mine: !!r.mine,
     tags: r.tags,
     sourceUrl: r.sourceUrl ?? "",
     tokens: r.tokens,
@@ -293,6 +301,21 @@ export async function fetchCatalogFacets(): Promise<{
 }
 
 export async function fetchShared(shareToken: string): Promise<CatalogRecipe | null> {
+  // Signed in, the call carries the minted token, so a recipe by an author the
+  // caller blocked answers 404. Signed out, the plain read still works and
+  // shows everything; any other failure is thrown rather than read unfiltered.
+  if (isBackendAvailable()) {
+    try {
+      const j = await invokeRaw<{ recipe?: DbRecipe }>("getShared", { shareToken });
+      return j.recipe ? toCatalogRecipe(j.recipe) : null;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/HTTP 404/.test(msg)) return null;
+      // Only a signed-out reader takes the plain read. Any other failure must
+      // not reopen the recipes of an author this person blocked.
+      if (!isSignedOutError(msg)) throw e;
+    }
+  }
   const res = await fetch(apiUrl(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -309,10 +332,15 @@ export async function fetchShared(shareToken: string): Promise<CatalogRecipe | n
 async function invoke(action: string, params: Record<string, unknown> = {}): Promise<{ recipes?: DbRecipe[]; recipe?: DbRecipe }> {
   const actions = cjs().actions;
   if (!actions?.invoke) throw new Error("Recipes backend is unavailable (open this inside ConjureOS).");
-  return (await actions.invoke(APP_PATH, REMOTE_ACTION, { action, ...params })) as {
-    recipes?: DbRecipe[];
-    recipe?: DbRecipe;
-  };
+  try {
+    return (await actions.invoke(APP_PATH, REMOTE_ACTION, { action, ...params })) as {
+      recipes?: DbRecipe[];
+      recipe?: DbRecipe;
+    };
+  } catch (e) {
+    // A 422 from the content filter becomes a RecipeRefusal that names its field.
+    throw refusalFrom(e) ?? e;
+  }
 }
 
 export async function listMine(): Promise<SavedRecipe[]> {
@@ -441,6 +469,18 @@ export async function publishChefRecipe(
  * the home promo and the Studio list reuse the existing catalog detail path.
  */
 export async function fetchChefLatest(limit = 12): Promise<CatalogRecipe[]> {
+  // Through invoke when signed in: the minted token is what lets the server
+  // leave out authors this person blocked. The plain read is the fallback.
+  if (isBackendAvailable()) {
+    try {
+      const j = await invokeRaw<{ recipes?: DbRecipe[] }>("chefFeed", { limit });
+      return (j.recipes ?? []).map(toCatalogRecipe);
+    } catch (e) {
+      // Only a signed-out reader takes the plain read; any other failure must
+      // not bring back authors this person blocked.
+      if (!isSignedOutError(e instanceof Error ? e.message : String(e))) throw e;
+    }
+  }
   const res = await fetch(apiUrl(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -449,6 +489,61 @@ export async function fetchChefLatest(limit = 12): Promise<CatalogRecipe[]> {
   if (!res.ok) throw new Error(`chefFeed ${res.status}`);
   const j = (await res.json()) as { recipes?: DbRecipe[] };
   return (j.recipes ?? []).map(toCatalogRecipe);
+}
+
+// ── report and block (safety actions: signed in, not behind the terms) ──
+
+/** Report another person's public recipe. Throws an Error whose message is a plain line. */
+export async function reportRecipe(recipeId: string, category: ReportCategory, details?: string): Promise<void> {
+  await sendReport("reportRecipe", recipeId, category, details);
+}
+
+/** Report the chef who wrote a recipe (the server resolves the author). */
+export async function reportChef(recipeId: string, category: ReportCategory, details?: string): Promise<void> {
+  await sendReport("reportChef", recipeId, category, details);
+}
+
+async function sendReport(action: string, recipeId: string, category: ReportCategory, details?: string): Promise<void> {
+  try {
+    await invokeRaw(action, { recipeId, category, ...(details?.trim() ? { details: details.trim() } : {}) });
+  } catch (e) {
+    throw new Error(reportErrorLine(e));
+  }
+}
+
+/** Block the author of a recipe. Idempotent. */
+export async function blockAuthor(recipeId: string): Promise<void> {
+  try {
+    await invokeRaw("blockAuthor", { recipeId });
+  } catch (e) {
+    throw new Error(blockErrorLine(e));
+  }
+}
+
+export async function unblockAuthor(userId: string): Promise<void> {
+  try {
+    await invokeRaw("unblockAuthor", { userId });
+  } catch (e) {
+    throw new Error(blockErrorLine(e));
+  }
+}
+
+export interface BlockedAuthor {
+  userId: string;
+  /** Their handle; null when they have none. */
+  username: string | null;
+}
+
+export async function listBlocked(): Promise<BlockedAuthor[]> {
+  const r = await invokeRaw<{ blocked?: BlockedAuthor[] }>("listBlocked");
+  return r.blocked ?? [];
+}
+
+/** Write a username (the backend checks it against the name filter). Throws a RecipeRefusal on a hit. */
+export async function setUsername(username: string): Promise<string> {
+  await beforeContentWrite();
+  const r = await invokeRaw<{ username?: string }>("setUsername", { username });
+  return r.username ?? username;
 }
 
 // ── image upload ──────────────────────────────────────────────────────────
@@ -499,7 +594,11 @@ export interface AppUser {
 async function invokeRaw<T>(action: string, params: Record<string, unknown> = {}): Promise<T> {
   const actions = cjs().actions;
   if (!actions?.invoke) throw new Error("Recipes backend is unavailable (open this inside ConjureOS).");
-  return (await actions.invoke(APP_PATH, REMOTE_ACTION, { action, ...params })) as T;
+  try {
+    return (await actions.invoke(APP_PATH, REMOTE_ACTION, { action, ...params })) as T;
+  } catch (e) {
+    throw refusalFrom(e) ?? e;
+  }
 }
 
 /**

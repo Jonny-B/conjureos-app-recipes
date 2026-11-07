@@ -6,6 +6,7 @@ import { SnapRecipeScreen } from "./SnapRecipeScreen";
 import { RecipeEditor } from "../components/RecipeEditor";
 import { RecipeRow } from "../components/RecipeRow";
 import { Icon } from "../icons";
+import { isRecipeHidden } from "../features/blockedAuthors";
 
 export const CHEF_NAME = "Chef Payson";
 
@@ -27,7 +28,7 @@ export function StudioScreen() {
 
   const refresh = useCallback(() => {
     fetchChefLatest(50)
-      .then(setPosts)
+      .then((l) => setPosts(l.filter((r) => !isRecipeHidden(r.id))))
       .catch(() => setPosts([]));
   }, []);
 
