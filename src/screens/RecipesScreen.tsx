@@ -9,6 +9,7 @@ import {
 } from "../features/nutrition";
 import { scaleRecipe } from "../features/scaling";
 import { Icon } from "../icons";
+import { plainError } from "../features/plainError";
 
 interface Props {
   recipes: Recipe[];
@@ -158,7 +159,7 @@ export function RecipesScreen({ recipes, onRestart, onCook }: Props) {
       // rate-limited or empty does not, and must not delay or block the save.
       if (!strip && cardState?.kind === "pending") void backfillNutrition(idx, saved);
     } catch (err) {
-      setSaveErr(err instanceof Error ? err.message : String(err));
+      setSaveErr(plainError(err));
     } finally {
       setSavingIdx(null);
     }

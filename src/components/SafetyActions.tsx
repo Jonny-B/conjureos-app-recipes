@@ -4,6 +4,7 @@ import { hideRecipe } from "../features/blockedAuthors";
 import { useSheetDialog } from "../hooks/useSheetDialog";
 import { ReportSheet } from "./ReportSheet";
 import { Icon } from "../icons";
+import { plainError } from "../features/plainError";
 
 /**
  * Whether to offer Report and Block on a recipe. The chef feed, catalog and
@@ -60,7 +61,7 @@ function BlockConfirm({ recipeId, onClose, onBlocked }: { recipeId: string; onCl
       await blockAuthor(recipeId);
       onBlocked();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(plainError(e));
       setBusy(false);
     }
   };

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { withoutSavedTwins } from "../features/feedMerge";
 import type { CatalogRecipe, FeedRecipe, Recipe, RecipeSource, SavedRecipe } from "../types";
 import { getCatalog, categories, toRecipe, loadRecipeBody, withRecipeBody, patchCatalogRecipe, isCatalogLoaded, isCatalogLoading } from "../features/catalog";
 import {
@@ -155,7 +156,7 @@ export function RecipesBrowseScreen({ source, onSourceChange, onCook, catalogVer
         .map((c) => ({ kind: "catalog", id: c.id, recipe: c, favorite: true }));
       return [...savedFavs, ...catFavs];
     }
-    const catItems: FeedRecipe[] = catalog.filter((c) => !isRecipeHidden(c.id)).map((c) => ({ kind: "catalog", id: c.id, recipe: c, favorite: favs.has(c.id) }));
+    const catItems: FeedRecipe[] = withoutSavedTwins(catalog, saved).filter((c) => !isRecipeHidden(c.id)).map((c) => ({ kind: "catalog", id: c.id, recipe: c, favorite: favs.has(c.id) }));
     return [...savedItems, ...catItems];
   }, [source, catalog, saved, favs]);
 

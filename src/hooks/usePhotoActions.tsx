@@ -11,6 +11,7 @@ import {
   photoFromUrl,
 } from "../features/aiPhoto";
 import { ensureTermsAccepted } from "../features/terms";
+import { plainError } from "../features/plainError";
 
 /**
  * The three ways a recipe gets its photo, in one place, so every surface
@@ -37,6 +38,17 @@ export interface PhotoSubject {
   category?: string | null;
 }
 
+/** The price beside an AI photo action: the one wording everywhere it is offered. */
+export function costLabel(cost: number | null, ceiling: boolean): string | null {
+  if (cost === null) return null;
+  return `${ceiling ? "up to " : ""}${cost} credits`;
+}
+
+export function costTag(cost: number | null, ceiling: boolean) {
+  const label = costLabel(cost, ceiling);
+  return label ? <span className="ai-cost"> · {label}</span> : null;
+}
+
 export function usePhotoActions({
   subject,
   apply,
@@ -60,7 +72,7 @@ export function usePhotoActions({
     if (canEnhance) void aiPhotoCost("image.edit").then(setEnhanceCost);
   }, [canGenerate, canEnhance]);
 
-  const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
+  const fail = (e: unknown) => setError(plainError(e));
 
   /** Terms before any busy state, so nothing looks started before "I accept". */
   const termsFirst = async (): Promise<boolean> => {

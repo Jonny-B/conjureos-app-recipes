@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { FeedRecipe, Recipe, SavedRecipe } from "../types";
 import { formatStrip } from "../features/nutrition";
 import { safeHref, hrefHost } from "../features/safeUrl";
-import { photoBusyText, usePhotoActions } from "../hooks/usePhotoActions";
+import { costTag, photoBusyText, usePhotoActions } from "../hooks/usePhotoActions";
 import { adminRemoveRecipeImage, adminSetRecipeImage, recipeIdFromPath, setOwnRecipeImage } from "../bridge/recipesApi";
 import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
 import { categoryOf } from "../features/recipeLook";
@@ -172,7 +172,7 @@ export function RecipeDetail({
               )}
               {canEditPhoto && photo.canEnhance && (
                 <button className="overflow-item" onClick={menuThen(() => void photo.uploadAndEnhance())} disabled={!!photoBusy}>
-                  <Icon name="wand" /> Upload &amp; enhance with AI
+                  <Icon name="wand" /> Upload &amp; enhance with AI{costTag(photo.enhanceCost, true)}
                 </button>
               )}
               {canEditPhoto && photo.canEnhance && recipe.imageUrl && !recipe.imageAi && (
@@ -181,12 +181,12 @@ export function RecipeDetail({
                   onClick={menuThen(() => void photo.enhanceExisting(recipe.imageUrl!))}
                   disabled={!!photoBusy}
                 >
-                  <Icon name="wand" /> Enhance this photo with AI
+                  <Icon name="wand" /> Enhance this photo with AI{costTag(photo.enhanceCost, true)}
                 </button>
               )}
               {canEditPhoto && photo.canGenerate && (
                 <button className="overflow-item" onClick={menuThen(() => void photo.generate())} disabled={!!photoBusy}>
-                  <Icon name="wand" /> {recipe.imageUrl ? "New AI photo" : "Generate AI photo"}
+                  <Icon name="wand" /> {recipe.imageUrl ? "New AI photo" : "Generate AI photo"}{costTag(photo.generateCost, false)}
                 </button>
               )}
               {canEditPhoto && photo.original && (
@@ -350,7 +350,6 @@ export function RecipeDetail({
                 </a>
               </div>
             )}
-            {feed.kind === "saved" && <div className="recipe-cover-source">{feed.recipe.path}</div>}
           </footer>
         </div>
       </article>

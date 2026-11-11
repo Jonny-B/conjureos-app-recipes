@@ -12,6 +12,7 @@ import {
   loadCookSession,
   saveCookSession,
 } from "../features/cookSession";
+import { plainError } from "../features/plainError";
 
 interface Props {
   recipe: Recipe;
@@ -101,7 +102,7 @@ export function GuidedCook({ recipe, saved, savedPath = null, onBack, onMade, on
       hasWritten.current = false;
       setMadeDone(true);
     } catch (e) {
-      setSaveError(e instanceof Error ? e.message : String(e));
+      setSaveError(plainError(e));
     } finally {
       setSaving(false);
     }
@@ -275,7 +276,7 @@ export function GuidedCook({ recipe, saved, savedPath = null, onBack, onMade, on
                   await onUnmade();
                   setUndone(true);
                 } catch (e) {
-                  setSaveError(e instanceof Error ? e.message : String(e));
+                  setSaveError(plainError(e));
                 } finally {
                   setUndoing(false);
                 }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useSheetDialog } from "../hooks/useSheetDialog";
 import { acceptTerms } from "../bridge/recipesApi";
 import { TERMS_BODY, TERMS_TITLE, TERMS_VERSION, hasAcceptedCurrentTerms, setAcceptedTermsVersion } from "../features/terms";
+import { plainError } from "../features/plainError";
 
 /**
  * The Recipes terms for your content. Two uses: asked for (the first time you
@@ -22,7 +23,7 @@ export function TermsSheet({ onClose, asking }: { onClose: (accepted: boolean) =
       setAcceptedTermsVersion(TERMS_VERSION);
       onClose(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(plainError(e));
     } finally {
       setBusy(false);
     }

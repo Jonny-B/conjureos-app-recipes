@@ -4,6 +4,7 @@ import { extractRecipeFromPhotos } from "../features/customRecipe";
 import { CaptureScreen } from "./CaptureScreen";
 import { RecipeEditor } from "../components/RecipeEditor";
 import { Icon } from "../icons";
+import { plainError } from "../features/plainError";
 
 /**
  * Snap a recipe: photograph an existing recipe (a card, cookbook page,
@@ -47,7 +48,7 @@ export function SnapRecipeScreen({
       setLastPhotos([]);
       setStage("editing");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(plainError(e));
       setStage("capture");
     } finally {
       aiInFlight.current = false;

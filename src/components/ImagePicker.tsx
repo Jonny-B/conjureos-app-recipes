@@ -1,5 +1,5 @@
 import type { Recipe } from "../types";
-import { photoBusyText, usePhotoActions } from "../hooks/usePhotoActions";
+import { costTag, photoBusyText, usePhotoActions } from "../hooks/usePhotoActions";
 import { Icon } from "../icons";
 
 /**
@@ -38,14 +38,14 @@ export function ImagePicker({
   const enhanceButton = (label: string, onClick: () => void) => (
     <button className="btn secondary" onClick={onClick} disabled={busy} type="button">
       <Icon name="wand" /> {label}
-      {photo.enhanceCost !== null && <span className="ai-cost"> · up to {photo.enhanceCost} credits</span>}
+      {costTag(photo.enhanceCost, true)}
     </button>
   );
   const generateButton = (label: string) =>
     canGenerate && (
       <button className="btn secondary" onClick={() => void photo.generate()} disabled={busy} type="button">
         <Icon name="wand" /> {label}
-        {photo.generateCost !== null && <span className="ai-cost"> · {photo.generateCost} credits</span>}
+        {costTag(photo.generateCost, false)}
       </button>
     );
 

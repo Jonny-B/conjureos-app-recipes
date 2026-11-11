@@ -16,6 +16,7 @@ import type { Recipe, SavedRecipe } from "../types";
 import { generateFromDescription } from "../features/recipes";
 import { RecipesScreen } from "./RecipesScreen";
 import { Icon } from "../icons";
+import { plainError } from "../features/plainError";
 
 export function DescribeScreen({
   onBack,
@@ -42,7 +43,7 @@ export function DescribeScreen({
       const recipes = await generateFromDescription(text);
       setState({ kind: "recipes", recipes });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(plainError(e));
       setState({ kind: "input" });
     } finally {
       setBusy(false);

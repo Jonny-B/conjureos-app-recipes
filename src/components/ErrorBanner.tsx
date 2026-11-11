@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { Icon } from "../icons";
+import { plainError } from "../features/plainError";
 
 /**
  * The app's one way of telling a user a thing they asked for did not happen.
@@ -17,8 +18,7 @@ import { Icon } from "../icons";
  * already own their handlers, and the smallest change that fixes every call
  * site is one `run()` around the body and one banner in the tree.
  */
-export const errText = (e: unknown): string =>
-  e instanceof Error && e.message ? e.message : String(e ?? "Something went wrong.");
+export const errText = (e: unknown): string => plainError(e);
 
 export function useActionError(): {
   error: string | null;

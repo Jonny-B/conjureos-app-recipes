@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { listBlocked, unblockAuthor, type BlockedAuthor } from "../bridge/recipesApi";
 import { clearHiddenRecipes } from "../features/blockedAuthors";
 import { useSheetDialog } from "../hooks/useSheetDialog";
+import { plainError } from "../features/plainError";
 
 /** Settings: the authors you blocked, each with Unblock. */
 export function BlockedSheet({ onClose, onChanged }: { onClose: () => void; onChanged?: () => void }) {
@@ -35,7 +36,7 @@ export function BlockedSheet({ onClose, onChanged }: { onClose: () => void; onCh
       clearHiddenRecipes();
       onChanged?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(plainError(e));
     } finally {
       setBusyId(null);
     }
