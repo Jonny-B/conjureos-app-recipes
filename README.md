@@ -149,7 +149,7 @@ Bump `version` in **both** `package.json` and `src/version.ts` together (the in-
 There is no manual ZIP-import step. CI builds this source with ConjureOS `@bundle` and publishes a new store version:
 
 - **Dev:** Actions → "Publish to ConjureOS App Store" → Run workflow (`workflow_dispatch`).
-- **Prod:** publish a GitHub Release (the release notes become the changelog).
+- **Prod:** publish a GitHub Release (the release notes become the changelog), or Run workflow from `main` with target `prod` (the changelog input becomes the changelog).
 
 Installed users see the new version as an update. Full mechanics, secrets, and the one-time bootstrap are in [`ANCHOR_APP_CI_SETUP.md`](https://github.com/Jonny-B/ConjureOS/blob/dev/ANCHOR_APP_CI_SETUP.md) in the ConjureOS repo. Author + repository fields from `package.json` surface on the installed app's manifest.
 
