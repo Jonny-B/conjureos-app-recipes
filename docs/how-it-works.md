@@ -388,7 +388,8 @@ it happens in CI. There is no ZIP import step and no second build target.
 | Command / trigger | Output | Target |
 |---|---|---|
 | `npm run build` | `dist/recipes.html`, one self-contained HTML file | What you inspect locally; the same `bundle()` CI runs. |
-| Actions → "Publish to ConjureOS App Store" → Run workflow (`workflow_dispatch`) | A new store version, slug `recipes` | The **dev** project (`dev.conjureos.pages.dev`). |
+| Actions → "Publish to ConjureOS App Store" → Run workflow (`workflow_dispatch`), target `dev` (the default) | A new store version, slug `recipes` | The **dev** project (`dev.conjureos.pages.dev`). |
+| The same, run from `main` with target `prod` | A new store version; the changelog input becomes the changelog | The **prod** project, like a Release. |
 | Publish a GitHub Release | A new store version, slug `recipes`; the release notes become the changelog | The **prod** project. Ships to real users. |
 
 The workflow (`.github/workflows/publish-store.yml`) checks ConjureOS out

@@ -339,6 +339,7 @@ hairlines alone read as a 2001 directory listing:
 
 ## Publishing
 
-Dev: Actions, "Publish to ConjureOS App Store", Run workflow (workflow_dispatch).
-Prod: publish a GitHub Release. See `README.md` and ConjureOS
-`ANCHOR_APP_CI_SETUP.md`.
+Dev: Actions, "Publish to ConjureOS App Store", Run workflow (target `dev`, the
+default). Prod: publish a GitHub Release, or Run workflow from `main` with target
+`prod` (the choice Conjure Health and Fitness have). See `README.md` and
+ConjureOS `ANCHOR_APP_CI_SETUP.md`.
