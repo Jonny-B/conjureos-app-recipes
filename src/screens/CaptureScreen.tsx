@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type DragEvent, type ChangeEvent } from "r
 import { preparePhoto, formatBytes } from "../features/capture";
 import { Icon } from "../icons";
 import type { CapturedPhoto } from "../types";
+import { plainError } from "../features/plainError";
 
 /**
  * True on touch devices (phones/tablets): a coarse pointer. We use this to
@@ -101,7 +102,7 @@ export function CaptureScreen({ onIdentify, initialPhotos, title, emptyHint, mor
           // Skip the bad file but keep going on the others; surface the
           // first failure if everything blew up.
           if (prepared.length === 0 && !err) {
-            setErr(e instanceof Error ? e.message : String(e));
+            setErr(plainError(e));
           }
         }
       }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useSheetDialog } from "../hooks/useSheetDialog";
 import { reportChef, reportRecipe } from "../bridge/recipesApi";
 import { REPORT_CATEGORIES, REPORT_DETAILS_MAX, type ReportCategory } from "../features/report";
+import { plainError } from "../features/plainError";
 
 /**
  * Report another person's public recipe, or the chef who wrote it. The reasons
@@ -34,7 +35,7 @@ export function ReportSheet({
       await (target === "chef" ? reportChef : reportRecipe)(recipeId, category, details);
       setDone(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(plainError(e));
     } finally {
       setBusy(false);
     }

@@ -3,6 +3,7 @@ import type { Recipe } from "../types";
 import { structureRecipe } from "../features/customRecipe";
 import { RecipeEditor } from "../components/RecipeEditor";
 import { Icon } from "../icons";
+import { plainError } from "../features/plainError";
 
 /**
  * Create-your-own flow. The user types or pastes a recipe in free text; the
@@ -38,7 +39,7 @@ export function CreateScreen({
       setRecipe(r);
       setNonce((n) => n + 1);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(plainError(e));
     } finally {
       setBusy(false);
     }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Recipe } from "../types";
 import { complete, type ChatMessage } from "../bridge/ai";
 import { Icon } from "../icons";
+import { plainError } from "../features/plainError";
 
 /**
  * "Ask the chef" — an unobtrusive AI cooking assistant for the guided cook.
@@ -55,7 +56,7 @@ export function ChefChat({ recipe, open, onClose }: { recipe: Recipe; open: bool
       });
       setMessages((m) => [...m, { role: "assistant", content: reply.trim() }]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(plainError(e));
     } finally {
       setBusy(false);
     }

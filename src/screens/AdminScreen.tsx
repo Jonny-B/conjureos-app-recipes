@@ -14,9 +14,10 @@ import {
   type ModRecipe,
 } from "../bridge/recipesApi";
 import { Dropdown, type DropdownOption } from "../components/Dropdown";
-import { photoBusyText, usePhotoActions } from "../hooks/usePhotoActions";
+import { costTag, photoBusyText, usePhotoActions } from "../hooks/usePhotoActions";
 import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
 import { Icon } from "../icons";
+import { plainError } from "../features/plainError";
 
 const ROLE_OPTIONS: DropdownOption<AppRole>[] = [
   { value: "user", label: "User" },
@@ -103,7 +104,7 @@ function UsersView({ myEmail, onViewRecipes }: { myEmail: string | null; onViewR
       setTotal(r.total);
       setError(null);
     } catch (e) {
-      if (mine === seq.current) setError(e instanceof Error ? e.message : String(e));
+      if (mine === seq.current) setError(plainError(e));
     }
   }, []);
 
@@ -132,7 +133,7 @@ function UsersView({ myEmail, onViewRecipes }: { myEmail: string | null; onViewR
     try {
       await fn();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(plainError(e));
     } finally {
       setBusy(null);
     }
@@ -441,7 +442,7 @@ function RecipesView({ userFilter, onClearUser }: { userFilter: AppUser | null; 
         setTotal(r.total);
         setError(null);
       } catch (e) {
-        if (mine === seq.current) setError(e instanceof Error ? e.message : String(e));
+        if (mine === seq.current) setError(plainError(e));
       }
     },
     [query, userFilter, onlyAi],
@@ -458,7 +459,7 @@ function RecipesView({ userFilter, onClearUser }: { userFilter: AppUser | null; 
     try {
       await fn();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(plainError(e));
     } finally {
       setBusy(null);
     }
@@ -614,12 +615,12 @@ function AdminPhotoActions({
           onClick={() => void (r.imageUrl && !r.imageAi ? photo.enhanceExisting(r.imageUrl) : photo.uploadAndEnhance())}
           title={r.imageUrl && !r.imageAi ? "Enhance the current photo" : "Upload a photo and enhance it"}
         >
-          <Icon name="wand" /> {r.imageUrl && !r.imageAi ? "Enhance" : "Upload & enhance"}
+          <Icon name="wand" /> {r.imageUrl && !r.imageAi ? "Enhance" : "Upload & enhance"}{costTag(photo.enhanceCost, true)}
         </button>
       )}
       {photo.canGenerate && (
         <button className="btn secondary" type="button" disabled={off} onClick={() => void photo.generate()}>
-          <Icon name="wand" /> AI photo
+          <Icon name="wand" /> AI photo{costTag(photo.generateCost, false)}
         </button>
       )}
       {photo.original && (

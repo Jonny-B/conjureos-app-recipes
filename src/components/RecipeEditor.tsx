@@ -7,6 +7,7 @@ import { ImagePicker } from "./ImagePicker";
 import { RECIPE_PHOTOS_ENABLED } from "../features/flags";
 import { Icon } from "../icons";
 import { refusalFrom, type RecipeRefusal } from "../features/refusal";
+import { plainError } from "../features/plainError";
 
 /** Fields that have a place on this card to show their own refusal line. */
 const SLOT_FIELDS = new Set(["title", "summary", "category", "tags", "ingredients", "instructions", "blog", "imageUrl"]);
@@ -90,7 +91,7 @@ export function RecipeEditor({
       setDirty(false);
       setSaved(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(plainError(e));
     } finally {
       setBusy(null);
     }
@@ -121,7 +122,7 @@ export function RecipeEditor({
         // A field with no place on this card still gets its line, in the banner.
         if (!SLOT_FIELDS.has(r.field)) setError(r.line);
       } else {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(plainError(e));
       }
     } finally {
       setBusy(null);
